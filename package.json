@@ -2,12 +2,13 @@
   "name": "SirgioBOT",
   "version": "1.0.0",
   "main": "index.js",
-
+  "type": "module",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
-    "discord.js": "^14.15.3",
-    "node-fetch": "^2.6.7"
+    "discord.js": "^14.11.0",
+    "node-fetch": "^3.3.1",
+    "cron": "^2.3.1"
   }
 }
