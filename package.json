@@ -1,0 +1,13 @@
+{
+  "name": "SirgioBOT",
+  "version": "1.0.0",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.15.3",
+    "node-fetch": "^2.6.7"
+  }
+}
