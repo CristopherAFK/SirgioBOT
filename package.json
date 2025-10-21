@@ -1,0 +1,17 @@
+{
+  "name": "sirgiobot",
+  "version": "1.0.0",
+  "description": "Bot de Discord con sistema de autoroles, bienvenida, automod y registro de staff.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.15.3",
+    "dotenv": "^16.4.5"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "license": "MIT"
+}
