@@ -772,13 +772,11 @@ client.on("messageDelete", async (message) => {
 // =========================
 client.login(process.env.TOKEN);
 
-// =========================
-// SERVER KEEP-ALIVE (para Render Free Plan)
-// =========================
+// Pequeño servidor para que Render detecte un puerto activo
 const express = require("express");
 const app = express();
 
-app.get("/", (req, res) => res.send("✅ SirgioBOT está en línea"));
+app.get("/", (req, res) => res.send("SirgioBOT is alive!"));
 app.listen(process.env.PORT || 3000, () => {
-  console.log("🌐 Servidor web iniciado para mantener activo el bot");
+  console.log("Servidor web activo para mantener vivo el bot.");
 });
