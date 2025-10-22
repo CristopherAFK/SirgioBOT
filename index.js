@@ -25,7 +25,7 @@ const ROLES_CHANNEL_ID = "1422713049957273621";       // Canal donde se publican
 const LOG_CHANNEL_ID = "1413243479412310037";         // Canal de logs
 const REGLAS_CHANNEL_ID = "1212998742505037864";      // Canal de reglas
 const GENERAL_CHANNEL_ID = "1422783198655545435";     // #general donde se manda bienvenida
-const MUTED_ROLE_ID = "ID_DEL_ROL_MUTED_AQUI";        // <- Si ya creaste el rol Muted, pon la ID aquí. Si queda vacío, el bot intentará crear/usar "Muted".
+const MUTED_ROLE_ID = "1430271610358726717";        // <- Si ya creaste el rol Muted, pon la ID aquí. Si queda vacío, el bot intentará crear/usar "Muted".
 
 // Banners (usados por el comando !Roles)
 const banners = {
@@ -767,12 +767,9 @@ client.on("messageDelete", async (message) => {
   await logChannel.send({ embeds: [embed] });
 });
 
-// =========================
-// LOGIN
-// =========================
-client.login(process.env.TOKEN);
-
-// Pequeño servidor para que Render detecte un puerto activo
+// =====================
+// Servidor para Render
+// =====================
 const express = require("express");
 const app = express();
 
@@ -780,3 +777,8 @@ app.get("/", (req, res) => res.send("SirgioBOT is alive!"));
 app.listen(process.env.PORT || 3000, () => {
   console.log("Servidor web activo para mantener vivo el bot.");
 });
+
+// =====================
+// LOGIN
+// =====================
+client.login(process.env.TOKEN);
