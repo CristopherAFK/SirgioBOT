@@ -611,7 +611,7 @@ client.on("messageCreate", async (message) => {
 let automodActivo = true;
 
 // Canal de logs del staff
-const staffLogChannelId = "1413243479412310037";
+const staffLogChannelId = "1327451046553063505";
 
 // IDs de roles del staff (para registrar su actividad)
 const staffRoles = [
