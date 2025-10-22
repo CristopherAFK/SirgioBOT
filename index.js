@@ -771,3 +771,14 @@ client.on("messageDelete", async (message) => {
 // LOGIN
 // =========================
 client.login(process.env.TOKEN);
+
+// =========================
+// SERVER KEEP-ALIVE (para Render Free Plan)
+// =========================
+const express = require("express");
+const app = express();
+
+app.get("/", (req, res) => res.send("✅ SirgioBOT está en línea"));
+app.listen(process.env.PORT || 3000, () => {
+  console.log("🌐 Servidor web iniciado para mantener activo el bot");
+});
