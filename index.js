@@ -780,13 +780,7 @@ app.listen(process.env.PORT || 3000, () => {
 // ===============================
 // SISTEMA DE TICKETS (CORREGIDO Y VALIDADO)
 // ===============================
-const { 
-  EmbedBuilder, 
-  ActionRowBuilder, 
-  StringSelectMenuBuilder, 
-  ButtonBuilder, 
-  ButtonStyle 
-} = require("discord.js");
+
 const fs = require("fs");
 
 // ID de la categoría donde se crearán los tickets
