@@ -777,6 +777,41 @@ app.get("/", (req, res) => res.send("SirgioBOT is alive!"));
 app.listen(process.env.PORT || 3000, () => {
   console.log("Servidor web activo para mantener vivo el bot.");
 });
+// ===============================
+// CONFIGURACIÓN DEL SISTEMA DE TICKETS
+// ===============================
+const fs = require("fs");
+
+const TICKET_CATEGORY_ID = "1228437209628020736"; // ID de la categoría de tickets
+const STAFF_ROLES_ALLOWED = [
+  "1229140504310972599", // Mod
+  "1212891335929897030"  // Admin
+];
+
+const TICKET_COUNT_FILE = "./ticketCount.json";
+
+// Función para leer el número actual de tickets
+function readTicketCount() {
+  try {
+    if (!fs.existsSync(TICKET_COUNT_FILE)) {
+      fs.writeFileSync(TICKET_COUNT_FILE, JSON.stringify({ count: 0 }));
+    }
+    const data = JSON.parse(fs.readFileSync(TICKET_COUNT_FILE, "utf8"));
+    return data.count || 0;
+  } catch (e) {
+    console.error("Error leyendo ticketCount.json:", e);
+    return 0;
+  }
+}
+
+// Función para escribir el nuevo número de tickets
+function writeTicketCount(newCount) {
+  try {
+    fs.writeFileSync(TICKET_COUNT_FILE, JSON.stringify({ count: newCount }));
+  } catch (e) {
+    console.error("Error escribiendo ticketCount.json:", e);
+  }
+}
 
 // permisos: solo staff
   const member = message.member;
