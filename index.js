@@ -780,75 +780,53 @@ app.listen(process.env.PORT || 3000, () => {
 // ===============================
 // CONFIGURACIÓN DEL SISTEMA DE TICKETS
 // ===============================
-const fs = require("fs");
+client.on("messageCreate", async (message) => {
+  if (message.author.bot) return;
 
-const TICKET_CATEGORY_ID = "1228437209628020736"; // ID de la categoría de tickets
-const STAFF_ROLES_ALLOWED = [
-  "1229140504310972599", // Mod
-  "1212891335929897030"  // Admin
-];
+  // === COMANDO: !Tickets ===
+  if (message.content.toLowerCase() === "!tickets") {
+    const STAFF_ROLES_ALLOWED = ["1229140504310972599", "1212891335929897030"];
+    const member = message.member;
 
-const TICKET_COUNT_FILE = "./ticketCount.json";
-
-// Función para leer el número actual de tickets
-function readTicketCount() {
-  try {
-    if (!fs.existsSync(TICKET_COUNT_FILE)) {
-      fs.writeFileSync(TICKET_COUNT_FILE, JSON.stringify({ count: 0 }));
+    // Solo staff puede usarlo
+    if (!member.roles.cache.some(r => STAFF_ROLES_ALLOWED.includes(r.id))) {
+      return message.reply("❌ No tienes permiso para usar este comando.");
     }
-    const data = JSON.parse(fs.readFileSync(TICKET_COUNT_FILE, "utf8"));
-    return data.count || 0;
-  } catch (e) {
-    console.error("Error leyendo ticketCount.json:", e);
-    return 0;
+
+    const iconUrl = "https://media.discordapp.net/attachments/1420914042251509990/1430698897927307347/79794618.png";
+    const greenColor = 0x00A86B;
+
+    const embed = new EmbedBuilder()
+      .setColor(greenColor)
+      .setAuthor({ name: "🎟️ Tickets", iconURL: iconUrl })
+      .setDescription(
+        "¿Tienes alguna duda respecto al servidor?\n" +
+        "¿Alguien te está molestando y deseas reportarlo?\n" +
+        "¿Deseas apelar una sanción injusta?\n\n" +
+        "En este canal podrás abrir un ticket para hablar directamente con el staff de Sirgio, quienes te ayudarán con los problemas o dudas que tengas. " +
+        "Simplemente elige una opción en el menú de abajo, indica el tipo de ayuda que necesitas y luego explica tu caso.\n\n" +
+        "⚠️ **Advertencia:** No abras tickets innecesarios ni los uses para bromear. El mal uso del sistema puede resultar en sanciones."
+      );
+
+    const menu = new StringSelectMenuBuilder()
+      .setCustomId("ticket_menu")
+      .setPlaceholder("🎫 Selecciona una categoría...")
+      .addOptions([
+        { label: "Discord Bots", value: "discord_bots", emoji: "🤖", description: "Problemas con bots" },
+        { label: "Reportar usuario", value: "report_user", emoji: "🚨", description: "Reportes a miembros" },
+        { label: "Streams", value: "streams", emoji: "🎥", description: "Soporte sobre streams" },
+        { label: "Lives", value: "lives", emoji: "🎬", description: "Soporte sobre lives" },
+        { label: "Dudas", value: "dudas", emoji: "❓", description: "Preguntas generales" },
+        { label: "Otros", value: "otros", emoji: "🟢", description: "Otros temas" }
+      ]);
+
+    const row = new ActionRowBuilder().addComponents(menu);
+
+    await message.channel.send({ embeds: [embed], components: [row] });
+    await message.reply("✅ Panel de tickets enviado correctamente.");
   }
-}
-
-// Función para escribir el nuevo número de tickets
-function writeTicketCount(newCount) {
-  try {
-    fs.writeFileSync(TICKET_COUNT_FILE, JSON.stringify({ count: newCount }));
-  } catch (e) {
-    console.error("Error escribiendo ticketCount.json:", e);
-  }
-}
-
-// permisos: solo staff
-  const member = message.member;
-  if (!member.roles.cache.some(r => STAFF_ROLES_ALLOWED.includes(r.id))) {
-    return message.reply({ content: "❌ No tienes permiso para usar este comando.", ephemeral: true }).catch(()=>{});
-  }
-
-  const iconUrl = "https://media.discordapp.net/attachments/1420914042251509990/1430698897927307347/79794618.png";
-  const greenColor = 0x00A86B;
-
-  const embed = new EmbedBuilder()
-    .setColor(greenColor)
-    .setAuthor({ name: "🎟️ Tickets", iconURL: iconUrl })
-    .setDescription(
-      "¿Tienes alguna duda respecto al servidor?\n" +
-      "¿Alguien te está molestando y deseas reportarlo?\n" +
-      "¿Deseas apelar una sanción injusta?\n\n" +
-      "En este canal podrás abrir un ticket para hablar directamente con el staff de Sirgio, quienes te ayudarán con los problemas o dudas que tengas. Simplemente elige una opción en el menú de abajo, indica el tipo de ayuda que necesitas y luego explica tu caso.\n\n" +
-      "⚠️ **Advertencia:** No abras tickets innecesarios ni los uses para bromear. El mal uso del sistema puede resultar en sanciones."
-    );
-
-  const menu = new StringSelectMenuBuilder()
-    .setCustomId("ticket_menu")
-    .setPlaceholder("🎫 Selecciona una categoría...")
-    .addOptions([
-      { label: "Discord Bots", value: "discord_bots", emoji: "🤖", description: "Problemas con bots" },
-      { label: "Reportar usuario", value: "report_user", emoji: "🚨", description: "Reportes a miembros" },
-      { label: "Streams", value: "streams", emoji: "🎥", description: "Soporte sobre streams" },
-      { label: "Lives", value: "lives", emoji: "🎬", description: "Soporte sobre lives" },
-      { label: "Dudas", value: "dudas", emoji: "❓", description: "Preguntas generales" },
-      { label: "Otros", value: "otros", emoji: "🟢", description: "Otros temas" }
-    ]);
-
-  const row = new ActionRowBuilder().addComponents(menu);
-  await message.channel.send({ embeds: [embed], components: [row] });
-  await message.reply({ content: "✅ Panel de tickets enviado.", ephemeral: true }).catch(()=>{});
 });
+
 
 // -------------------------
 // Manejo de interacciones: selección del menu y confirmación
