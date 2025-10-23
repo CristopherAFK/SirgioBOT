@@ -5,6 +5,9 @@
 require("dotenv").config();
 const fs = require("fs");
 const { Client, GatewayIntentBits, Partials, EmbedBuilder, PermissionsBitField } = require("discord.js");
+const ticketSystem = require('./sistemas/ticketsSystem.js');
+
+
 
 const client = new Client({
   intents: [
@@ -16,6 +19,9 @@ const client = new Client({
   ],
   partials: [Partials.Message, Partials.Reaction, Partials.User]
 });
+
+// Inicializar sistema de tickets
+ticketSystem(client);
 
 // =========================
 // CONFIG
@@ -777,6 +783,8 @@ app.get("/", (req, res) => res.send("SirgioBOT is alive!"));
 app.listen(process.env.PORT || 3000, () => {
   console.log("Servidor web activo para mantener vivo el bot.");
 });
+module.exports = { client };
+
 
 
 // =====================
