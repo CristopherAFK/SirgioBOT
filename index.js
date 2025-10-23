@@ -781,7 +781,6 @@ app.listen(process.env.PORT || 3000, () => {
 // SISTEMA DE TICKETS (CORREGIDO Y VALIDADO)
 // ===============================
 
-const fs = require("fs");
 
 // ID de la categoría donde se crearán los tickets
 const TICKET_CATEGORY_ID = "1228437209628020736";
