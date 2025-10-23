@@ -801,6 +801,38 @@ function readTicketCount() {
     return 0;
   }
 }
+// =========================
+// SISTEMA DE TICKETS
+// =========================
+
+const {
+  EmbedBuilder,
+  ActionRowBuilder,
+  StringSelectMenuBuilder, // ✅ agregado para evitar el ReferenceError
+  ButtonBuilder,
+  ButtonStyle
+} = require("discord.js"); // ✅ importa correctamente desde discord.js
+
+// const fs = require("fs"); ❌ elimina esta línea si ya está arriba en tu código
+
+// Aquí empieza el evento o comando de tickets
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isStringSelectMenu()) return;
+
+  // Ejemplo base (ajústalo si tu código tiene más lógica)
+  if (interaction.customId === "select_ticket") {
+    const value = interaction.values[0];
+
+    if (value === "support") {
+      const embed = new EmbedBuilder()
+        .setColor("Blue")
+        .setTitle("🎟️ Ticket de Soporte")
+        .setDescription("Tu ticket ha sido creado correctamente.");
+
+      await interaction.reply({ embeds: [embed], ephemeral: true });
+    }
+  }
+});
 
 function writeTicketCount(count) {
   fs.writeFileSync(TICKET_COUNT_FILE, JSON.stringify({ count }));
