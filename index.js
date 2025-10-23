@@ -778,6 +778,133 @@ app.listen(process.env.PORT || 3000, () => {
   console.log("Servidor web activo para mantener vivo el bot.");
 });
 
+// permisos: solo staff
+  const member = message.member;
+  if (!member.roles.cache.some(r => STAFF_ROLES_ALLOWED.includes(r.id))) {
+    return message.reply({ content: "❌ No tienes permiso para usar este comando.", ephemeral: true }).catch(()=>{});
+  }
+
+  const iconUrl = "https://media.discordapp.net/attachments/1420914042251509990/1430698897927307347/79794618.png";
+  const greenColor = 0x00A86B;
+
+  const embed = new EmbedBuilder()
+    .setColor(greenColor)
+    .setAuthor({ name: "🎟️ Tickets", iconURL: iconUrl })
+    .setDescription(
+      "¿Tienes alguna duda respecto al servidor?\n" +
+      "¿Alguien te está molestando y deseas reportarlo?\n" +
+      "¿Deseas apelar una sanción injusta?\n\n" +
+      "En este canal podrás abrir un ticket para hablar directamente con el staff de Sirgio, quienes te ayudarán con los problemas o dudas que tengas. Simplemente elige una opción en el menú de abajo, indica el tipo de ayuda que necesitas y luego explica tu caso.\n\n" +
+      "⚠️ **Advertencia:** No abras tickets innecesarios ni los uses para bromear. El mal uso del sistema puede resultar en sanciones."
+    );
+
+  const menu = new StringSelectMenuBuilder()
+    .setCustomId("ticket_menu")
+    .setPlaceholder("🎫 Selecciona una categoría...")
+    .addOptions([
+      { label: "Discord Bots", value: "discord_bots", emoji: "🤖", description: "Problemas con bots" },
+      { label: "Reportar usuario", value: "report_user", emoji: "🚨", description: "Reportes a miembros" },
+      { label: "Streams", value: "streams", emoji: "🎥", description: "Soporte sobre streams" },
+      { label: "Lives", value: "lives", emoji: "🎬", description: "Soporte sobre lives" },
+      { label: "Dudas", value: "dudas", emoji: "❓", description: "Preguntas generales" },
+      { label: "Otros", value: "otros", emoji: "🟢", description: "Otros temas" }
+    ]);
+
+  const row = new ActionRowBuilder().addComponents(menu);
+  await message.channel.send({ embeds: [embed], components: [row] });
+  await message.reply({ content: "✅ Panel de tickets enviado.", ephemeral: true }).catch(()=>{});
+});
+
+// -------------------------
+// Manejo de interacciones: selección del menu y confirmación
+// -------------------------
+client.on("interactionCreate", async (interaction) => {
+  try {
+    if (interaction.isStringSelectMenu() && interaction.customId === "ticket_menu") {
+      const choice = interaction.values[0];
+      const confirmRow = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId("confirm_ticket").setLabel("✅ Continuar").setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId("cancel_ticket").setLabel("❌ Cancelar").setStyle(ButtonStyle.Danger)
+      );
+
+      await interaction.reply({ content: `¿Estás seguro de que deseas abrir un ticket para **${choice.replace("_", " ")}**?`, components: [confirmRow], ephemeral: true });
+      return;
+    }
+
+    if (interaction.isButton()) {
+      if (interaction.customId === "cancel_ticket") {
+        return interaction.update({ content: "❌ Cancelado.", components: [] });
+      }
+
+      if (interaction.customId === "confirm_ticket") {
+        // crear ticket
+        const user = interaction.user;
+        let count = readTicketCount();
+        count++;
+        writeTicketCount(count);
+
+        const channel = await interaction.guild.channels.create({
+          name: `ticket-${user.username}-${count}`,
+          type: 0, // text channel
+          parent: TICKET_CATEGORY_ID,
+          permissionOverwrites: [
+            { id: interaction.guild.id, deny: ["ViewChannel"] },
+            { id: user.id, allow: ["ViewChannel", "SendMessages", "AttachFiles", "AddReactions"] },
+            // asignar permisos a los roles staff
+            { id: "1229140504310972599", allow: ["ViewChannel", "SendMessages", "ManageMessages"] },
+            { id: "1212891335929897030", allow: ["ViewChannel", "SendMessages", "ManageMessages"] }
+          ]
+        });
+
+        const embed = new EmbedBuilder()
+          .setColor(0x00A86B)
+          .setTitle(`🎟️ Ticket #${count}`)
+          .setDescription(`👋 Hola ${user}, gracias por contactar con el staff.\n\nPor favor describe tu problema o solicitud aquí. Un miembro del staff te atenderá pronto.`)
+          .setFooter({ text: "Sistema de Tickets — SirgioBOT" })
+          .setTimestamp();
+
+        await channel.send({ content: `<@${user.id}>`, embeds: [embed] });
+        return interaction.update({ content: `✅ Ticket creado: ${channel}`, components: [] });
+      }
+    }
+  } catch (err) {
+    console.error("Error en interactionCreate (tickets):", err);
+    if (interaction.replied === false && interaction.deferred === false) {
+      try { await interaction.reply({ content: "Ocurrió un error al procesar la interacción.", ephemeral: true }); } catch(e){}
+    }
+  }
+});
+
+// -------------------------
+// COMANDOS DE STAFF: cerrar y eliminar ticket (mensajes, solo roles permitidos)
+// Uso: !cerrarticket  -> envía mensaje y borra en 10s
+//      !eliminarticket -> elimina inmediatamente
+// -------------------------
+client.on("messageCreate", async (msg) => {
+  try {
+    if (msg.author.bot) return;
+    const content = msg.content.trim().toLowerCase();
+    if (!["!cerrarticket", "!eliminarticket"].includes(content)) return;
+
+    const member = msg.member;
+    if (!member) return;
+    if (!member.roles.cache.some(r => STAFF_ROLES_ALLOWED.includes(r.id))) return msg.reply("❌ No tienes permisos para esto.");
+
+    // Debe ser canal ticket
+    if (!msg.channel.name?.startsWith?.("ticket-")) return msg.reply("❌ Este comando solo funciona dentro de un ticket.");
+
+    if (content === "!cerrarticket") {
+      await msg.channel.send("🛑 Ticket cerrado. Este canal se eliminará en 10 segundos.");
+      setTimeout(() => msg.channel.delete().catch(()=>{}), 10000);
+    } else if (content === "!eliminarticket") {
+      await msg.channel.delete().catch(()=>{});
+    }
+  } catch (e) {
+    console.error("Error en comandos de ticket:", e);
+  }
+});
+
+
 // =====================
 // LOGIN
 // =====================
