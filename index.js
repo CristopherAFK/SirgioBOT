@@ -778,7 +778,7 @@ app.listen(process.env.PORT || 3000, () => {
   console.log("Servidor web activo para mantener vivo el bot.");
 });
 // ===============================
-// SISTEMA DE TICKETS (CORREGIDO)
+// SISTEMA DE TICKETS (CORREGIDO Y VALIDADO)
 // ===============================
 const { 
   EmbedBuilder, 
@@ -830,17 +830,13 @@ client.on("messageCreate", async (message) => {
     .setColor(0x00A86B)
     .setAuthor({ name: "🎟️ Sistema de Tickets", iconURL: iconUrl })
     .setDescription(
-      
+      "¿Tienes alguna duda respecto al servidor?\n" +
+      "¿Alguien te está molestando y deseas reportarlo?\n" +
+      "¿Deseas apelar una sanción injusta?\n\n" +
+      "En este canal podrás abrir un ticket para hablar directamente con el staff de Sirgio, quienes te ayudarán con los problemas o dudas que tengas. " +
+      "Simplemente elige una opción en el menú de abajo, indica el tipo de ayuda que necesitas y luego explica tu caso.\n\n" +
+      "⚠️ **Advertencia:** No abras tickets innecesarios ni los uses para bromear. El mal uso del sistema puede resultar en sanciones."
     );
-
-  const menu = new StringSelectMenuBuilder()
-    .setCustomId("ticket_menu")
-    .setPlaceholder("🎫 Selecciona una "¿Tienes alguna duda respecto al servidor?\n" + "¿Alguien te está molestando y deseas reportarlo?\n"
-    + "¿Deseas apelar una sanción injusta?\n\n"
-    + "En este canal podrás abrir un ticket para hablar directamente con el staff de Sirgio, quienes te ayudarán con los problemas o dudas que tengas.
-    " + "Simplemente elige una opción en el menú de abajo, indica el tipo de ayuda que necesitas y luego explica tu caso.\n\n"
-    + "⚠️ **Advertencia:** No abras tickets innecesarios ni los uses para bromear. El mal uso del sistema puede resultar en sanciones."
-       );
 
   const menu = new StringSelectMenuBuilder()
     .setCustomId("ticket_menu")
@@ -949,10 +945,6 @@ client.on("messageCreate", async (msg) => {
     console.error("Error en comando de ticket:", e);
   }
 });
-
-  }
-});
-
 
 // =====================
 // LOGIN
