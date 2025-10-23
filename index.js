@@ -30,7 +30,7 @@ const MOD_ROLE_ID = "1229140504310972599";            // Rol de moderador (solo 
 const ROLES_CHANNEL_ID = "1422713049957273621";       // Canal donde se publican los embeds de roles
 const LOG_CHANNEL_ID = "1413243479412310037";         // Canal de logs
 const REGLAS_CHANNEL_ID = "1212998742505037864";      // Canal de reglas
-const GENERAL_CHANNEL_ID = "1422783198655545435";     // #general donde se manda bienvenida
+const GENERAL_CHANNEL_ID = "1212999950275837972";     // #general donde se manda bienvenida
 const MUTED_ROLE_ID = "1430271610358726717";        // <- Si ya creaste el rol Muted, pon la ID aquí. Si queda vacío, el bot intentará crear/usar "Muted".
 
 // Banners (usados por el comando !Roles)
