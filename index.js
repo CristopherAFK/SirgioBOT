@@ -22,6 +22,37 @@ const client = new Client({
 
 // Inicializar sistema de tickets
 ticketSystem(client);
+// =========================
+// CARGA DE COMANDOS (Slash Commands)
+// =========================
+client.commands = new Map();
+
+// Leer todos los archivos .js dentro de la carpeta ./comandos
+const commandFiles = fs.readdirSync('./comandos').filter(file => file.endsWith('.js'));
+
+for (const file of commandFiles) {
+  const command = require(`./comandos/${file}`);
+  client.commands.set(command.data.name, command);
+  console.log(`✅ Comando cargado: /${command.data.name}`);
+}
+
+// Escuchar interacciones (cuando un usuario usa un slash command)
+client.on('interactionCreate', async interaction => {
+  if (!interaction.isChatInputCommand()) return;
+
+  const command = client.commands.get(interaction.commandName);
+  if (!command) return;
+
+  try {
+    await command.execute(interaction);
+  } catch (error) {
+    console.error(`❌ Error ejecutando /${interaction.commandName}:`, error);
+    await interaction.reply({
+      content: 'Hubo un error al ejecutar el comando 😥',
+      ephemeral: true,
+    });
+  }
+});
 
 // =========================
 // CONFIG
