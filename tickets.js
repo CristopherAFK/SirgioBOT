@@ -7,7 +7,7 @@ module.exports = {
 
   async execute(interaction) {
     // 🔒 ID del rol STAFF que puede usar el comando
-    const STAFF_ROLE_ID = '1229140504310972599'; 
+    const STAFF_ROLE_ID = '1212891335929897030'; 
 
     if (!interaction.member.roles.cache.has(STAFF_ROLE_ID)) {
       return interaction.reply({ content: '❌ Solo el staff puede usar este comando.', ephemeral: true });
