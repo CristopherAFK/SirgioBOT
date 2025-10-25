@@ -4,18 +4,174 @@
 
 require("dotenv").config();
 const fs = require("fs");
+// Hemos eliminado 'const { Client, GatewayIntentBits, EmbedBuilder } = require('discord.js');' duplicado.
 const { Client, GatewayIntentBits, Partials, EmbedBuilder, PermissionsBitField } = require("discord.js");
+const express = require("express"); // Se mantiene para el servidor web de Render.
+
+// --- CONFIGURACIÓN DEL CLIENTE (Mantenemos la primera inicialización) ---
 
 const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMembers,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent,
-    GatewayIntentBits.GuildMessageReactions
-  ],
-  partials: [Partials.Message, Partials.Reaction, Partials.User]
+    intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMembers,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.MessageContent, // ¡Esto es clave y ya estaba bien!
+        GatewayIntentBits.GuildMessageReactions
+    ],
+    partials: [Partials.Message, Partials.Reaction, Partials.User]
 });
+
+// --- VARIABLES DEL COMANDO !PuntosStaff ---
+// Usaremos process.env.PREFIX si lo tienes en .env, si no, lo defines aquí.
+const PREFIX = '!'; 
+const CHANNEL_ID_SANCION = '1413243479412310037'; // ID del canal de evidencia de sanción
+const CEL_COLOR = 0x00BFFF; // Color celeste
+
+// Banners (URLs)
+const BANNER_INICIO = "https://media.discordapp.net/attachments/1420914042251509990/1431478904652169266/58_sin_titulo_20251024210339.png?ex=68fd901e&is=68fc3e9e&hm=f89cb6487df8f5e4d677a0b80dde0eed39eec71a583d2ce14e8a74bac7196cf5";
+const BANNER_POSITIVOS = "https://media.discordapp.net/attachments/1420914042251509990/1431478900869038250/58_sin_titulo_20251024210557.png?ex=68fd901d&is=68fc3e9d&hm=0a422d565c166017a23f0f2d57eec5d0e3f80315eb4ab651862ceec893e37683";
+const BANNER_NEGATIVOS = "https://media.discordapp.net/attachments/1420914042251509990/1431475846614618202/58_sin_titulo_20251024205334.png?ex=68fd8d45&is=68fc3bc5&hm=bf57c18a388fb16fdf0aaf1e98183fb7d9d73e524d8ae5fb1e6da57c6a2a2ec4";
+
+// =======================================================
+// --- FUNCIÓN PARA CREAR LOS 3 EMBEDS (SIN CAMBIOS) ---
+// =======================================================
+
+function crearEmbedsPuntosStaff() {
+    
+    // 1. Embed de Introducción
+    const embed1 = new EmbedBuilder()
+        .setColor(CEL_COLOR)
+        .setDescription(
+            // ... (Contenido del Embed 1)
+            "> Cada acción realizada por un miembro del Staff otorgará puntos positivos o puntos negativos, " +
+            "según su impacto en la comunidad.\n\n" +
+            "Este sistema busca reconocer el buen trabajo y mantener una gestión responsable " +
+            "dentro del servidor."
+        )
+        .setImage(BANNER_INICIO);
+
+    // 2. Embed de Puntos Positivos y Recompensas
+    const embed2 = new EmbedBuilder()
+        .setColor(CEL_COLOR)
+        .setImage(BANNER_POSITIVOS)
+        .addFields(
+            { 
+                name: "🌟 Puntos Positivos", 
+                value: 
+                    // ... (Contenido de Puntos Positivos)
+                    "> Acciones que reflejan compromiso, amabilidad y buena gestión.\n\n" +
+                    "✅ Dar una bienvenida amigable a un nuevo usuario: **+2 pts**\n" +
+                    "💡 Dar ideas consecutivamente (según la calidad): **+X pts**\n" +
+                    "🎉 Ser activo con la comunidad / incentivar dinámicas: **+3 pts**\n" +
+                    "⚖️ Aplicar sanciones correctas de forma constante: **+1 pt**\n" +
+                    "📅 Organizar eventos (dentro o fuera del servidor): **+3 pts**\n" +
+                    "📺 Ser activo en los directos de Sirgio: **+1 pt**\n" +
+                    "🧭 Orientar a usuarios nuevos y dar advertencias cuando sea necesario: **+2 pts**\n" +
+                    "🤝 Tratar con amabilidad a los usuarios: **+1 pt**\n" +
+                    "🎟️ Atender tickets de forma correcta y completa: **+4 pts**",
+                inline: false
+            },
+            { 
+                name: "\u200b\n--- 🏆 Recompensas por acumular puntos positivos ---",
+                value: 
+                    // ... (Contenido de Recompensas)
+                    "> Cuantos más puntos acumules, más reconocimiento recibirás.\n\n" +
+                    "🔸 Mayor posibilidad de ascenso de rango\n" +
+                    "🔸 Obtener insignias especiales (Moderador del Mes, del Año, etc.)\n" +
+                    "🔸 Poder decidir nuevos emojis o stickers del servidor\n" +
+                    "🔸 Acceder a peticiones personalizadas o recompensas internas",
+                inline: false
+            }
+        );
+
+    // 3. Embed de Puntos Negativos y Consecuencias
+    const embed3 = new EmbedBuilder()
+        .setColor(CEL_COLOR)
+        .setImage(BANNER_NEGATIVOS)
+        .addFields(
+            { 
+                name: "⚠️ Puntos Negativos",
+                value: 
+                    // ... (Contenido de Puntos Negativos)
+                    "> Acciones que afectan el funcionamiento o imagen del Staff.\n\n" +
+                    "🚫 Dar sanciones incorrectas, sin razón o exageradas: **−3 pts**\n" +
+                    "😴 Inactividad prolongada en el servidor: **−2 pts**\n" +
+                    "📴 Inactividad en directos: **−1 pt**\n" +
+                    "❌ Dar indicaciones erróneas a usuarios: **−2 pts**\n" +
+                    "🔨 Baneo sin razón o desproporcionado: **−10 pts**\n" +
+                    "🧹 Eliminar canales/hilos sin permiso: **−3 pts**\n" +
+                    `📑 No dejar evidencia de sanción en <#${CHANNEL_ID_SANCION}> (mute, tiempo, razón): **−2 pts**\n` +
+                    "👎 No aplicar sanciones cuando son necesarias: **−3 pts**\n" +
+                    "⚠️ No advertir cuando es necesario: **−2 pts**\n" +
+                    "📤 Filtrar contenido o conversaciones privadas / leaks de actualizaciones: **−4 pts**\n" +
+                    "📕 No seguir la guía de baneos: **−3 pts**\n" +
+                    "🔞 Chistes sobre menores de edad: **-4 pts**\n" +
+                    "👊 Romper reglas de manera masiva/esenciales y o de manera consecutiva: **- 2 pts**",
+                inline: false
+            },
+            { 
+                name: "\u200b\n--- ❗ Consecuencias por puntos negativos ---",
+                value: 
+                    // ... (Contenido de Consecuencias)
+                    "> Dependiendo de la gravedad y reincidencia:\n\n" +
+                    "🔻 Descenso de rango\n" +
+                    "🔻 Pérdida de privilegios o permisos\n" +
+                    "🔻 Aislamiento temporal del Staff\n" +
+                    "🔻 En casos extremos, expulsión y veto permanente del equipo",
+                inline: false
+            }
+        )
+        .setFooter({
+            text: 
+                "🧮 Notas finales: Los puntos se revisarán mensualmente por el equipo de administración. " +
+                "Se tomarán en cuenta la constancia, actitud y participación dentro y fuera del servidor."
+        });
+    
+    return [embed1, embed2, embed3];
+}
+
+// =======================================================
+// --- EVENTOS DEL BOT ---
+// =======================================================
+
+// Evento: Bot Listo (Mantenemos el que ya tenías)
+client.once('ready', () => {
+    console.log(`Bot conectado como ${client.user.tag}`);
+    // Aquí puedes tener más lógica de inicio
+});
+
+// Evento: Manejo de Mensajes (AÑADIMOS la lógica del comando aquí)
+client.on('messageCreate', async message => {
+    // Es CRÍTICO que el manejador de mensajes de !PuntosStaff
+    // esté DENTRO de tu función principal client.on('messageCreate', ...) si ya tenías una.
+    
+    // Tu lógica principal de comandos debe comenzar aquí.
+    
+    // Lógica para el comando !PuntosStaff
+    if (message.content.startsWith(PREFIX) && !message.author.bot) {
+        const args = message.content.slice(PREFIX.length).trim().split(/ +/);
+        const command = args.shift().toLowerCase();
+        
+        if (command === 'puntosstaff') {
+            try {
+                const embeds = crearEmbedsPuntosStaff();
+                
+                // Envía los tres embeds
+                for (const embed of embeds) {
+                    await message.channel.send({ embeds: [embed] });
+                }
+            } catch (error) {
+                console.error('Error al ejecutar el comando PuntosStaff:', error);
+                message.channel.send('Ocurrió un error al intentar mostrar el sistema de puntos. 😅');
+            }
+            return; // Detiene el procesamiento para este comando
+        }
+        
+        // Aquí iría tu lógica para OTROS comandos (si los tienes)
+        // Ejemplo: if (command === 'kick') { ... }
+    }
+});
+
 
 // =========================
 // CONFIG
@@ -765,162 +921,6 @@ client.on("messageDelete", async (message) => {
     .setTimestamp();
 
   await logChannel.send({ embeds: [embed] });
-});
-const { Client, GatewayIntentBits, EmbedBuilder } = require('discord.js');
-
-// --- Configuración (Reemplaza con tu información) ---
-const PREFIX = '!';
-const CHANNEL_ID_SANCION = '1413243479412310037'; // ID del canal de evidencia de sanción
-
-// Colores
-const CEL_COLOR = 0x00BFFF; // Color celeste
-
-// Banners (URLs)
-const BANNER_INICIO = "https://media.discordapp.net/attachments/1420914042251509990/1431478904652169266/58_sin_titulo_20251024210339.png?ex=68fd901e&is=68fc3e9e&hm=f89cb6487df8f5e4d677a0b80dde0eed39eec71a583d2ce14e8a74bac7196cf5";
-const BANNER_POSITIVOS = "https://media.discordapp.net/attachments/1420914042251509990/1431478900869038250/58_sin_titulo_20251024210557.png?ex=68fd901d&is=68fc3e9d&hm=0a422d565c166017a23f0f2d57eec5d0e3f80315eb4ab651862ceec893e37683";
-const BANNER_NEGATIVOS = "https://media.discordapp.net/attachments/1420914042251509990/1431475846614618202/58_sin_titulo_20251024205334.png?ex=68fd8d45&is=68fc3bc5&hm=bf57c18a388fb16fdf0aaf1e98183fb7d9d73e524d8ae5fb1e6da57c6a2a2ec4";
-
-// Inicializa el Cliente de Discord
-const client = new Client({ 
-    // Necesario para leer el contenido de los mensajes de comandos de prefijo
-    intents: [
-        GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent
-    ] 
-});
-
-// --- Función para crear los 3 Embeds ---
-
-function crearEmbedsPuntosStaff() {
-    
-    // 1. Embed de Introducción
-    const embed1 = new EmbedBuilder()
-        .setColor(CEL_COLOR)
-        .setDescription(
-            "> Cada acción realizada por un miembro del Staff otorgará puntos positivos o puntos negativos, " +
-            "según su impacto en la comunidad.\n\n" +
-            "Este sistema busca reconocer el buen trabajo y mantener una gestión responsable " +
-            "dentro del servidor."
-        )
-        .setImage(BANNER_INICIO);
-
-    // 2. Embed de Puntos Positivos y Recompensas
-    const embed2 = new EmbedBuilder()
-        .setColor(CEL_COLOR)
-        .setImage(BANNER_POSITIVOS)
-        .addFields(
-            { 
-                name: "🌟 Puntos Positivos", 
-                value: 
-                    "> Acciones que reflejan compromiso, amabilidad y buena gestión.\n\n" +
-                    "✅ Dar una bienvenida amigable a un nuevo usuario: **+2 pts**\n" +
-                    "💡 Dar ideas consecutivamente (según la calidad): **+X pts**\n" +
-                    "🎉 Ser activo con la comunidad / incentivar dinámicas: **+3 pts**\n" +
-                    "⚖️ Aplicar sanciones correctas de forma constante: **+1 pt**\n" +
-                    "📅 Organizar eventos (dentro o fuera del servidor): **+3 pts**\n" +
-                    "📺 Ser activo en los directos de Sirgio: **+1 pt**\n" +
-                    "🧭 Orientar a usuarios nuevos y dar advertencias cuando sea necesario: **+2 pts**\n" +
-                    "🤝 Tratar con amabilidad a los usuarios: **+1 pt**\n" +
-                    "🎟️ Atender tickets de forma correcta y completa: **+4 pts**",
-                inline: false
-            },
-            { 
-                name: "\u200b\n--- 🏆 Recompensas por acumular puntos positivos ---",
-                value: 
-                    "> Cuantos más puntos acumules, más reconocimiento recibirás.\n\n" +
-                    "🔸 Mayor posibilidad de ascenso de rango\n" +
-                    "🔸 Obtener insignias especiales (Moderador del Mes, del Año, etc.)\n" +
-                    "🔸 Poder decidir nuevos emojis o stickers del servidor\n" +
-                    "🔸 Acceder a peticiones personalizadas o recompensas internas",
-                inline: false
-            }
-        );
-
-
-    // 3. Embed de Puntos Negativos y Consecuencias
-    const embed3 = new EmbedBuilder()
-        .setColor(CEL_COLOR)
-        .setImage(BANNER_NEGATIVOS)
-        .addFields(
-            { 
-                name: "⚠️ Puntos Negativos",
-                value: 
-                    "> Acciones que afectan el funcionamiento o imagen del Staff.\n\n" +
-                    "🚫 Dar sanciones incorrectas, sin razón o exageradas: **−3 pts**\n" +
-                    "😴 Inactividad prolongada en el servidor: **−2 pts**\n" +
-                    "📴 Inactividad en directos: **−1 pt**\n" +
-                    "❌ Dar indicaciones erróneas a usuarios: **−2 pts**\n" +
-                    "🔨 Baneo sin razón o desproporcionado: **−10 pts**\n" +
-                    "🧹 Eliminar canales/hilos sin permiso: **−3 pts**\n" +
-                    `📑 No dejar evidencia de sanción en <#${CHANNEL_ID_SANCION}> (mute, tiempo, razón): **−2 pts**\n` +
-                    "👎 No aplicar sanciones cuando son necesarias: **−3 pts**\n" +
-                    "⚠️ No advertir cuando es necesario: **−2 pts**\n" +
-                    "📤 Filtrar contenido o conversaciones privadas / leaks de actualizaciones: **−4 pts**\n" +
-                    "📕 No seguir la guía de baneos: **−3 pts**\n" +
-                    "🔞 Chistes sobre menores de edad: **-4 pts**\n" + // ⬅️ EMOJI CORREGIDO
-                    "👊 Romper reglas de manera masiva/esenciales y o de manera consecutiva: **- 2 pts**", // ⬅️ EMOJI CORREGIDO
-                inline: false
-            },
-            { 
-                name: "\u200b\n--- ❗ Consecuencias por puntos negativos ---",
-                value: 
-                    "> Dependiendo de la gravedad y reincidencia:\n\n" +
-                    "🔻 Descenso de rango\n" +
-                    "🔻 Pérdida de privilegios o permisos\n" +
-                    "🔻 Aislamiento temporal del Staff\n" +
-                    "🔻 En casos extremos, expulsión y veto permanente del equipo",
-                inline: false
-            }
-        )
-        .setFooter({
-            text: 
-                "🧮 Notas finales: Los puntos se revisarán mensualmente por el equipo de administración. " +
-                "Se tomarán en cuenta la constancia, actitud y participación dentro y fuera del servidor."
-        });
-    
-    return [embed1, embed2, embed3];
-}
-
-// --- Evento: Bot Listo ---
-client.once('ready', () => {
-    console.log(`Bot conectado como ${client.user.tag}`);
-});
-
-// --- Evento: Manejo de Mensajes (Comando !PuntosStaff) ---
-client.on('messageCreate', async message => {
-    // Ignora mensajes de otros bots y mensajes sin el prefijo
-    if (message.author.bot || !message.content.startsWith(PREFIX)) return;
-
-    // Obtiene el comando y los argumentos
-    const args = message.content.slice(PREFIX.length).trim().split(/ +/);
-    const command = args.shift().toLowerCase();
-
-    // Lógica para el comando !PuntosStaff
-    if (command === 'puntosstaff') {
-        try {
-            const embeds = crearEmbedsPuntosStaff();
-            
-            // Envía los tres embeds al canal donde se ejecutó el comando
-            for (const embed of embeds) {
-                await message.channel.send({ embeds: [embed] });
-            }
-        } catch (error) {
-            console.error('Error al ejecutar el comando PuntosStaff:', error);
-            message.channel.send('Ocurrió un error al intentar mostrar el sistema de puntos. 😅');
-        }
-    }
-});
-
-// =====================
-// Servidor para Render
-// =====================
-const express = require("express");
-const app = express();
-
-app.get("/", (req, res) => res.send("SirgioBOT is alive!"));
-app.listen(process.env.PORT || 3000, () => {
-  console.log("Servidor web activo para mantener vivo el bot.");
 });
 
 
