@@ -1,19 +1,15 @@
 {
   "name": "sirgiobot",
   "version": "1.0.0",
-  "description": "Bot de Discord con sistema de autoroles, bienvenida, automod y registro de staff.",
+  "description": "Support del Lag",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
     "deploy-commands": "node deploy-commands.js"
   },
   "dependencies": {
-    "discord.js": "^14.15.0",
+    "discord.js": "^14.15.3",
     "dotenv": "^16.3.1",
-    "express": "^4.18.2"
-  },
-  "engines": {
-    "node": ">=18.0.0"
-  },
-  "license": "MIT"
+    "express": "^4.19.2"
+  }
 }
