@@ -1,3 +1,5 @@
 {
-  "lastTicket": 0
+  "lastTicket": 0,
+  "userHasTicket": {},
+  "channels": {}
 }
