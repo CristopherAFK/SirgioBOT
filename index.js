@@ -443,7 +443,7 @@ client.on("messageCreate", async (message) => {
 }); // 👈 CIERRA AQUÍ el evento messageCreate del sistema de tickets
 
 // ===== Autogenerador de autoroles (comando !roles) + listeners de reacciones =====
-const { EmbedBuilder, PermissionsBitField } = require('discord.js');
+const { PermissionsBitField } = require('discord.js');
 
 // CONFIG
 const ALLOWED_ROLE = "1423037245279047711"; // quien puede usar !roles
