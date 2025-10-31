@@ -4,8 +4,8 @@ module.exports = {
   name: "roles",
   description: "Envía los mensajes de autoroles.",
   async execute(message) {
-    const allowedRole = "1423037245279047711";
-    const channelID = "1423037245279047711";
+    const allowedRole = "1229140504310972599";
+    const channelID = "1422713049957273621";
 
     if (!message.member.roles.cache.has(allowedRole))
       return message.reply("❌ No tienes permiso para usar este comando.");
