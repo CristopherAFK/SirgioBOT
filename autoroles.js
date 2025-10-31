@@ -5,7 +5,7 @@ module.exports = {
   description: "Envía los mensajes de autoroles.",
   async execute(message) {
     const allowedRole = "1423037245279047711";
-    const channelID = "1422713049957273621";
+    const channelID = "1423037245279047711";
 
     if (!message.member.roles.cache.has(allowedRole))
       return message.reply("❌ No tienes permiso para usar este comando.");
@@ -52,10 +52,10 @@ module.exports = {
           "<@&1313716235573264437>: Personas que han llegado a nivel 10, teniendo acceso a mandar Gifs en ⁠#1422783198655545435\n\n" +
           "<@&1313716079998140536>: Personas que han llegado a nivel 5, teniendo acceso a mandar audios en #1422783198655545435\n\n" +
           "<@&1313715879816597514>: Personas que han llegado a nivel 1.\n\n" +
-          "Nota: Todos los que queden a partir del Top 10 en la tabla de niveles obtendrán un rol exclusivo, y el Top 1 su propio rol exclusivo.\n\n" +
           "<@&1255562775888003124>: Rol exclusivo para los que estuvieron en la tabla de niveles en la temporada 1 (A partir del Top 10).\n\n" +
           "<@&1267286215439421534>: Rol exclusivo para los que estuvieron en la tabla de niveles en la temporada 2 (A partir del Top 10).\n\n" +
-          "<@&1316821713362878594>: Rol exclusivo para los que estuvieron en la tabla de niveles en la temporada 3 (A partir del Top 10)."
+          "<@&1316821713362878594>: Rol exclusivo para los que estuvieron en la tabla de niveles en la temporada 3 (A partir del Top 10).\n\n" +
+         "Nota: Todos los que queden a partir del Top 10 en la tabla de niveles obtendrán un rol exclusivo, y el Top 1 su propio rol exclusivo. 
       );
 
     // =========================
