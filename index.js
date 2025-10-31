@@ -441,13 +441,82 @@ client.on("messageCreate", async (message) => {
     console.error("Error en comando de cierre de ticket:", err);
   }
 });
+// =========================
+// 🎭 Sistema de Autoroles (reacciones)
+// =========================
+
+client.on('messageReactionAdd', async (reaction, user) => {
+    if (user.bot) return;
+    if (reaction.partial) await reaction.fetch();
+    if (reaction.message.partial) await reaction.message.fetch();
+
+    const guild = reaction.message.guild;
+    if (!guild) return;
+
+    const member = await guild.members.fetch(user.id).catch(() => null);
+    if (!member) return;
+
+    // Aquí defines los IDs de roles por emoji
+    const roles = {
+        // Países
+        "🇲🇽": "1422713885808367668", // México
+        "🇸🇻": "1422714047444549642", // El Salvador
+        "🇨🇱": "1422714190344411167", // Chile
+        "🇨🇴": "1422714323453196328", // Colombia
+        "🇦🇷": "1422714448036438056", // Argentina
+
+        // Género
+        "♂️": "1422721068560947281", // Hombre
+        "♀️": "1422721255666210918", // Mujer
+
+        // Videojuegos
+        "🎮": "1422721404189861898", // Gamer
+
+        // Anuncios
+        "📢": "1422721554737928233" // Anuncios
+    };
+
+    const roleId = roles[reaction.emoji.name];
+    if (roleId) {
+        await member.roles.add(roleId).catch(() => {});
+    }
+});
+
+client.on('messageReactionRemove', async (reaction, user) => {
+    if (user.bot) return;
+    if (reaction.partial) await reaction.fetch();
+    if (reaction.message.partial) await reaction.message.fetch();
+
+    const guild = reaction.message.guild;
+    if (!guild) return;
+
+    const member = await guild.members.fetch(user.id).catch(() => null);
+    if (!member) return;
+
+    const roles = {
+        "🇲🇽": "1422713885808367668",
+        "🇸🇻": "1422714047444549642",
+        "🇨🇱": "1422714190344411167",
+        "🇨🇴": "1422714323453196328",
+        "🇦🇷": "1422714448036438056",
+        "♂️": "1422721068560947281",
+        "♀️": "1422721255666210918",
+        "🎮": "1422721404189861898",
+        "📢": "1422721554737928233"
+    };
+
+    const roleId = roles[reaction.emoji.name];
+    if (roleId) {
+        await member.roles.remove(roleId).catch(() => {});
+    }
+});
 
 // -------------------------
 // READY, Express y login
 // -------------------------
 client.once("ready", () => {
   console.log(`✅ SirgioBOT conectado como ${client.user.tag}`);
-  client.user.setActivity("LagSupport", { type: 3 });
+  client.user.setActivity("El Bot del Lag", { type: 3 });
 });
 
 const app = express();
