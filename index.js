@@ -647,14 +647,16 @@ client.on('messageReactionAdd', async (reaction, user) => {
 
     // comprobar en cada mapa
     const roleId = paisesReacciones[emoji] || generoReacciones[emoji] || juegosReacciones[emoji] || anunciosReacciones[emoji];
-    if (!roleId) return;
+   if (!roleId) return;
 
-    // evadir errores si no se puede asignar
-    await member.roles.add(roleId).catch(e => console.warn('No se pudo añadir rol:', roleId, e.message));
+await member.roles.add(roleId).catch(e => console.warn('No se pudo añadir rol:', roleId, e.message));
   } catch (err) {
     console.error('Err en messageReactionAdd:', err);
   }
 });
+
+
+
 
 // Listener: quitar rol cuando quitan reacción
 client.on('messageReactionRemove', async (reaction, user) => {
