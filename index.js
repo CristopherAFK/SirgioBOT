@@ -446,7 +446,7 @@ client.on("messageCreate", async (message) => {
 const { PermissionsBitField } = require('discord.js');
 
 // CONFIG
-const ALLOWED_ROLE = "1423037245279047711"; // quien puede usar !roles
+const ALLOWED_ROLE = "1229140504310972599"; // quien puede usar !roles
 const TARGET_CHANNEL = "1422713049957273621"; // donde se enviarán los embeds
 
 // Mapas de reacciones (emoji -> roleId)
