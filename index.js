@@ -440,6 +440,7 @@ client.on("messageCreate", async (message) => {
   } catch (err) {
     console.error("Error en comando de cierre de ticket:", err);
   }
+}); // 👈 CIERRA AQUÍ el evento messageCreate del sistema de tickets
 
 // ===== Autogenerador de autoroles (comando !roles) + listeners de reacciones =====
 const { EmbedBuilder, PermissionsBitField } = require('discord.js');
