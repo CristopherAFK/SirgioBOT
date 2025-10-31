@@ -441,74 +441,244 @@ client.on("messageCreate", async (message) => {
     console.error("Error en comando de cierre de ticket:", err);
   }
 });
-// =========================
-// 🎭 Sistema de Autoroles (reacciones)
-// =========================
+});
+// ===== Autogenerador de autoroles (comando !roles) + listeners de reacciones =====
+const { EmbedBuilder, PermissionsBitField } = require('discord.js');
 
-client.on('messageReactionAdd', async (reaction, user) => {
-    if (user.bot) return;
-    if (reaction.partial) await reaction.fetch();
-    if (reaction.message.partial) await reaction.message.fetch();
+// CONFIG
+const ALLOWED_ROLE = "1423037245279047711"; // quien puede usar !roles
+const TARGET_CHANNEL = "1422713049957273621"; // donde se enviarán los embeds
 
-    const guild = reaction.message.guild;
-    if (!guild) return;
+// Mapas de reacciones (emoji -> roleId)
+const paisesReacciones = {
+  "🇻🇪": "1268383665168060517",
+  "🇨🇴": "1268383284023525426",
+  "🇪🇨": "1268384015925252240",
+  "🇨🇱": "1268384143054471220",
+  "🇦🇷": "1268384222796582993",
+  "🇵🇪": "1268384464115994686",
+  "🇧🇴": "1268384560325066864",
+  "🇺🇾": "1268384709461934160",
+  "🇵🇾": "1268384785403875350",
+  "🇵🇦": "1268384817645359215",
+  "🇭🇳": "1268384915011932312",
+  "🇬🇹": "1268385256507965450",
+  "🇸🇻": "1268385050802651217",
+  "🇨🇷": "1413710208546508901",
+  "🇲🇽": "1268385311038246943",
+  "🇪🇸": "1268385402704756847",
+  "🇵🇷": "1268385447722356767",
+  "🇩🇴": "1268406577522806845",
+};
 
-    const member = await guild.members.fetch(user.id).catch(() => null);
-    if (!member) return;
+const generoReacciones = {
+  "🔒": "1268381141648277616",
+  "⚧️": "1268377460286951488",
+  "♂️": "1268377312227889223",
+  "♀️": "1268377374781739070",
+};
 
-    // Aquí defines los IDs de roles por emoji
-    const roles = {
-        // Países
-        "🇲🇽": "1422713885808367668", // México
-        "🇸🇻": "1422714047444549642", // El Salvador
-        "🇨🇱": "1422714190344411167", // Chile
-        "🇨🇴": "1422714323453196328", // Colombia
-        "🇦🇷": "1422714448036438056", // Argentina
+const juegosReacciones = {
+  "⬛": "1350919243339923609",
+  "🚀": "1350917758988324885",
+  "🟧": "1350917038939308272",
+  "⭐": "1350918091873320980",
+  "🔫": "1350917298051092651",
+  "⛏️": "1350917442557313257",
+  "🪠": "1413239980196626452",
+  "🎤": "1413240385521713222",
+  "🦟": "1413243773990862968",
+  "👑": "1413243772703215679",
+  "⚽": "1413241320566161518",
+};
 
-        // Género
-        "♂️": "1422721068560947281", // Hombre
-        "♀️": "1422721255666210918", // Mujer
+const anunciosReacciones = {
+  "🎉": "1268376127920148510",
+  "📺": "1268374279913996328",
+  "🎵": "1268375078949621770",
+  "👾": "1268374348641865769",
+  "📼": "1268375969823985744",
+  "🎶": "1268376833720586332",
+  "📣": "1268374164595675309",
+  "📝": "1268375562997600338",
+};
 
-        // Videojuegos
-        "🎮": "1422721404189861898", // Gamer
+// Mensajes informativos (no tienen reacciones)
+const staffEmbed = new EmbedBuilder()
+  .setColor("#43B581")
+  .setImage("https://media.discordapp.net/attachments/1225629661627682846/1422065793499136151/58_sin_titulo_20250928214126.png")
+  .setDescription(
+    "<@&1230952139015327755>: El Superior que dirige a los Administradores.\n\n" +
+    "<@&1212891335929897030>: Administradores en totalidad del Servidor.\n\n" +
+    "<@&1230952186549243948>: Encargados de liderar a los Moderadores.\n\n" +
+    "<@&1229140504310972599>: Moderadores del servidor.\n\n" +
+    "<@&1230949752733175888>: Encargados de supervisar el Servidor.\n\n" +
+    "<@&1230949777215197195>: Programadores del Servidor.\n\n" +
+    "<@&1230949963551215627>: Encargados de organizar Eventos dentro o fuera del Servidor.\n\n" +
+    "<@&1228835483036029078>: Editores de Sirgio."
+  );
 
-        // Anuncios
-        "📢": "1422721554737928233" // Anuncios
-    };
+const nivelesEmbed = new EmbedBuilder()
+  .setColor("#5DADEC")
+  .setImage("https://media.discordapp.net/attachments/1225629661627682846/1422073914686701639/58_sin_titulo_20250928221347.png")
+  .setDescription(
+    "<@&1313716964383920269>: Usuarios que han llegado a nivel Nivel 100 — Personas que han llegado a nivel 100. Pueden añadir un emoji de su gusto al servidor y cambiarse el apodo del servidor a merced..\n\n" +
+    "<@&1313716864790302730>: Usuarios que han llegado a nivel Nivel 75.\n\n" +
+    "<@&1313716715934453761>: Usuarios que han llegado a nivel Nivel 50.\n\n" +
+    "<@&1313716612452581437>: Usuarios que han llegado a nivel Nivel 40.\n\n" +
+    "<@&1313716401021911102>: Usuarios que han llegado a nivel  Nivel 35 — Teniendo Acceso al canal de spam.\n\n" +
+    "<@&1239330751334584421>: Nivel 25 — Pueden mandar imágenes y videos en ⁠#1422783198655545435.\n\n" +
+    "<@&1313716306599481436>: Nivel 20.\n\n" +
+    "<@&1313716235573264437>: Nivel 10 — Pueden mandar Gifs en ⁠#1422783198655545435.\n\n" +
+    "<@&1313716079998140536>: Nivel 5 — Pueden mandar audios en ⁠#1422783198655545435.\n\n" +
+    "<@&1313715879816597514>: Nivel 1.\n\n" +
+    "📘 **Nota:** Todos los que queden a partir del Top 10 en la tabla de niveles obtendrán un rol exclusivo, y el Top 1 su propio rol exclusivo.\n\n" +
+    "<@&1255562775888003124>: Temporada 1 (Top 10+).\n\n" +
+    "<@&1267286215439421534>: Temporada 2 (Top 10+).\n\n" +
+    "<@&1316821713362878594>: Temporada 3 (Top 10+)."
+  );
 
-    const roleId = roles[reaction.emoji.name];
-    if (roleId) {
-        await member.roles.add(roleId).catch(() => {});
+const exclusivosEmbed = new EmbedBuilder()
+  .setColor("#9B59B6")
+  .setImage("https://media.discordapp.net/attachments/1225629661627682846/1422246097820057742/58_sin_titulo_20250929093723.png")
+  .setDescription(
+    "<@&1229938887955189843>: Boosters — Acceso a canales exclusivos.\n\n" +
+    "<@&1433610447944417312>: Usuarios que aportan sugerencias.\n\n" +
+    "<@&1230595787717611686>: Suscriptores de Sirgio.\n\n" +
+    "<@&1422077772393746583>: Actualización del 1/10/25.\n\n" +
+    "<@&1431822024833241188>: Participantes en la Sapo Invasión.\n\n" +
+    "<@&1268066983333593088>: Usuarios activos en ⁠#1422813008815456347."
+  );
+
+const paisesEmbed = new EmbedBuilder()
+  .setColor("#E67E22")
+  .setImage("https://media.discordapp.net/attachments/1225629661627682846/1422283408935092376/58_sin_titulo_20250929120620.png")
+  .setDescription("🌎 Reacciona con la bandera de tu país para obtener el rol correspondiente.");
+
+const generoEmbed = new EmbedBuilder()
+  .setColor("#E74C3C")
+  .setImage("https://media.discordapp.net/attachments/1225629661627682846/1422283408935092376/58_sin_titulo_20250929120620.png")
+  .setDescription("🔒 Privado\n\n⚧️ No binarie\n\n♂️ Hombre\n\n♀️ Mujer");
+
+const juegosEmbed = new EmbedBuilder()
+  .setColor("#00C6FF")
+  .setImage("https://media.discordapp.net/attachments/1225629661627682846/1422289906079629403/58_sin_titulo_20250929123134.png")
+  .setDescription("⬛ 🚀 🟧 ⭐ 🔫 ⛏️ 🪠 🎤 🦟 👑 ⚽\nReacciona para obtener roles de tus juegos favoritos.");
+
+const anunciosEmbed = new EmbedBuilder()
+  .setColor("#C8FF00")
+  .setImage("https://media.discordapp.net/attachments/1225629661627682846/1422305674318053426/58_sin_titulo_20250929133434.png")
+  .setDescription("🎉 📺 🎵 👾 📼 🎶 📣 📝\nReacciona para recibir notificaciones específicas.");
+
+// Lista de mensajes que se enviarán
+const mensajes = [
+  { embed: staffEmbed },
+  { embed: nivelesEmbed },
+  { embed: exclusivosEmbed },
+  { embed: paisesEmbed, reactions: paisesReacciones },
+  { embed: generoEmbed, reactions: generoReacciones },
+  { embed: juegosEmbed, reactions: juegosReacciones },
+  { embed: anunciosEmbed, reactions: anunciosReacciones },
+];
+
+// Guardamos en memoria los IDs de los mensajes que generó el bot
+const autorolesMessageIds = new Set();
+
+// Listener: comando !roles (texto)
+client.on('messageCreate', async (message) => {
+  try {
+    if (message.author.bot) return;
+    if (message.content.trim().toLowerCase() !== '!roles') return;
+
+    // canal / rol requerido
+    if (message.channel.id !== TARGET_CHANNEL) {
+      return message.reply(`❌ Usa este comando en <#${TARGET_CHANNEL}>.`);
     }
+    if (!message.member.roles.cache.has(ALLOWED_ROLE)) {
+      return message.reply('❌ No tienes permiso para usar este comando.');
+    }
+
+    const botMember = message.guild.members.me;
+    if (!botMember.permissionsIn(message.channel).has([
+      PermissionsBitField.Flags.SendMessages,
+      PermissionsBitField.Flags.EmbedLinks,
+      PermissionsBitField.Flags.AddReactions,
+      PermissionsBitField.Flags.ManageRoles
+    ])) {
+      return message.reply('❌ No tengo permisos suficientes en ese canal (Enviar mensajes, Insertar enlaces, Añadir reacciones, Gestionar roles).');
+    }
+
+    // Enviar los embeds uno por uno y reaccionar
+    for (const { embed, reactions } of mensajes) {
+      const sent = await message.channel.send({ embeds: [embed] });
+      autorolesMessageIds.add(sent.id);
+
+      if (reactions) {
+        // reacciona en el orden de las keys
+        for (const emoji of Object.keys(reactions)) {
+          try { await sent.react(emoji); } catch (err) { console.warn('No se pudo reaccionar con', emoji, err.message); }
+        }
+      }
+
+      // opcional: espera 600ms entre mensajes para evitar ratelimits
+      await new Promise(r => setTimeout(r, 600));
+    }
+
+    await message.reply('✅ Autoroles enviados correctamente.');
+  } catch (err) {
+    console.error('Error en !roles:', err);
+    message.reply('❌ Ocurrió un error al intentar enviar los autoroles (mira la consola).');
+  }
 });
 
-client.on('messageReactionRemove', async (reaction, user) => {
+// Listener: agregar rol cuando reaccionan en los mensajes generados por el bot
+client.on('messageReactionAdd', async (reaction, user) => {
+  try {
     if (user.bot) return;
     if (reaction.partial) await reaction.fetch();
     if (reaction.message.partial) await reaction.message.fetch();
 
+    if (!autorolesMessageIds.has(reaction.message.id)) return; // importante: solo en mensajes generados por !roles
+
+    const emoji = reaction.emoji.name;
     const guild = reaction.message.guild;
     if (!guild) return;
-
     const member = await guild.members.fetch(user.id).catch(() => null);
     if (!member) return;
 
-    const roles = {
-        "🇲🇽": "1422713885808367668",
-        "🇸🇻": "1422714047444549642",
-        "🇨🇱": "1422714190344411167",
-        "🇨🇴": "1422714323453196328",
-        "🇦🇷": "1422714448036438056",
-        "♂️": "1422721068560947281",
-        "♀️": "1422721255666210918",
-        "🎮": "1422721404189861898",
-        "📢": "1422721554737928233"
-    };
+    // comprobar en cada mapa
+    const roleId = paisesReacciones[emoji] || generoReacciones[emoji] || juegosReacciones[emoji] || anunciosReacciones[emoji];
+    if (!roleId) return;
 
-    const roleId = roles[reaction.emoji.name];
-    if (roleId) {
-        await member.roles.remove(roleId).catch(() => {});
-    }
+    // evadir errores si no se puede asignar
+    await member.roles.add(roleId).catch(e => console.warn('No se pudo añadir rol:', roleId, e.message));
+  } catch (err) {
+    console.error('Err en messageReactionAdd:', err);
+  }
+});
+
+// Listener: quitar rol cuando quitan reacción
+client.on('messageReactionRemove', async (reaction, user) => {
+  try {
+    if (user.bot) return;
+    if (reaction.partial) await reaction.fetch();
+    if (reaction.message.partial) await reaction.message.fetch();
+
+    if (!autorolesMessageIds.has(reaction.message.id)) return;
+
+    const emoji = reaction.emoji.name;
+    const guild = reaction.message.guild;
+    if (!guild) return;
+    const member = await guild.members.fetch(user.id).catch(() => null);
+    if (!member) return;
+
+    const roleId = paisesReacciones[emoji] || generoReacciones[emoji] || juegosReacciones[emoji] || anunciosReacciones[emoji];
+    if (!roleId) return;
+
+    await member.roles.remove(roleId).catch(e => console.warn('No se pudo remover rol:', roleId, e.message));
+  } catch (err) {
+    console.error('Err en messageReactionRemove:', err);
+  }
 });
 
 // -------------------------
