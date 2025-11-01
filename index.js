@@ -42,6 +42,8 @@ const client = new Client({
   partials: [Partials.Channel, Partials.Message, Partials.Reaction]
 });
 
+require('./automod')(client);
+
 // STAFF ROLES (admin, mod, headadmin)
 const STAFF_ROLE_IDS = [
   "1212891335929897030", // admin
@@ -455,7 +457,6 @@ const app = express();
 app.get("/", (req, res) => res.send("SirgioBOT is alive!"));
 app.listen(process.env.PORT || 3000, () => console.log("🌐 Servidor web activo para mantener el bot despierto."));
 
-require('./automod')(client);
 
 
 client.login(process.env.DISCORD_TOKEN || process.env.TOKEN);
