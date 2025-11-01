@@ -37,12 +37,14 @@ const client = new Client({
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
-    GatewayIntentBits.GuildMembers
+    GatewayIntentBits.GuildMembers,
   ],
   partials: [Partials.Channel, Partials.Message, Partials.Reaction]
 });
 
-require('./automod.js');
+// 👉 Conectamos el sistema de AutoMod aquí:
+require('./automod.js')(client);
+
 
 
 // STAFF ROLES (admin, mod, headadmin)
