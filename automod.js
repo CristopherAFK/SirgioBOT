@@ -1,18 +1,19 @@
-const {
-  Client,
-  EmbedBuilder,
-  SlashCommandBuilder,
-  ButtonBuilder,
-  ButtonStyle,
-  ActionRowBuilder,
-  Routes,
-  REST,
-} = require("discord.js");
-const fs = require("fs");
+const { 
+  Client, 
+  GatewayIntentBits, 
+  EmbedBuilder, 
+  PermissionsBitField, 
+  SlashCommandBuilder, 
+  ActionRowBuilder, 
+  ButtonBuilder, 
+  ButtonStyle 
+} = require('discord.js');
+const fs = require('fs');
+const path = require('path');
 
-// ===============================
-// ⚙️ CONFIGURACIÓN
-// ===============================
+// =========================
+// CONFIGURACIÓN PRINCIPAL
+// =========================
 const GUILD_ID = "1212886282645147768";
 const LOG_CHANNEL_ID = "1434002832016801842";
 const MUTED_ROLE_ID = "1430271610358726717";
@@ -21,310 +22,244 @@ const IGNORED_CHANNELS = ["1258524941289263254", "1313723272290111559"];
 const BOT_OWNER_ID = "1032482231677108224";
 const TICKET_CHANNEL_ID = "1228438600497102960";
 
-// ===============================
-// 📁 Archivos JSON
-// ===============================
-const WARNINGS_FILE = "./warns.json";
-const BANNED_WORDS_FILE = "./bannedWords.json";
-const SENSITIVE_WORDS_FILE = "./sensitiveWords.json";
+const warnsFile = path.join(__dirname, 'warns.json');
+const bannedWordsFile = path.join(__dirname, 'bannedWords.json');
+const sensitiveWordsFile = path.join(__dirname, 'sensitiveWords.json');
 
-// Crear archivos si no existen
-if (!fs.existsSync(WARNINGS_FILE)) fs.writeFileSync(WARNINGS_FILE, "{}");
-if (!fs.existsSync(BANNED_WORDS_FILE)) fs.writeFileSync(BANNED_WORDS_FILE, "[]");
-if (!fs.existsSync(SENSITIVE_WORDS_FILE)) fs.writeFileSync(SENSITIVE_WORDS_FILE, "[]");
+if (!fs.existsSync(warnsFile)) fs.writeFileSync(warnsFile, JSON.stringify({}));
+if (!fs.existsSync(bannedWordsFile)) fs.writeFileSync(bannedWordsFile, JSON.stringify({ words: ["palabramala1", "palabramala2"] }, null, 2));
+if (!fs.existsSync(sensitiveWordsFile)) fs.writeFileSync(sensitiveWordsFile, JSON.stringify({ words: ["negro", "gordo", "flaco"] }, null, 2));
 
-let warnings = JSON.parse(fs.readFileSync(WARNINGS_FILE));
-let bannedWords = JSON.parse(fs.readFileSync(BANNED_WORDS_FILE));
-let sensitiveWords = JSON.parse(fs.readFileSync(SENSITIVE_WORDS_FILE));
+let warns = JSON.parse(fs.readFileSync(warnsFile, 'utf8'));
+const bannedWords = require(bannedWordsFile).words;
+const sensitiveWords = require(sensitiveWordsFile).words;
 
-function saveWarnings() {
-  fs.writeFileSync(WARNINGS_FILE, JSON.stringify(warnings, null, 2));
+let automodEnabled = true;
+const cooldown = new Map();
+
+// =========================
+// FUNCIONES AUXILIARES
+// =========================
+function saveWarns() {
+  fs.writeFileSync(warnsFile, JSON.stringify(warns, null, 2));
 }
 
-// ===============================
-// 🧠 Funciones de utilidad
-// ===============================
-function hasIgnoredRole(member) {
-  return STAFF_ROLE_IDS.some((id) => member.roles.cache.has(id));
+function addWarn(userId) {
+  if (!warns[userId]) warns[userId] = [];
+  const now = Date.now();
+  warns[userId].push({ date: now });
+  saveWarns();
+  return warns[userId].length;
 }
 
-function isIgnoredChannel(channelId) {
-  return IGNORED_CHANNELS.includes(channelId);
+function resetWarns(userId) {
+  delete warns[userId];
+  saveWarns();
 }
 
-// ===============================
-// ✉️ Advertencia privada
-// ===============================
-async function sendPrivateWarn(user, color, reason, muteTime, client) {
-  const embed = new EmbedBuilder()
-    .setColor(color)
-    .setTitle(muteTime ? "⛔ Has sido sancionado" : "⚠️ Advertencia")
-    .setDescription(
-      muteTime
-        ? `Has sido sancionado por: **${reason}**.\nDuración del mute: **${muteTime} minutos.**`
-        : `Has recibido una advertencia por: **${reason}**.\nReincidir generará sanción.`
-    )
-    .setFooter({ text: "SirgioBOT - Moderación automática" })
-    .setTimestamp();
-
-  const button = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setLabel("Ver palabras prohibidas")
-      .setStyle(ButtonStyle.Danger)
-      .setCustomId("show_banned_words")
-  );
-
-  try {
-    await user.send({ embeds: [embed], components: [button] });
-  } catch {
-    console.log(`No se pudo enviar DM a ${user.tag}`);
-  }
+function getWarns(userId) {
+  return warns[userId] || [];
 }
 
-// ===============================
-// ⚠️ Sistema de advertencias y mute
-// ===============================
-async function warnUser(client, user, reason, guild) {
-  if (!warnings[user.id]) warnings[user.id] = [];
-  warnings[user.id].push({ reason, date: new Date().toISOString() });
-  saveWarnings();
-
-  const warnCount = warnings[user.id].length;
-  const muteDurations = [0, 10, 20, 40, 60]; // min
-  const muteTime = muteDurations[Math.min(warnCount, muteDurations.length - 1)];
-  const member = await guild.members.fetch(user.id).catch(() => null);
-
-  if (muteTime > 0 && member) {
-    await member.roles.add(MUTED_ROLE_ID).catch(() => {});
-    setTimeout(async () => {
-      await member.roles.remove(MUTED_ROLE_ID).catch(() => {});
-    }, muteTime * 60 * 1000);
-  }
-
-  await sendPrivateWarn(user, muteTime ? 0xff0000 : 0xfad02e, reason, muteTime, client);
-
-  const logChannel = guild.channels.cache.get(LOG_CHANNEL_ID);
-  if (logChannel) {
-    const logEmbed = new EmbedBuilder()
-      .setColor(muteTime ? "Red" : "Yellow")
-      .setTitle(muteTime ? "⛔ Sanción aplicada" : "⚠️ Advertencia emitida")
-      .setDescription(
-        `**Usuario:** ${user.tag}\n**Razón:** ${reason}\n**Warns totales:** ${warnCount}\n**Duración del mute:** ${
-          muteTime ? `${muteTime}m` : "Advertencia"
-        }`
-      )
-      .setTimestamp();
-    logChannel.send({ embeds: [logEmbed] });
-  }
-}
-
-// ===============================
-// 🧹 Limpieza automática de warns (cada 30 días)
-// ===============================
+// Limpieza automática cada 30 días
 setInterval(() => {
-  const now = new Date();
-  let changed = false;
-  for (const [userId, userWarns] of Object.entries(warnings)) {
-    warnings[userId] = userWarns.filter(
-      (w) => now - new Date(w.date) < 30 * 24 * 60 * 60 * 1000
-    );
-    if (warnings[userId].length === 0) delete warnings[userId];
-    changed = true;
-  }
-  if (changed) {
-    saveWarnings();
-    console.log("🧹 Warns antiguos eliminados automáticamente");
-  }
-}, 24 * 60 * 60 * 1000); // cada 24h
+  warns = {};
+  saveWarns();
+  console.log("🧹 Warns limpiados automáticamente cada 30 días.");
+}, 30 * 24 * 60 * 60 * 1000);
 
-// ===============================
-// 💬 AutoMod principal
-// ===============================
+// =========================
+// SISTEMA DE SANCIONES
+// =========================
+async function applyMute(member, minutes, reason, logChannel) {
+  try {
+    await member.roles.add(MUTED_ROLE_ID);
+    setTimeout(async () => {
+      await member.roles.remove(MUTED_ROLE_ID);
+    }, minutes * 60 * 1000);
+
+    const embed = new EmbedBuilder()
+      .setColor('Red')
+      .setTitle('🔇 Usuario muteado')
+      .setDescription(`**Usuario:** ${member.user.tag}\n**Duración:** ${minutes} minutos\n**Razón:** ${reason}`)
+      .setTimestamp();
+
+    if (logChannel) logChannel.send({ embeds: [embed] });
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+// =========================
+// SISTEMA AUTOMOD
+// =========================
 module.exports = (client) => {
-  let automodEnabled = true;
-  const userMessages = {};
 
-  client.once("ready", async () => {
-    console.log("✅ AutoMod cargado correctamente");
+  // ---- Registro de comandos automáticamente ----
+  client.once('ready', async () => {
+    try {
+      const data = [
+        new SlashCommandBuilder().setName('automod').setDescription('Controla el sistema Automod')
+          .addSubcommand(s => s.setName('on').setDescription('Activa el automod'))
+          .addSubcommand(s => s.setName('off').setDescription('Desactiva el automod'))
+          .addSubcommand(s => s.setName('status').setDescription('Muestra el estado del automod')),
+        new SlashCommandBuilder().setName('warns').setDescription('Muestra las advertencias de un usuario')
+          .addUserOption(opt => opt.setName('usuario').setDescription('Usuario a revisar').setRequired(true)),
+        new SlashCommandBuilder().setName('addwarn').setDescription('Agrega una advertencia a un usuario')
+          .addUserOption(opt => opt.setName('usuario').setDescription('Usuario a advertir').setRequired(true)),
+        new SlashCommandBuilder().setName('removewarn').setDescription('Elimina una advertencia de un usuario')
+          .addUserOption(opt => opt.setName('usuario').setDescription('Usuario a modificar').setRequired(true)),
+        new SlashCommandBuilder().setName('resetwarns').setDescription('Elimina todas las advertencias de un usuario')
+          .addUserOption(opt => opt.setName('usuario').setDescription('Usuario a limpiar').setRequired(true)),
+        new SlashCommandBuilder().setName('viewwarns').setDescription('Muestra el historial detallado de advertencias')
+          .addUserOption(opt => opt.setName('usuario').setDescription('Usuario a revisar').setRequired(true))
+      ].map(cmd => cmd.toJSON());
 
-    // ===============================
-    // Slash Commands
-    // ===============================
-    const commands = [
-      new SlashCommandBuilder()
-        .setName("automod")
-        .setDescription("Controla el sistema de AutoMod")
-        .addSubcommand((sub) => sub.setName("on").setDescription("Activa el AutoMod"))
-        .addSubcommand((sub) => sub.setName("off").setDescription("Desactiva el AutoMod"))
-        .addSubcommand((sub) => sub.setName("status").setDescription("Ver estado del AutoMod")),
-
-      new SlashCommandBuilder()
-        .setName("addwarn")
-        .setDescription("Agrega una advertencia manual")
-        .addUserOption((o) => o.setName("usuario").setDescription("Usuario").setRequired(true))
-        .addStringOption((o) => o.setName("razon").setDescription("Motivo").setRequired(true)),
-
-      new SlashCommandBuilder()
-        .setName("removewarn")
-        .setDescription("Elimina la última advertencia de un usuario")
-        .addUserOption((o) => o.setName("usuario").setDescription("Usuario").setRequired(true)),
-
-      new SlashCommandBuilder()
-        .setName("resetwarns")
-        .setDescription("Resetea todas las advertencias de un usuario")
-        .addUserOption((o) => o.setName("usuario").setDescription("Usuario").setRequired(true)),
-
-      new SlashCommandBuilder()
-        .setName("viewwarns")
-        .setDescription("Muestra las advertencias de un usuario")
-        .addUserOption((o) => o.setName("usuario").setDescription("Usuario").setRequired(true)),
-    ];
-
-    const rest = new REST({ version: "10" }).setToken(process.env.TOKEN);
-    await rest.put(Routes.applicationGuildCommands(client.user.id, GUILD_ID), {
-      body: commands,
-    });
-    console.log("🟢 Comandos registrados en el servidor.");
+      await client.application.commands.set(data, GUILD_ID);
+      console.log("✅ Comandos del automod registrados correctamente.");
+    } catch (err) {
+      console.error("❌ Error al registrar comandos:", err);
+    }
   });
 
-  // ===============================
-  // 🎛️ Comandos
-  // ===============================
-  client.on("interactionCreate", async (interaction) => {
-    if (interaction.isButton() && interaction.customId === "show_banned_words") {
-      const embed = new EmbedBuilder()
-        .setColor("Red")
-        .setTitle("🚫 Lista de palabras prohibidas")
-        .setDescription(bannedWords.join(", "));
-      return interaction.reply({ embeds: [embed], ephemeral: true });
-    }
-
+  // ---- Manejo de comandos ----
+  client.on('interactionCreate', async (interaction) => {
     if (!interaction.isChatInputCommand()) return;
 
-    const { commandName } = interaction;
-    if (
-      !STAFF_ROLE_IDS.some((id) => interaction.member.roles.cache.has(id)) &&
-      interaction.user.id !== BOT_OWNER_ID
-    )
-      return interaction.reply({
-        content: "❌ No tienes permisos para usar este comando.",
-        ephemeral: true,
-      });
+    const { commandName, options } = interaction;
 
-    const guild = interaction.guild;
-
-    if (commandName === "automod") {
+    if (commandName === 'automod') {
       const sub = interaction.options.getSubcommand();
-      if (sub === "on") automodEnabled = true;
-      else if (sub === "off") automodEnabled = false;
-
-      const color = sub === "status" ? "Blue" : automodEnabled ? "Green" : "Red";
-      const statusMsg =
-        sub === "status"
-          ? `🔧 AutoMod está **${automodEnabled ? "activado" : "desactivado"}**`
-          : `✅ AutoMod **${sub === "on" ? "activado" : "desactivado"}**`;
-
-      return interaction.reply({
-        embeds: [new EmbedBuilder().setColor(color).setDescription(statusMsg)],
-        ephemeral: true,
-      });
-    }
-
-    if (commandName === "addwarn") {
-      const user = interaction.options.getUser("usuario");
-      const reason = interaction.options.getString("razon");
-      await warnUser(client, user, reason, guild);
-      return interaction.reply({ content: `⚠️ Advertencia añadida a **${user.tag}**`, ephemeral: true });
-    }
-
-    if (commandName === "removewarn") {
-      const user = interaction.options.getUser("usuario");
-      if (!warnings[user.id]?.length)
-        return interaction.reply({ content: "❌ Este usuario no tiene advertencias.", ephemeral: true });
-      warnings[user.id].pop();
-      saveWarnings();
-      return interaction.reply({ content: `🟢 Se eliminó una advertencia de **${user.tag}**.`, ephemeral: true });
-    }
-
-    if (commandName === "resetwarns") {
-      const user = interaction.options.getUser("usuario");
-      delete warnings[user.id];
-      saveWarnings();
-      return interaction.reply({ content: `🔄 Warns de **${user.tag}** reseteados.`, ephemeral: true });
-    }
-
-    if (commandName === "viewwarns") {
-      const user = interaction.options.getUser("usuario");
-      const userWarns = warnings[user.id] || [];
-      const desc = userWarns.length
-        ? userWarns.map((w, i) => `**${i + 1}.** ${w.reason}`).join("\n")
-        : "✅ Sin advertencias.";
-      const embed = new EmbedBuilder().setColor("Yellow").setTitle(`Advertencias de ${user.tag}`).setDescription(desc);
-      return interaction.reply({ embeds: [embed], ephemeral: true });
-    }
-  });
-
-  // ===============================
-  // 💬 Filtrado de mensajes
-  // ===============================
-  client.on("messageCreate", async (message) => {
-    if (message.author.bot || !automodEnabled) return;
-    if (isIgnoredChannel(message.channel.id)) return;
-
-    const member = message.member;
-    if (!member || hasIgnoredRole(member)) return;
-
-    const content = message.content.toLowerCase();
-    const guild = message.guild;
-
-    // 🚫 Palabras prohibidas
-    if (bannedWords.some((w) => content.includes(w))) {
-      await warnUser(client, message.author, "Uso de palabra prohibida", guild);
-      return message.delete().catch(() => {});
-    }
-
-    // ⚠️ Palabras potencialmente ofensivas
-    if (sensitiveWords.some((w) => content.includes(w))) {
-      const mentioned = message.mentions.users.first();
-      if (mentioned) {
-        mentioned
-          .send({
-            content: `💬 Hola ${mentioned}, si este mensaje te incomodó u ofendió, puedes crear un ticket en <#${TICKET_CHANNEL_ID}>.`,
-          })
-          .catch(() => {});
+      if (sub === 'on') {
+        automodEnabled = true;
+        await interaction.reply({ content: '✅ Automod activado.', ephemeral: true });
+      } else if (sub === 'off') {
+        automodEnabled = false;
+        await interaction.reply({ content: '❌ Automod desactivado.', ephemeral: true });
+      } else if (sub === 'status') {
+        await interaction.reply({ content: `⚙️ Automod está **${automodEnabled ? 'activado' : 'desactivado'}**.`, ephemeral: true });
       }
     }
 
-    // 📛 Spam por líneas
-    if (content.split("\n").length > 5) {
-      await warnUser(client, message.author, "Spam (demasiadas líneas)", guild);
-      return message.delete().catch(() => {});
+    if (['warns', 'addwarn', 'removewarn', 'resetwarns', 'viewwarns'].includes(commandName)) {
+      const user = options.getUser('usuario');
+      const member = await interaction.guild.members.fetch(user.id);
+      const logChannel = interaction.guild.channels.cache.get(LOG_CHANNEL_ID);
+
+      if (commandName === 'warns' || commandName === 'viewwarns') {
+        const userWarns = getWarns(user.id);
+        if (userWarns.length === 0) {
+          return interaction.reply({ content: `${user.tag} no tiene advertencias.`, ephemeral: true });
+        }
+
+        const embed = new EmbedBuilder()
+          .setColor('Yellow')
+          .setTitle(`⚠️ Advertencias de ${user.tag}`)
+          .setDescription(userWarns.map((w, i) => `**${i + 1}.** <t:${Math.floor(w.date / 1000)}:R>`).join('\n'))
+          .setTimestamp();
+
+        return interaction.reply({ embeds: [embed], ephemeral: true });
+      }
+
+      if (commandName === 'addwarn') {
+        const totalWarns = addWarn(user.id);
+        const muteTimes = [10, 20, 40, 60];
+        const duration = muteTimes[Math.min(totalWarns - 1, muteTimes.length - 1)];
+
+        const embed = new EmbedBuilder()
+          .setColor('Red')
+          .setTitle('🚨 Nueva advertencia')
+          .setDescription(`**Usuario:** ${user.tag}\n**Advertencias totales:** ${totalWarns}\n**Duración mute:** ${duration} min`)
+          .setTimestamp();
+
+        logChannel.send({ embeds: [embed] });
+        await applyMute(member, duration, "Automod", logChannel);
+        interaction.reply({ content: `⚠️ ${user.tag} recibió una advertencia (${totalWarns}).`, ephemeral: true });
+      }
+
+      if (commandName === 'removewarn') {
+        if (warns[user.id]?.length > 0) warns[user.id].pop();
+        saveWarns();
+        return interaction.reply({ content: `Se eliminó una advertencia a ${user.tag}.`, ephemeral: true });
+      }
+
+      if (commandName === 'resetwarns') {
+        resetWarns(user.id);
+        return interaction.reply({ content: `Todas las advertencias de ${user.tag} fueron eliminadas.`, ephemeral: true });
+      }
     }
 
-    // 📨 Flood (5 mensajes seguidos)
-    if (!userMessages[message.author.id])
-      userMessages[message.author.id] = { count: 0, lastMessage: Date.now() };
+    // Botón "Ver palabras prohibidas"
+    if (interaction.isButton() && interaction.customId === 'ver_palabras') {
+      const banned = JSON.parse(fs.readFileSync(bannedWordsFile, 'utf8')).words;
+      const embed = new EmbedBuilder()
+        .setColor('Purple')
+        .setTitle('🚫 Palabras prohibidas')
+        .setDescription(banned.map(w => `• ${w}`).join('\n'))
+        .setFooter({ text: 'Evita usar estas palabras para no recibir sanciones.' });
 
-    const userData = userMessages[message.author.id];
-    userData.count =
-      Date.now() - userData.lastMessage < 7000 ? userData.count + 1 : 1;
-    userData.lastMessage = Date.now();
+      await interaction.reply({ embeds: [embed], ephemeral: true });
+    }
+  });
 
-    if (userData.count >= 5) {
-      await warnUser(client, message.author, "Spam (mensajes seguidos)", guild);
-      userData.count = 0;
+  // ---- Sistema principal de monitoreo ----
+  client.on('messageCreate', async (message) => {
+    if (!automodEnabled || message.author.bot) return;
+    if (IGNORED_CHANNELS.includes(message.channel.id)) return;
+    const logChannel = message.guild.channels.cache.get(LOG_CHANNEL_ID);
+    const member = message.member;
+
+    // Anti-spam
+    if (!cooldown.has(message.author.id)) cooldown.set(message.author.id, []);
+    const timestamps = cooldown.get(message.author.id);
+    timestamps.push(Date.now());
+    const filtered = timestamps.filter(t => Date.now() - t < 10000);
+    cooldown.set(message.author.id, filtered);
+    if (filtered.length >= 5 || message.content.split('\n').length >= 5) {
+      const warnsCount = addWarn(message.author.id);
+      const muteTimes = [10, 20, 40, 60];
+      const duration = muteTimes[Math.min(warnsCount - 1, muteTimes.length - 1)];
+      await applyMute(member, duration, "Anti-spam", logChannel);
+      message.delete();
+      return;
     }
 
-    // 🔠 Mayúsculas excesivas
-    const capsRatio = content.replace(/[^A-Z]/g, "").length / content.length;
-    if (content.length > 15 && capsRatio > 0.7) {
-      await warnUser(client, message.author, "Uso excesivo de mayúsculas", guild);
+    // Palabras prohibidas
+    if (bannedWords.some(w => message.content.toLowerCase().includes(w))) {
+      const warnsCount = addWarn(message.author.id);
+      const muteTimes = [10, 20, 40, 60];
+      const duration = muteTimes[Math.min(warnsCount - 1, muteTimes.length - 1)];
+      await applyMute(member, duration, "Palabra prohibida", logChannel);
+
+      const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId('ver_palabras')
+          .setLabel('Ver palabras prohibidas')
+          .setStyle(ButtonStyle.Danger)
+      );
+
+      const embed = new EmbedBuilder()
+        .setColor('Red')
+        .setTitle('🚫 Palabra prohibida detectada')
+        .setDescription(`Tu mensaje contenía una palabra prohibida.`)
+        .setFooter({ text: 'Evita reincidir para no recibir sanciones más graves.' });
+
+      await message.channel.send({ content: `<@${message.author.id}>`, embeds: [embed], components: [row] });
+      await message.delete();
+      return;
     }
 
-    // 🔗 Enlaces
-    if (/(https?:\/\/[^\s]+)/g.test(content)) {
-      await warnUser(client, message.author, "Envío de links no permitidos", guild);
-      message.delete().catch(() => {});
+    // Palabras ofensivas
+    if (sensitiveWords.some(w => message.content.toLowerCase().includes(w))) {
+      const mentionedUser = message.mentions.users.first();
+      if (mentionedUser) {
+        const dmEmbed = new EmbedBuilder()
+          .setColor('Yellow')
+          .setTitle('⚠️ Posible mensaje ofensivo detectado')
+          .setDescription(`Hola <@${mentionedUser.id}>, alguien te dijo algo que podría ser ofensivo. Si te incomodó, puedes crear un ticket en <#${TICKET_CHANNEL_ID}>.`)
+          .setFooter({ text: 'SirgioBOT cuida tu seguridad emocional 💛' });
+        await mentionedUser.send({ embeds: [dmEmbed] }).catch(() => {});
+      }
     }
   });
 };
