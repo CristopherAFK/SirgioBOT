@@ -378,3 +378,49 @@ module.exports = (client) => {
     }
   });
 };
+// ============================
+// 🔘 Listener para el botón "Ver Palabras Prohibidas"
+// ============================
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isButton()) return;
+
+  if (interaction.customId === "view_banned_words") {
+    const bannedWordsList = [
+      "Server muerto",
+      "borren el server",
+      "puta, puto",
+      "perra",
+      "pene",
+      "vagina",
+      "negros, negro",
+      "hitler",
+      "Violacion, violar, viole",
+      "suicidate, mátate, kill your self, kys",
+      "maldito",
+      "mierda",
+      "coño",
+      "zorra",
+      "mamame el guebo",
+      "server de los sensibles",
+      "server de los cristales",
+      "chaqueta, masturbación",
+      "server de mrd",
+      "pedofilo",
+      "porno",
+      "borra esa mierda",
+      "borra la cuenta",
+      "midgio"
+    ];
+
+    const embed = new EmbedBuilder()
+      .setColor("Red")
+      .setTitle("🚫 Lista de Palabras Prohibidas")
+      .setDescription(bannedWordsList.map((w) => `• ${w}`).join("\n"))
+      .setFooter({ text: "Evita usar este tipo de lenguaje en el servidor." });
+
+    await interaction.reply({
+      embeds: [embed],
+      ephemeral: true
+    });
+  }
+});
