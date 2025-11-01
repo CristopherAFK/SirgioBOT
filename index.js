@@ -455,5 +455,8 @@ const app = express();
 app.get("/", (req, res) => res.send("SirgioBOT is alive!"));
 app.listen(process.env.PORT || 3000, () => console.log("🌐 Servidor web activo para mantener el bot despierto."));
 
+require('./automod')(client);
+
+
 client.login(process.env.DISCORD_TOKEN || process.env.TOKEN);
   
