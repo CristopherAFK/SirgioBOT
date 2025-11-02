@@ -45,7 +45,8 @@ const client = new Client({
 // 👉 Conectamos el sistema de AutoMod aquí:
 require('./automod.js')(client);
 // Conectamos los comandos de moderación
-require('./moderationCommands.js')(client);
+require('./moderationCommands.js');
+
 
 // =============================
 // 📦 Sistema de comandos Slash
