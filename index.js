@@ -57,19 +57,9 @@ client.on('interactionCreate', async interaction => {
   if (!interaction.isCommand()) return;
 
   try {
-    const commandFiles = fs.readdirSync(path.join(__dirname, 'commands')).filter(file => file.endsWith('.js'));
+   console.log(`Comando slash recibido: ${interaction.commandName}`);
+await interaction.reply({ content: '✅ Comando recibido (los comandos slash están activos).', ephemeral: true });
 
-    for (const file of commandFiles) {
-      const command = require(`./commands/${file}`);
-      const commandsArray = Array.isArray(command) ? command : [command];
-
-      for (const cmd of commandsArray) {
-        if (interaction.commandName === cmd.data.name) {
-          await cmd.execute(interaction);
-          return;
-        }
-      }
-    }
   } catch (error) {
     console.error('❌ Error ejecutando comando:', error);
     if (interaction.replied || interaction.deferred) {
