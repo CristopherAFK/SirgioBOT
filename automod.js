@@ -355,6 +355,8 @@ module.exports = (client) => {
   // ====== messageCreate: principal detección ======
   // Map para flood detection: userId -> { count, lastMessage }
   const userMessages = {};
+// Estado del AutoMod (por defecto activado)
+let automodEnabled = true;
 
   client.on("messageCreate", async (message) => {
     try {
