@@ -13,9 +13,6 @@ const {
   ButtonStyle,
 } = require("discord.js");
 
-// 🔧 Estado global del AutoMod (activo por defecto)
-let automodEnabled = true;
-
 // ===============================
 // ====== CONFIG (IDs provistas) ======
 const GUILD_ID = "1212886282645147768";
@@ -25,7 +22,7 @@ const STAFF_ROLE_IDS = ["1212891335929897030", "1229140504310972599"];
 const IGNORED_CHANNELS = ["1258524941289263254", "1313723272290111559"];
 const BOT_OWNER_ID = "1032482231677108224";
 const TICKET_CHANNEL_ID = "1228438600497102960";
-
+// =====================================
 
 // ====== Archivos (deben existir o se crearán) ======
 const WARNS_PATH = path.join(__dirname, "warns.json");
@@ -358,7 +355,6 @@ module.exports = (client) => {
   // ====== messageCreate: principal detección ======
   // Map para flood detection: userId -> { count, lastMessage }
   const userMessages = {};
-  
 
   client.on("messageCreate", async (message) => {
     try {
