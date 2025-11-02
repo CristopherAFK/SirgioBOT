@@ -44,6 +44,39 @@ const client = new Client({
 
 // 👉 Conectamos el sistema de AutoMod aquí:
 require('./automod.js')(client);
+// =============================
+// 📦 Sistema de comandos Slash
+// =============================
+
+const fs = require('fs');
+const path = require('path');
+
+client.on('interactionCreate', async interaction => {
+  if (!interaction.isCommand()) return;
+
+  try {
+    const commandFiles = fs.readdirSync(path.join(__dirname, 'commands')).filter(file => file.endsWith('.js'));
+
+    for (const file of commandFiles) {
+      const command = require(`./commands/${file}`);
+      const commandsArray = Array.isArray(command) ? command : [command];
+
+      for (const cmd of commandsArray) {
+        if (interaction.commandName === cmd.data.name) {
+          await cmd.execute(interaction);
+          return;
+        }
+      }
+    }
+  } catch (error) {
+    console.error('❌ Error ejecutando comando:', error);
+    if (interaction.replied || interaction.deferred) {
+      await interaction.followUp({ content: '❌ Ocurrió un error al ejecutar el comando.', ephemeral: true });
+    } else {
+      await interaction.reply({ content: '❌ Ocurrió un error al ejecutar el comando.', ephemeral: true });
+    }
+  }
+});
 
 
 
