@@ -44,32 +44,6 @@ const client = new Client({
 
 // 👉 Conectamos el sistema de AutoMod aquí:
 require('./automod.js')(client);
-// Conectamos los comandos de moderación
-require('./moderationCommands.js');
-
-
-// =============================
-// 📦 Sistema de comandos Slash
-// =============================
-
-
-client.on('interactionCreate', async interaction => {
-  if (!interaction.isCommand()) return;
-
-  try {
-   console.log(`Comando slash recibido: ${interaction.commandName}`);
-await interaction.reply({ content: '✅ Comando recibido (los comandos slash están activos).', ephemeral: true });
-
-  } catch (error) {
-    console.error('❌ Error ejecutando comando:', error);
-    if (interaction.replied || interaction.deferred) {
-      await interaction.followUp({ content: '❌ Ocurrió un error al ejecutar el comando.', ephemeral: true });
-    } else {
-      await interaction.reply({ content: '❌ Ocurrió un error al ejecutar el comando.', ephemeral: true });
-    }
-  }
-});
-
 
 
 // STAFF ROLES (admin, mod, headadmin)
