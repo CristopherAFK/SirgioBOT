@@ -51,8 +51,6 @@ require('./moderationCommands.js')(client);
 // 📦 Sistema de comandos Slash
 // =============================
 
-const fs = require('fs');
-const path = require('path');
 
 client.on('interactionCreate', async interaction => {
   if (!interaction.isCommand()) return;
