@@ -41,6 +41,10 @@ const client = new Client({
   ],
   partials: [Partials.Channel, Partials.Message, Partials.Reaction]
 });
+// =========================
+// CARGAR SISTEMA AUTOMOD
+// =========================
+require("./automod")(client);
 
 // STAFF ROLES (admin, mod, headadmin)
 const STAFF_ROLE_IDS = [
