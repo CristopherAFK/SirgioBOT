@@ -635,6 +635,7 @@ module.exports = (client) => {
           if (ch) {
             const emb = new EmbedBuilder()
               .setTitle("✉️ Mensaje enviado")
+              .setColor("#00BFFF")
               .addFields(
                 { name: "Usuario", value: `${message.author.tag} (${message.author.id})`, inline: true },
                 { name: "Canal origen", value: `${message.channel}`, inline: true },
