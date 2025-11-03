@@ -1,20 +1,33 @@
 // =========================
-// SirgioBOT - Sistema de Bienvenidas
+// SirgioBOT - Sistema de Bienvenidas (versión corregida)
 // =========================
 
-const { EmbedBuilder } = require('discord.js');
+const { EmbedBuilder, ChannelType } = require("discord.js");
 
-// IDs de los canales
 const WELCOME_CHANNEL_ID = "1255251210173153342"; // Canal de bienvenidas
 const RULES_CHANNEL_ID = "1212998742505037864";
 const ROLES_CHANNEL_ID = "1422713049957273621";
 
 module.exports = (client) => {
-    client.on('guildMemberAdd', async (member) => {
+    client.on("guildMemberAdd", async (member) => {
         try {
-            const channel = member.guild.channels.cache.get(WELCOME_CHANNEL_ID);
-            if (!channel) return;
+            console.log(`[Welcome] Nuevo miembro detectado: ${member.user.tag}`);
 
+            // Intentar obtener el canal correctamente
+            let channel = member.guild.channels.cache.get(WELCOME_CHANNEL_ID);
+
+            // Si no está en caché, intentar obtenerlo con fetch
+            if (!channel) {
+                channel = await member.guild.channels.fetch(WELCOME_CHANNEL_ID).catch(() => null);
+            }
+
+            // Verificar que sea un canal de texto válido
+            if (!channel || channel.type !== ChannelType.GuildText) {
+                console.error(`[Welcome] El canal con ID ${WELCOME_CHANNEL_ID} no es de texto o no existe.`);
+                return;
+            }
+
+            // Crear embed de bienvenida
             const embed = new EmbedBuilder()
                 .setColor("#00BFFF") // Celeste
                 .setTitle(`¡Bienvenid@ ${member.user.username}! ✨`)
@@ -30,10 +43,13 @@ module.exports = (client) => {
                     iconURL: member.guild.iconURL({ dynamic: true })
                 });
 
+            // Enviar mensaje
             await channel.send({
-                content: `¡✨ ${member} ha ingresado al servidor!`,
+                content: `✨ ${member} ha ingresado al servidor`,
                 embeds: [embed],
             });
+
+            console.log(`[Welcome] Mensaje enviado correctamente en ${channel.name}`);
         } catch (error) {
             console.error("Error al enviar mensaje de bienvenida:", error);
         }
