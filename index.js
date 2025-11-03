@@ -45,6 +45,7 @@ const client = new Client({
 // CARGAR SISTEMA AUTOMOD
 // =========================
 require("./automod")(client);
+require('./welcome.js')(client);
 
 // STAFF ROLES (admin, mod, headadmin)
 const STAFF_ROLE_IDS = [
