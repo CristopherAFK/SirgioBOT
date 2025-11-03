@@ -11,6 +11,8 @@ const {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  ChannelType,
+  PermissionFlagsBits
 } = require("discord.js");
 
 // ===============================
@@ -22,6 +24,7 @@ const STAFF_ROLE_IDS = ["1212891335929897030", "1229140504310972599"];
 const IGNORED_CHANNELS = ["1258524941289263254", "1313723272290111559"];
 const BOT_OWNER_ID = "1032482231677108224";
 const TICKET_CHANNEL_ID = "1228438600497102960";
+const VIGIL_CATEGORY_ID = "1255251210173153342"; // categoría para canales de vigilancia
 // =====================================
 
 // ====== Archivos (deben existir o se crearán) ======
@@ -80,7 +83,6 @@ const CAPS_LENGTH_THRESHOLD = 15; // longitud mínima para evaluar caps
 const CAPS_RATIO_THRESHOLD = 0.7; // ratio mayúsculas > 0.7 considerado abuso
 
 // Mute progresivo por número de warns (index = warnCount)
-// warn1 -> 0 (advertencia), warn2 -> 10m, warn3 -> 20m, warn4 -> 40m, warn5+ -> 60m
 function getMuteMinutesForWarnCount(count) {
   if (count <= 1) return 0;
   if (count === 2) return 10;
@@ -88,6 +90,10 @@ function getMuteMinutesForWarnCount(count) {
   if (count === 4) return 40;
   return 60;
 }
+
+// ====== Estado runtime para mutes y vigilancias (no persiste reinicios) ======
+const activeMutes = new Map(); // userId -> timeoutId
+const activeVigilances = new Map(); // userId -> { channelId, timeoutId, active }
 
 // ====== Limpieza automática de warns (cada 24h se revisa y borra warns >30d) ======
 function cleanupExpiredWarns(client) {
@@ -108,7 +114,7 @@ function cleanupExpiredWarns(client) {
         const logCh = guild?.channels.cache.get(LOG_CHANNEL_ID);
         if (logCh) {
           const embed = new EmbedBuilder()
-            .setColor("Green")
+            .setColor(0x00ff00)
             .setTitle("🧹 Warns limpiados automáticamente")
             .setDescription(`Se eliminaron warns antiguos de <@${userId}> por inactividad (30 días).`)
             .setTimestamp();
@@ -139,6 +145,23 @@ function findBannedWordInText(text) {
     }
   }
   return null;
+}
+
+// ====== Util: parsear duraciones como "10m", "1h", "2d" o número (minutos) ======
+function parseDuration(input) {
+  if (!input) return null;
+  const s = String(input).trim().toLowerCase();
+  const m = s.match(/^(\d+)\s*(s|m|h|d)?$/);
+  if (!m) return null;
+  const num = parseInt(m[1], 10);
+  const unit = m[2] || "m"; // si no especifica, asumimos minutos
+  switch (unit) {
+    case "s": return num * 1000;
+    case "m": return num * 60 * 1000;
+    case "h": return num * 60 * 60 * 1000;
+    case "d": return num * 24 * 60 * 60 * 1000;
+    default: return num * 60 * 1000;
+  }
 }
 
 // ====== Aplicar warn (persistente) ======
@@ -178,12 +201,15 @@ async function applyWarn(client, guild, user, member, reason, detectedWord = nul
     try {
       await member.roles.add(MUTED_ROLE_ID).catch(() => {});
       // quitar rol después de tiempo (no persiste reinicios)
-      setTimeout(async () => {
+      const timeoutId = setTimeout(async () => {
         try {
           const refreshed = await guild.members.fetch(member.id).catch(() => null);
           if (refreshed) await refreshed.roles.remove(MUTED_ROLE_ID).catch(() => {});
         } catch {}
+        activeMutes.delete(member.id);
       }, muteMinutes * 60 * 1000);
+      // guardar en memoria por si queremos cancelar manualmente
+      activeMutes.set(member.id, timeoutId);
     } catch (e) {
       console.error("Error aplicando mute por rol:", e);
     }
@@ -194,7 +220,7 @@ async function applyWarn(client, guild, user, member, reason, detectedWord = nul
     const logCh = guild?.channels.cache.get(LOG_CHANNEL_ID);
     if (logCh) {
       const logEmbed = new EmbedBuilder()
-        .setColor(muteMinutes > 0 ? "Red" : "Yellow")
+        .setColor(muteMinutes > 0 ? 0xff0000 : 0xffff00)
         .setTitle(muteMinutes > 0 ? "⛔ Sanción aplicada" : "⚠️ Advertencia emitida")
         .addFields(
           { name: "Usuario", value: `${user.tag} (${user.id})`, inline: true },
@@ -212,8 +238,24 @@ async function applyWarn(client, guild, user, member, reason, detectedWord = nul
   return { warnCount, muteMinutes };
 }
 
+// ====== Util: sanear nombre de canal (mantiene algunos caracteres permitidos) ======
+function sanitizeChannelName(name) {
+  if (!name) return "";
+  return name
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "") // quitar tildes
+    .replace(/[^a-zA-Z0-9 _\-–—|·\u{1F440}\u{1F50D}\u{1F50E}\u{1F4AC}\u{1F4E6}]/gu, "") // permitir algunos símbolos y emoji comunes
+    .trim()
+    .replace(/\s+/g, "-")
+    .slice(0, 90)
+    .toLowerCase();
+}
+
 // ====== Entrypoint: export module ======
 module.exports = (client) => {
+  // Estado básico
+  let automodEnabled = true;
+
   // reload lists on command if needed
   client.automod = client.automod || {};
   client.automod.reloadLists = () => {
@@ -257,7 +299,26 @@ module.exports = (client) => {
           .addUserOption((o) => o.setName("usuario").setDescription("Usuario objetivo").setRequired(true)),
         new SlashCommandBuilder()
           .setName("reloadlists")
-          .setDescription("Recarga las listas de palabras prohibidas y sensibles (staff)")
+          .setDescription("Recarga las listas de palabras prohibidas y sensibles (staff)"),
+        // ---- NUEVOS COMANDOS ----
+        new SlashCommandBuilder()
+          .setName("mute")
+          .setDescription("Mutea manualmente a un usuario (staff)")
+          .addUserOption(o => o.setName("usuario").setDescription("Usuario a mutear").setRequired(true))
+          .addStringOption(o => o.setName("tiempo").setDescription("Duración (ej: 10m, 1h, 2d). Por defecto minutos").setRequired(true)),
+        new SlashCommandBuilder()
+          .setName("remove_mute")
+          .setDescription("Quita el mute a un usuario (staff)")
+          .addUserOption(o => o.setName("usuario").setDescription("Usuario objetivo").setRequired(true)),
+        new SlashCommandBuilder()
+          .setName("vigilar")
+          .setDescription("Inicia vigilancia de un usuario creando un canal privado (staff)")
+          .addUserOption(o => o.setName("usuario").setDescription("Usuario a vigilar").setRequired(true))
+          .addStringOption(o => o.setName("tiempo").setDescription("Duración (ej: 10m, 1h, 2d). Si 0 -> indefinido").setRequired(true)),
+        new SlashCommandBuilder()
+          .setName("cerrar_vigilancia")
+          .setDescription("Cierra y elimina el canal de vigilancia (staff)")
+          .addUserOption(o => o.setName("usuario").setDescription("Usuario cuya vigilancia cerrar").setRequired(true))
       ].map((c) => c.toJSON());
 
       await client.application.commands.set(commands, GUILD_ID);
@@ -275,7 +336,7 @@ module.exports = (client) => {
         // se asegura de leer la lista actualizada
         const list = loadWords(BANNED_PATH);
         const embed = new EmbedBuilder()
-          .setColor("Red")
+          .setColor(0xff0000)
           .setTitle("🚫 Lista de palabras prohibidas")
           .setDescription(list.length ? list.map((w) => `• ${w}`).join("\n") : "La lista está vacía.")
           .setFooter({ text: "Evita usar este tipo de lenguaje en el servidor." });
@@ -334,13 +395,211 @@ module.exports = (client) => {
         const arr = warnings[user.id] || [];
         if (!arr.length) return interaction.reply({ content: `✅ ${user.tag} no tiene advertencias.`, ephemeral: true });
         const desc = arr.map((w, i) => `**${i + 1}.** ${w.reason} — ${new Date(w.date).toLocaleString()}`).join("\n");
-        const embed = new EmbedBuilder().setColor("Yellow").setTitle(`Warns de ${user.tag}`).setDescription(desc);
+        const embed = new EmbedBuilder().setColor(0xffff00).setTitle(`Warns de ${user.tag}`).setDescription(desc);
         return interaction.reply({ embeds: [embed], ephemeral: true });
       }
 
       if (name === "reloadlists") {
         reloadWordLists();
         return interaction.reply({ content: `🔁 Listas recargadas. bannedWords=${bannedWords.length}, sensitiveWords=${sensitiveWords.length}`, ephemeral: true });
+      }
+
+      // ====== NUEVOS ======
+      if (name === "mute") {
+        const user = interaction.options.getUser("usuario");
+        const tiempo = interaction.options.getString("tiempo");
+        const ms = parseDuration(tiempo);
+        if (!ms) return interaction.reply({ content: "❌ Tiempo inválido. Usa ejemplo: 10m, 1h, 2d", ephemeral: true });
+
+        const guild = interaction.guild;
+        const member = await guild.members.fetch(user.id).catch(() => null);
+        if (!member) return interaction.reply({ content: "❌ No se encontró al miembro.", ephemeral: true });
+
+        try {
+          await member.roles.add(MUTED_ROLE_ID);
+          // si ya tenía un timeout, limpiarlo
+          if (activeMutes.has(member.id)) {
+            clearTimeout(activeMutes.get(member.id));
+            activeMutes.delete(member.id);
+          }
+          const timeoutId = setTimeout(async () => {
+            try {
+              const refreshed = await guild.members.fetch(member.id).catch(() => null);
+              if (refreshed) await refreshed.roles.remove(MUTED_ROLE_ID).catch(() => {});
+            } catch {}
+            activeMutes.delete(member.id);
+          }, ms);
+          activeMutes.set(member.id, timeoutId);
+
+          const embed = new EmbedBuilder()
+            .setTitle("🔇 Usuario muteado")
+            .setDescription(`${user.tag} ha sido muteado manualmente por \`${tiempo}\`.`)
+            .setColor(0xffa500)
+            .setTimestamp();
+          // log
+          const logCh = guild.channels.cache.get(LOG_CHANNEL_ID);
+          if (logCh) logCh.send({ embeds: [embed] }).catch(() => {});
+
+          return interaction.reply({ content: `✅ ${user.tag} muteado por ${tiempo}.`, ephemeral: true });
+        } catch (e) {
+          console.error("Error muteando usuario:", e);
+          return interaction.reply({ content: "❌ Error aplicando mute.", ephemeral: true });
+        }
+      }
+
+      if (name === "remove_mute") {
+        const user = interaction.options.getUser("usuario");
+        const guild = interaction.guild;
+        const member = await guild.members.fetch(user.id).catch(() => null);
+        if (!member) return interaction.reply({ content: "❌ No se encontró al miembro.", ephemeral: true });
+        try {
+          await member.roles.remove(MUTED_ROLE_ID).catch(() => {});
+          if (activeMutes.has(member.id)) {
+            clearTimeout(activeMutes.get(member.id));
+            activeMutes.delete(member.id);
+          }
+          const embed = new EmbedBuilder()
+            .setTitle("🔊 Unmute")
+            .setDescription(`${user.tag} ha sido desmuteado manualmente.`)
+            .setColor(0x00ff00)
+            .setTimestamp();
+          const logCh = guild.channels.cache.get(LOG_CHANNEL_ID);
+          if (logCh) logCh.send({ embeds: [embed] }).catch(() => {});
+          return interaction.reply({ content: `✅ Se quitó el mute a ${user.tag}.`, ephemeral: true });
+        } catch (e) {
+          console.error("Error quitando mute:", e);
+          return interaction.reply({ content: "❌ Error quitando el mute.", ephemeral: true });
+        }
+      }
+
+      if (name === "vigilar") {
+        const user = interaction.options.getUser("usuario");
+        const tiempoText = interaction.options.getString("tiempo");
+        const ms = parseDuration(tiempoText);
+        if (ms === null) return interaction.reply({ content: "❌ Tiempo inválido. Usa: 10m, 1h, 2d o 0 para indefinido.", ephemeral: true });
+
+        // si ya hay vigilancia
+        if (activeVigilances.has(user.id) && activeVigilances.get(user.id).active) {
+          return interaction.reply({ content: `❗ Ya existe una vigilancia activa para ${user.tag}.`, ephemeral: true });
+        }
+
+        const guild = interaction.guild;
+        // nombre canal: "👀│Vigilando - usuario"
+        const baseName = `👀│Vigilando - ${user.username}`;
+        const chanName = sanitizeChannelName(baseName);
+
+        // permisos: oculto para @everyone, visible para staff y bot
+        const overwrites = [
+          { id: guild.id, deny: [PermissionFlagsBits.ViewChannel] },
+          { id: client.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] },
+          ...STAFF_ROLE_IDS.map(rid => ({ id: rid, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.SendMessages] }))
+        ];
+
+        let channel;
+        try {
+          channel = await guild.channels.create({
+            name: chanName,
+            type: ChannelType.GuildText,
+            parent: VIGIL_CATEGORY_ID,
+            permissionOverwrites: overwrites,
+            reason: `Vigilancia iniciada por ${interaction.user.tag} sobre ${user.tag}`
+          });
+        } catch (err) {
+          console.warn("No se pudo crear canal en categoría, intentando sin parent:", err);
+          channel = await guild.channels.create({
+            name: chanName,
+            type: ChannelType.GuildText,
+            permissionOverwrites: overwrites,
+            reason: `Vigilancia iniciada por ${interaction.user.tag} sobre ${user.tag}`
+          });
+        }
+
+        // marcar vigilancia activa
+        const state = { channelId: channel.id, active: true, userId: user.id, timeoutId: null };
+        activeVigilances.set(user.id, state);
+
+        // si tiempo ms > 0, programar fin (si 0 o null -> indefinido)
+        if (ms > 0) {
+          const tid = setTimeout(async () => {
+            // al terminar, poner active=false y notificar en canal de vigilancia
+            const st = activeVigilances.get(user.id);
+            if (!st) return;
+            st.active = false;
+            activeVigilances.set(user.id, st);
+            try {
+              const ch = guild.channels.cache.get(st.channelId) || await guild.channels.fetch(st.channelId).catch(() => null);
+              if (ch) {
+                const embed = new EmbedBuilder()
+                  .setTitle("⏱️ Vigilancia finalizada (automático)")
+                  .setDescription(`La vigilancia del usuario <@${user.id}> ha finalizado tras \`${tiempoText}\`.`)
+                  .setColor(0x00ff00)
+                  .setTimestamp();
+                await ch.send({ embeds: [embed] }).catch(() => {});
+              }
+              // también notificar en logs
+              const logCh = guild.channels.cache.get(LOG_CHANNEL_ID);
+              if (logCh) {
+                const le = new EmbedBuilder()
+                  .setTitle("🔔 Vigilancia finalizada")
+                  .setDescription(`La vigilancia de <@${user.id}> finalizó automáticamente tras \`${tiempoText}\`.`)
+                  .setTimestamp();
+                logCh.send({ embeds: [le] }).catch(() => {});
+              }
+            } catch (e) {
+              console.error("Error finalizando vigilancia automáticamente:", e);
+            } finally {
+              // no borrar canal automáticamente (según lo solicitado)
+              if (activeVigilances.has(user.id)) {
+                const st2 = activeVigilances.get(user.id);
+                st2.timeoutId = null;
+                activeVigilances.set(user.id, st2);
+              }
+            }
+          }, ms);
+          state.timeoutId = tid;
+          activeVigilances.set(user.id, state);
+        }
+
+        const embed = new EmbedBuilder()
+          .setTitle("👀 Vigilancia iniciada")
+          .setDescription(`Se ha creado el canal <#${channel.id}> para vigilar a ${user.tag}.\nDuración: ${ms > 0 ? tiempoText : "Indefinida"}.`)
+          .setColor(0x00ff00)
+          .setTimestamp();
+        // notificar en logs
+        const logCh = guild.channels.cache.get(LOG_CHANNEL_ID);
+        if (logCh) logCh.send({ embeds: [embed] }).catch(() => {});
+        return interaction.reply({ content: `✅ Vigilancia iniciada: ${channel}`, ephemeral: true });
+      }
+
+      if (name === "cerrar_vigilancia") {
+        const user = interaction.options.getUser("usuario");
+        const st = activeVigilances.get(user.id);
+        if (!st) return interaction.reply({ content: "❗ No hay vigilancia activa para ese usuario.", ephemeral: true });
+        const guild = interaction.guild;
+        try {
+          // limpiar timeout si existe
+          if (st.timeoutId) clearTimeout(st.timeoutId);
+          // eliminar registro
+          activeVigilances.delete(user.id);
+          // eliminar canal si existe
+          const ch = guild.channels.cache.get(st.channelId) || await guild.channels.fetch(st.channelId).catch(() => null);
+          if (ch) {
+            await ch.delete("Vigilancia cerrada manualmente").catch(() => {});
+          }
+          // notificar logs
+          const logCh = guild.channels.cache.get(LOG_CHANNEL_ID);
+          if (logCh) {
+            const le = new EmbedBuilder()
+              .setTitle("🗑️ Vigilancia cerrada")
+              .setDescription(`La vigilancia de <@${user.id}> fue cerrada por ${interaction.user.tag}.`)
+              .setTimestamp();
+            logCh.send({ embeds: [le] }).catch(() => {});
+          }
+          return interaction.reply({ content: `✅ Vigilancia de ${user.tag} cerrada y canal eliminado.`, ephemeral: true });
+        } catch (e) {
+          console.error("Error cerrando vigilancia:", e);
+          return interaction.reply({ content: "❌ Error cerrando la vigilancia.", ephemeral: true });
+        }
       }
     } catch (err) {
       console.error("Error en interactionCreate (automod):", err);
@@ -367,13 +626,47 @@ module.exports = (client) => {
       if (!member) return;
       if (STAFF_ROLE_IDS.some((r) => member.roles.cache.has(r))) return; // staff exento
 
+      // --- VIGILANCIA: registrar mensaje si existe vigilancia activa ---
+      const vig = activeVigilances.get(message.author.id);
+      if (vig && vig.active) {
+        try {
+          const guild = message.guild;
+          const ch = guild.channels.cache.get(vig.channelId) || await guild.channels.fetch(vig.channelId).catch(() => null);
+          if (ch) {
+            const emb = new EmbedBuilder()
+              .setTitle("✉️ Mensaje enviado")
+              .addFields(
+                { name: "Usuario", value: `${message.author.tag} (${message.author.id})`, inline: true },
+                { name: "Canal origen", value: `${message.channel}`, inline: true },
+                { name: "ID Mensaje", value: `${message.id}`, inline: true }
+              )
+              .setDescription(message.content?.slice(0, 4096) || "*Sin texto*")
+              .setTimestamp();
+            // si hay adjuntos, intentar añadir primera imagen como miniatura/imagen
+            if (message.attachments && message.attachments.size > 0) {
+              const first = message.attachments.first();
+              if (first.contentType && first.contentType.startsWith("image")) {
+                emb.setImage(first.url);
+              } else {
+                // si no es imagen, añadir url en un campo
+                emb.addFields({ name: "Adjuntos", value: message.attachments.map(a => a.url).join("\n"), inline: false });
+              }
+            }
+            await ch.send({ embeds: [emb] }).catch(() => {});
+          }
+        } catch (e) {
+          console.error("Error registrando mensaje en vigilancia:", e);
+        }
+      }
+
+      // --- resto del automod existente ---
       const content = message.content || "";
       const contentLower = content.toLowerCase();
 
       // 1) Sensitive words (si hay mencion, enviar DM privado al mencionado, log)
       const sensitiveFound = sensitiveWords.find((w) => {
         if (!w) return false;
-        // match phrase or word
+        // match phrase o palabra
         if (w.includes(" ")) return contentLower.includes(w);
         const re = new RegExp(`\\b${w.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&")}\\b`, "u");
         return re.test(contentLower);
@@ -382,20 +675,18 @@ module.exports = (client) => {
         const mentioned = message.mentions.users.first();
         try {
           const dmEmbed = new EmbedBuilder()
-            .setColor("Yellow")
+            .setColor(0xffff00)
             .setTitle("💬 Alerta: posible mensaje ofensivo")
             .setDescription(`Hola ${mentioned.username}, si este mensaje te incomodó u ofendió, puedes crear un ticket en <#${TICKET_CHANNEL_ID}>.`)
             .setFooter({ text: "SirgioBOT - Confidencial y privado" })
             .setTimestamp();
-          await mentioned.send({ embeds: [dmEmbed] }).catch(() => {
-            // usuario con DMs cerrados; ignorar
-          });
+          await mentioned.send({ embeds: [dmEmbed] }).catch(() => {});
 
           // Log
           const logCh = message.guild.channels.cache.get(LOG_CHANNEL_ID);
           if (logCh) {
             const logEmbed = new EmbedBuilder()
-              .setColor("Yellow")
+              .setColor(0xffff00)
               .setTitle("⚠️ Palabra sensible detectada")
               .addFields(
                 { name: "Autor", value: `${message.author.tag} (${message.author.id})`, inline: true },
@@ -462,6 +753,81 @@ module.exports = (client) => {
       // no match -> seguir normal
     } catch (e) {
       console.error("Error en messageCreate automod:", e);
+    }
+  });
+
+  // ====== Registrar eventos para edits y deletes para vigilancia ======
+  client.on("messageDelete", async (message) => {
+    try {
+      if (!message) return;
+      const authorId = message.author?.id || message?.executor?.id;
+      if (!authorId) return;
+      const vig = activeVigilances.get(authorId);
+      if (!vig || !vig.active) return;
+      const guild = client.guilds.cache.get(GUILD_ID);
+      if (!guild) return;
+      const ch = guild.channels.cache.get(vig.channelId) || await guild.channels.fetch(vig.channelId).catch(() => null);
+      if (!ch) return;
+
+      const emb = new EmbedBuilder()
+        .setTitle("🗑️ Mensaje eliminado")
+        .addFields(
+          { name: "Usuario", value: `${message.author ? `${message.author.tag} (${message.author.id})` : `ID: ${authorId}`}`, inline: true },
+          { name: "Canal origen", value: `${message.channel || "Desconocido"}`, inline: true },
+          { name: "ID Mensaje", value: `${message.id || "Desconocido"}`, inline: true }
+        )
+        .setDescription(message.content?.slice(0, 4096) || "*Contenido no disponible (cache)*")
+        .setTimestamp();
+      if (message.attachments && message.attachments.size > 0) {
+        const first = message.attachments.first();
+        if (first.contentType && first.contentType.startsWith("image")) {
+          emb.setImage(first.url);
+        } else {
+          emb.addFields({ name: "Adjuntos", value: message.attachments.map(a => a.url).join("\n"), inline: false });
+        }
+      }
+      await ch.send({ embeds: [emb] }).catch(() => {});
+    } catch (e) {
+      // no romper si falla
+    }
+  });
+
+  client.on("messageUpdate", async (oldMessage, newMessage) => {
+    try {
+      const authorId = (newMessage.author && newMessage.author.id) || (oldMessage && oldMessage.author && oldMessage.author.id);
+      if (!authorId) return;
+      const vig = activeVigilances.get(authorId);
+      if (!vig || !vig.active) return;
+      const guild = client.guilds.cache.get(GUILD_ID);
+      if (!guild) return;
+      const ch = guild.channels.cache.get(vig.channelId) || await guild.channels.fetch(vig.channelId).catch(() => null);
+      if (!ch) return;
+
+      const emb = new EmbedBuilder()
+        .setTitle("✏️ Mensaje editado")
+        .addFields(
+          { name: "Usuario", value: `${newMessage.author ? `${newMessage.author.tag} (${newMessage.author.id})` : `ID: ${authorId}`}`, inline: true },
+          { name: "Canal origen", value: `${newMessage.channel || oldMessage.channel || "Desconocido"}`, inline: true },
+          { name: "ID Mensaje", value: `${newMessage.id || oldMessage.id || "Desconocido"}`, inline: true }
+        )
+        .addFields(
+          { name: "Antes", value: (oldMessage?.content?.slice(0, 1024) || "*No disponible*"), inline: false },
+          { name: "Ahora", value: (newMessage?.content?.slice(0, 1024) || "*No disponible*"), inline: false }
+        )
+        .setTimestamp();
+
+      // attachments: mostrar si cambió
+      if (newMessage.attachments && newMessage.attachments.size > 0) {
+        const first = newMessage.attachments.first();
+        if (first.contentType && first.contentType.startsWith("image")) {
+          emb.setImage(first.url);
+        } else {
+          emb.addFields({ name: "Adjuntos", value: newMessage.attachments.map(a => a.url).join("\n"), inline: false });
+        }
+      }
+      await ch.send({ embeds: [emb] }).catch(() => {});
+    } catch (e) {
+      // no romper si falla
     }
   });
 
