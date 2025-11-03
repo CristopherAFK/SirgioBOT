@@ -4,7 +4,7 @@
 
 const { EmbedBuilder, ChannelType } = require("discord.js");
 
-const WELCOME_CHANNEL_ID = "1255251210173153342"; // Canal de bienvenidas
+const WELCOME_CHANNEL_ID = "1212999950275837972"; // Canal de bienvenidas
 const RULES_CHANNEL_ID = "1212998742505037864";
 const ROLES_CHANNEL_ID = "1422713049957273621";
 
