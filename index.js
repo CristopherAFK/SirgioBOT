@@ -46,6 +46,9 @@ const client = new Client({
 // =========================
 require("./automod")(client);
 require('./welcome.js')(client);
+const postulaciones = require('./postulaciones.js');
+client.commands.set(postulaciones.data.name, postulaciones);
+postulaciones.registerEvents(client);
 
 // STAFF ROLES (admin, mod, headadmin)
 const STAFF_ROLE_IDS = [
