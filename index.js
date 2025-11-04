@@ -50,7 +50,7 @@ client.commands = new Collection();
 // =========================
 require('./automod')(client);
 require('./welcome.js')(client);
-require('./postulaciones.js')(client);
+
 
 
 // STAFF ROLES (admin, mod, headadmin)
