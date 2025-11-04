@@ -1,5 +1,5 @@
 const { Client, GatewayIntentBits, Partials, EmbedBuilder, SlashCommandBuilder, Routes, REST, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, PermissionFlagsBits } = require('discord.js');
-require('dotenv').config();
+
 
 const client = new Client({
   intents: [
@@ -11,7 +11,6 @@ const client = new Client({
 });
 
 // ==================== CONFIG ====================
-const TOKEN = process.env.TOKEN; // ya lo tienes en Render
 const CLIENT_ID = '1420178410512060437';
 const GUILD_ID = '1212886282645147768'; // pon tu ID del servidor
 
