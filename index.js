@@ -42,9 +42,6 @@ const client = new Client({
   partials: [Partials.Channel, Partials.Message, Partials.Reaction]
 });
 
-const { Collection } = require('discord.js');
-client.commands = new Collection();
-
 // =========================
 // CARGAR SISTEMAS
 // =========================
