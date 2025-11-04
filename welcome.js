@@ -29,7 +29,7 @@ module.exports = (client) => {
 
             // Crear embed de bienvenida
             const embed = new EmbedBuilder()
-                .setColor("00a135") // verde
+                .setColor("#A7E0E4") // verde
                 .setTitle(`¡Bienvenid@ ${member.user.username}! ✨`)
                 .setDescription(
                     `Por favor, pasa a leer <#${RULES_CHANNEL_ID}> 📜 y visita <#${ROLES_CHANNEL_ID}> 🎭 para obtener tus roles.\n\n` +
