@@ -1,198 +1,166 @@
-// ===============================
-// 📋 Sistema de Postulaciones - SirgioBOT
-// ===============================
+// =========================
+// SirgioBOT - Sistema de Postulaciones (archivo único)
+// - Comando /postulaciones
+// - Cuestionario con modal (nombre, edad, experiencia, motivo)
+// - Envío automático al canal de postulaciones
+// =========================
 
 const {
-  SlashCommandBuilder,
-  EmbedBuilder,
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
-  ModalBuilder,
-  TextInputBuilder,
-  TextInputStyle,
-  PermissionFlagsBits,
+    Client,
+    GatewayIntentBits,
+    Partials,
+    Collection,
+    SlashCommandBuilder,
+    EmbedBuilder,
+    ActionRowBuilder,
+    ButtonBuilder,
+    ButtonStyle,
+    ModalBuilder,
+    TextInputBuilder,
+    TextInputStyle,
+    REST,
+    Routes,
 } = require("discord.js");
+const { token, clientId, guildId } = require("./config.json");
 
-module.exports = (client) => {
-  client.once("ready", async () => {
-    // ===== Registrar comando directamente =====
-    const commandData = new SlashCommandBuilder()
-      .setName("panelpostulaciones")
-      .setDescription("📋 Envía el panel principal de postulaciones.")
-      .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild);
+// Crear cliente
+const client = new Client({
+    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
+    partials: [Partials.Channel],
+});
 
-    try {
-      await client.application.commands.create(commandData);
-      console.log("✅ Comando /panelpostulaciones registrado correctamente.");
-    } catch (err) {
-      console.error("❌ Error al registrar /panelpostulaciones:", err);
-    }
-  });
+client.commands = new Collection();
 
-  // ===== Evento principal =====
-  client.on("interactionCreate", async (interaction) => {
-    // ======================
-    // Slash Command
-    // ======================
-    if (interaction.isChatInputCommand()) {
-      if (interaction.commandName !== "panelpostulaciones") return;
+// =========================
+// Definición del comando
+// =========================
+const postulacionesCommand = {
+    data: new SlashCommandBuilder()
+        .setName("postulaciones")
+        .setDescription("Abre el panel de postulaciones del servidor"),
+    async execute(interaction) {
+        const embed = new EmbedBuilder()
+            .setColor("#3498db")
+            .setTitle("📋 Postulaciones del Staff")
+            .setDescription("¿Quieres formar parte del equipo del servidor?\n\nPulsa el botón **Postularme** para comenzar tu solicitud.")
+            .setFooter({ text: "SirgioBOT • Sistema de Postulaciones" });
 
-      const CANAL_PERMITIDO = "1435093988196618383"; // 📂│postulaciones
-      if (interaction.channelId !== CANAL_PERMITIDO) {
-        return interaction.reply({
-          content: "❌ Este comando solo puede usarse en <#1435093988196618383>.",
-          ephemeral: true,
-        });
-      }
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId("abrir_postulacion")
+                .setLabel("📨 Postularme")
+                .setStyle(ButtonStyle.Primary)
+        );
 
-      const embed = new EmbedBuilder()
-        .setTitle("📋 | Postulaciones del Staff")
-        .setDescription(
-          `¿Quieres formar parte del equipo? Estos son los **requisitos mínimos**:\n\n` +
-            `🕓 Tener más de **16 años**\n` +
-            `📅 Haber estado al menos **3 meses** en el servidor\n` +
-            `💬 Ser **activo** en la comunidad\n` +
-            `🧾 Tener un **buen historial** de comportamiento\n` +
-            `🚫 No haber tenido problemas graves con otros miembros\n` +
-            `🗒️ Responder con sinceridad el siguiente **cuestionario**\n\n` +
-            `Selecciona el tipo de postulación que deseas enviar 👇`
-        )
-        .setColor("Blue")
-        .setThumbnail(interaction.guild.iconURL())
-        .setFooter({ text: "SirgioBOT - Sistema de Postulaciones" });
-
-      const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-          .setCustomId("postular_helper")
-          .setLabel("🧭 Helper")
-          .setStyle(ButtonStyle.Primary),
-        new ButtonBuilder()
-          .setCustomId("postular_editor")
-          .setLabel("🎬 Editor (Sirgio)")
-          .setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder()
-          .setCustomId("postular_programador")
-          .setLabel("💻 Programador (Server)")
-          .setStyle(ButtonStyle.Success),
-        new ButtonBuilder()
-          .setCustomId("postular_organizador")
-          .setLabel("🎉 Organizador de eventos")
-          .setStyle(ButtonStyle.Danger)
-      );
-
-      await interaction.reply({
-        embeds: [embed],
-        components: [row],
-      });
-    }
-
-    // ======================
-    // Botones de postulación
-    // ======================
-    if (interaction.isButton()) {
-      const id = interaction.customId;
-
-      // Crear modal según el tipo de postulación
-      const modal = new ModalBuilder()
-        .setCustomId(`form_${id}`)
-        .setTitle("📋 Formulario de Postulación");
-
-      const preguntas = [
-        new TextInputBuilder()
-          .setCustomId("nombre")
-          .setLabel("¿Cuál es tu nombre o apodo?")
-          .setStyle(TextInputStyle.Short)
-          .setRequired(true),
-
-        new TextInputBuilder()
-          .setCustomId("edad")
-          .setLabel("¿Cuál es tu edad?")
-          .setStyle(TextInputStyle.Short)
-          .setRequired(true),
-
-        new TextInputBuilder()
-          .setCustomId("tiempo")
-          .setLabel("¿Hace cuánto tiempo estás en el servidor?")
-          .setStyle(TextInputStyle.Short)
-          .setRequired(true),
-
-        new TextInputBuilder()
-          .setCustomId("motivo")
-          .setLabel("¿Por qué deseas unirte al staff?")
-          .setStyle(TextInputStyle.Paragraph)
-          .setRequired(true),
-
-        new TextInputBuilder()
-          .setCustomId("experiencia")
-          .setLabel("¿Tienes experiencia previa en el rol?")
-          .setStyle(TextInputStyle.Paragraph)
-          .setRequired(true),
-      ];
-
-      // Añadir campos al modal
-      modal.addComponents(
-        ...preguntas.map((p) => new ActionRowBuilder().addComponents(p))
-      );
-
-      await interaction.showModal(modal);
-    }
-
-    // ======================
-    // Cuando se envía el formulario
-    // ======================
-    if (interaction.isModalSubmit()) {
-      const { customId } = interaction;
-
-      if (
-        ![
-          "form_postular_helper",
-          "form_postular_editor",
-          "form_postular_programador",
-          "form_postular_organizador",
-        ].includes(customId)
-      )
-        return;
-
-      const nombre = interaction.fields.getTextInputValue("nombre");
-      const edad = interaction.fields.getTextInputValue("edad");
-      const tiempo = interaction.fields.getTextInputValue("tiempo");
-      const motivo = interaction.fields.getTextInputValue("motivo");
-      const experiencia = interaction.fields.getTextInputValue("experiencia");
-
-      const tipo =
-        customId === "form_postular_helper"
-          ? "🧭 Helper"
-          : customId === "form_postular_editor"
-          ? "🎬 Editor (Sirgio)"
-          : customId === "form_postular_programador"
-          ? "💻 Programador (Server)"
-          : "🎉 Organizador de eventos";
-
-      const embed = new EmbedBuilder()
-        .setTitle(`${tipo} - Nueva Postulación`)
-        .setColor("Green")
-        .addFields(
-          { name: "👤 Usuario", value: `${interaction.user}`, inline: true },
-          { name: "🕵️ Nombre / Apodo", value: nombre, inline: true },
-          { name: "🎂 Edad", value: edad, inline: true },
-          { name: "📅 Tiempo en el servidor", value: tiempo, inline: false },
-          { name: "💭 Motivación", value: motivo, inline: false },
-          { name: "🧰 Experiencia", value: experiencia, inline: false }
-        )
-        .setThumbnail(interaction.user.displayAvatarURL())
-        .setTimestamp();
-
-      // Canal donde se envían las postulaciones
-      const CANAL_STAFF = "1255251210173153342"; // 🔎 Canal de revisión
-      const canal = interaction.guild.channels.cache.get(CANAL_STAFF);
-      if (canal) await canal.send({ embeds: [embed] });
-
-      await interaction.reply({
-        content:
-          "✅ Tu postulación fue enviada correctamente. El equipo del staff la revisará pronto.",
-        ephemeral: true,
-      });
-    }
-  });
+        await interaction.reply({ embeds: [embed], components: [row] });
+    },
 };
+
+// Agregar a la colección de comandos
+client.commands.set(postulacionesCommand.data.name, postulacionesCommand);
+
+// =========================
+// Registro del comando (sin deploy externo)
+// =========================
+const rest = new REST({ version: "10" }).setToken(token);
+(async () => {
+    try {
+        console.log("🌀 Registrando comando /postulaciones...");
+        await rest.put(Routes.applicationGuildCommands(clientId, guildId), {
+            body: [postulacionesCommand.data.toJSON()],
+        });
+        console.log("✅ Comando /postulaciones registrado correctamente.");
+    } catch (error) {
+        console.error(error);
+    }
+})();
+
+// =========================
+// Eventos del bot
+// =========================
+client.once("ready", () => {
+    console.log(`✅ Conectado como ${client.user.tag}`);
+});
+
+client.on("interactionCreate", async (interaction) => {
+    // Ejecución del comando
+    if (interaction.isChatInputCommand()) {
+        const command = client.commands.get(interaction.commandName);
+        if (!command) return;
+        try {
+            await command.execute(interaction);
+        } catch (error) {
+            console.error(error);
+            await interaction.reply({ content: "⚠️ Hubo un error al ejecutar el comando.", ephemeral: true });
+        }
+    }
+
+    // Abrir formulario
+    if (interaction.isButton() && interaction.customId === "abrir_postulacion") {
+        const modal = new ModalBuilder()
+            .setCustomId("modal_postulacion")
+            .setTitle("Formulario de Postulación");
+
+        const nombre = new TextInputBuilder()
+            .setCustomId("nombre_input")
+            .setLabel("¿Cuál es tu nombre o apodo?")
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true);
+
+        const edad = new TextInputBuilder()
+            .setCustomId("edad_input")
+            .setLabel("¿Cuántos años tienes?")
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true);
+
+        const experiencia = new TextInputBuilder()
+            .setCustomId("experiencia_input")
+            .setLabel("¿Tienes experiencia en staff?")
+            .setStyle(TextInputStyle.Paragraph)
+            .setRequired(true);
+
+        const motivo = new TextInputBuilder()
+            .setCustomId("motivo_input")
+            .setLabel("¿Por qué quieres unirte al staff?")
+            .setStyle(TextInputStyle.Paragraph)
+            .setRequired(true);
+
+        modal.addComponents(
+            new ActionRowBuilder().addComponents(nombre),
+            new ActionRowBuilder().addComponents(edad),
+            new ActionRowBuilder().addComponents(experiencia),
+            new ActionRowBuilder().addComponents(motivo)
+        );
+
+        await interaction.showModal(modal);
+    }
+
+    // Procesar envío del formulario
+    if (interaction.isModalSubmit() && interaction.customId === "modal_postulacion") {
+        const nombre = interaction.fields.getTextInputValue("nombre_input");
+        const edad = interaction.fields.getTextInputValue("edad_input");
+        const experiencia = interaction.fields.getTextInputValue("experiencia_input");
+        const motivo = interaction.fields.getTextInputValue("motivo_input");
+
+        const embed = new EmbedBuilder()
+            .setColor("#2ecc71")
+            .setTitle("📨 Nueva Postulación Recibida")
+            .addFields(
+                { name: "👤 Nombre", value: nombre, inline: true },
+                { name: "🎂 Edad", value: edad, inline: true },
+                { name: "💼 Experiencia", value: experiencia },
+                { name: "📝 Motivo", value: motivo },
+            )
+            .setFooter({ text: `Postulación enviada por ${interaction.user.tag}` })
+            .setTimestamp();
+
+        // Reemplaza este ID por el del canal donde quieres que se envíen las postulaciones
+        const canalDestino = interaction.guild.channels.cache.get("1435091853308461179");
+
+        if (canalDestino) {
+            await canalDestino.send({ embeds: [embed] });
+        }
+
+        await interaction.reply({ content: "✅ Tu postulación fue enviada correctamente. ¡Gracias!", ephemeral: true });
+    }
+});
