@@ -1,132 +1,198 @@
-// =========================
-// Sistema de Postulaciones - SirgioBOT
-// =========================
+// ===============================
+// 📋 Sistema de Postulaciones - SirgioBOT
+// ===============================
+
+const {
+  SlashCommandBuilder,
+  EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
+  PermissionFlagsBits,
+} = require("discord.js");
 
 module.exports = (client) => {
-  const {
-    SlashCommandBuilder,
-    EmbedBuilder,
-    ActionRowBuilder,
-    StringSelectMenuBuilder,
-    ChannelType,
-    PermissionFlagsBits,
-  } = require("discord.js");
+  client.once("ready", async () => {
+    // ===== Registrar comando directamente =====
+    const commandData = new SlashCommandBuilder()
+      .setName("panelpostulaciones")
+      .setDescription("📋 Envía el panel principal de postulaciones.")
+      .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild);
 
-  // =========================
-  // CONFIGURACIÓN
-  // =========================
-
-  const POST_CHANNEL_ID = "1435093988196618383"; // canal donde se hacen las postulaciones
-  const STAFF_ROLE_ID = "1435091853308461179"; // solo el staff puede usar /postular normalmente
-
-  // =========================
-  // REGISTRO DEL COMANDO
-  // =========================
-
-  client.commands.set(
-    "postular",
-    new SlashCommandBuilder()
-      .setName("postular")
-      .setDescription("Crea una postulación para un puesto en el servidor.")
-      .setDefaultMemberPermissions(PermissionFlagsBits.SendMessages)
-      .toJSON()
-  );
-
-  // =========================
-  // SISTEMA DE POSTULACIONES
-  // =========================
-
-  client.on("interactionCreate", async (interaction) => {
-    if (!interaction.isChatInputCommand()) return;
-    if (interaction.commandName !== "postular") return;
-
-    // Restricción: solo el canal permitido
-    if (interaction.channel.id !== POST_CHANNEL_ID) {
-      return interaction.reply({
-        content: "❌ Este comando solo puede usarse en el canal de postulaciones.",
-        ephemeral: true,
-      });
+    try {
+      await client.application.commands.create(commandData);
+      console.log("✅ Comando /panelpostulaciones registrado correctamente.");
+    } catch (err) {
+      console.error("❌ Error al registrar /panelpostulaciones:", err);
     }
-
-    // Restricción: solo staff (cuando el sistema esté cerrado)
-    if (
-      !interaction.member.roles.cache.has(STAFF_ROLE_ID) &&
-      !interaction.channel.permissionsFor(interaction.guild.members.me).has(PermissionFlagsBits.SendMessages)
-    ) {
-      return interaction.reply({
-        content: "🚫 Actualmente las postulaciones están cerradas. Espera al próximo período de apertura.",
-        ephemeral: true,
-      });
-    }
-
-    // Embed con las instrucciones y requisitos
-    const requisitos = new EmbedBuilder()
-      .setColor("#f7b731")
-      .setTitle("📋 Requisitos para Postularte")
-      .setDescription(
-        "Antes de postularte, asegúrate de cumplir con los siguientes requisitos:\n\n" +
-          "✅ Tener más de **16 años**\n" +
-          "✅ Haber entrado hace **mínimo 3 meses** al servidor\n" +
-          "✅ Ser **activo** en la comunidad\n" +
-          "✅ Tener un **buen historial** (sin sanciones frecuentes)\n" +
-          "✅ No haber tenido **problemas graves** con otros miembros\n" +
-          "✅ **Responder con sinceridad** al siguiente cuestionario\n\n" +
-          "Selecciona el tipo de postulación que deseas realizar:"
-      )
-      .setFooter({ text: "SirgioBOT | Sistema de Postulaciones" })
-      .setTimestamp();
-
-    const menu = new StringSelectMenuBuilder()
-      .setCustomId("tipo_postulacion")
-      .setPlaceholder("📌 Selecciona un tipo de postulación")
-      .addOptions([
-        {
-          label: "Helper 🧹",
-          description: "Ayuda a moderar y apoyar la comunidad.",
-          value: "helper",
-        },
-        {
-          label: "Editor 🎬",
-          description: "Edita contenido para Sirgio.",
-          value: "editor",
-        },
-        {
-          label: "Programador 💻",
-          description: "Apoya en desarrollo técnico y del bot.",
-          value: "programador",
-        },
-        {
-          label: "Organizador 🎉",
-          description: "Crea y gestiona eventos del servidor.",
-          value: "organizador",
-        },
-      ]);
-
-    const row = new ActionRowBuilder().addComponents(menu);
-
-    await interaction.reply({ embeds: [requisitos], components: [row] });
   });
 
-  // =========================
-  // MANEJO DE SELECCIÓN
-  // =========================
-
+  // ===== Evento principal =====
   client.on("interactionCreate", async (interaction) => {
-    if (!interaction.isStringSelectMenu()) return;
-    if (interaction.customId !== "tipo_postulacion") return;
+    // ======================
+    // Slash Command
+    // ======================
+    if (interaction.isChatInputCommand()) {
+      if (interaction.commandName !== "panelpostulaciones") return;
 
-    const tipo = interaction.values[0];
-    const channel = interaction.channel;
+      const CANAL_PERMITIDO = "1435093988196618383"; // 📂│postulaciones
+      if (interaction.channelId !== CANAL_PERMITIDO) {
+        return interaction.reply({
+          content: "❌ Este comando solo puede usarse en <#1435093988196618383>.",
+          ephemeral: true,
+        });
+      }
 
-    const confirm = new EmbedBuilder()
-      .setColor("#00ff99")
-      .setTitle("✅ Postulación Iniciada")
-      .setDescription(
-        `Has seleccionado el puesto de **${tipo.toUpperCase()}**.\n\nPor favor, espera a que se te envíe el formulario o instrucciones correspondientes.`
+      const embed = new EmbedBuilder()
+        .setTitle("📋 | Postulaciones del Staff")
+        .setDescription(
+          `¿Quieres formar parte del equipo? Estos son los **requisitos mínimos**:\n\n` +
+            `🕓 Tener más de **16 años**\n` +
+            `📅 Haber estado al menos **3 meses** en el servidor\n` +
+            `💬 Ser **activo** en la comunidad\n` +
+            `🧾 Tener un **buen historial** de comportamiento\n` +
+            `🚫 No haber tenido problemas graves con otros miembros\n` +
+            `🗒️ Responder con sinceridad el siguiente **cuestionario**\n\n` +
+            `Selecciona el tipo de postulación que deseas enviar 👇`
+        )
+        .setColor("Blue")
+        .setThumbnail(interaction.guild.iconURL())
+        .setFooter({ text: "SirgioBOT - Sistema de Postulaciones" });
+
+      const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId("postular_helper")
+          .setLabel("🧭 Helper")
+          .setStyle(ButtonStyle.Primary),
+        new ButtonBuilder()
+          .setCustomId("postular_editor")
+          .setLabel("🎬 Editor (Sirgio)")
+          .setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder()
+          .setCustomId("postular_programador")
+          .setLabel("💻 Programador (Server)")
+          .setStyle(ButtonStyle.Success),
+        new ButtonBuilder()
+          .setCustomId("postular_organizador")
+          .setLabel("🎉 Organizador de eventos")
+          .setStyle(ButtonStyle.Danger)
+      );
+
+      await interaction.reply({
+        embeds: [embed],
+        components: [row],
+      });
+    }
+
+    // ======================
+    // Botones de postulación
+    // ======================
+    if (interaction.isButton()) {
+      const id = interaction.customId;
+
+      // Crear modal según el tipo de postulación
+      const modal = new ModalBuilder()
+        .setCustomId(`form_${id}`)
+        .setTitle("📋 Formulario de Postulación");
+
+      const preguntas = [
+        new TextInputBuilder()
+          .setCustomId("nombre")
+          .setLabel("¿Cuál es tu nombre o apodo?")
+          .setStyle(TextInputStyle.Short)
+          .setRequired(true),
+
+        new TextInputBuilder()
+          .setCustomId("edad")
+          .setLabel("¿Cuál es tu edad?")
+          .setStyle(TextInputStyle.Short)
+          .setRequired(true),
+
+        new TextInputBuilder()
+          .setCustomId("tiempo")
+          .setLabel("¿Hace cuánto tiempo estás en el servidor?")
+          .setStyle(TextInputStyle.Short)
+          .setRequired(true),
+
+        new TextInputBuilder()
+          .setCustomId("motivo")
+          .setLabel("¿Por qué deseas unirte al staff?")
+          .setStyle(TextInputStyle.Paragraph)
+          .setRequired(true),
+
+        new TextInputBuilder()
+          .setCustomId("experiencia")
+          .setLabel("¿Tienes experiencia previa en el rol?")
+          .setStyle(TextInputStyle.Paragraph)
+          .setRequired(true),
+      ];
+
+      // Añadir campos al modal
+      modal.addComponents(
+        ...preguntas.map((p) => new ActionRowBuilder().addComponents(p))
+      );
+
+      await interaction.showModal(modal);
+    }
+
+    // ======================
+    // Cuando se envía el formulario
+    // ======================
+    if (interaction.isModalSubmit()) {
+      const { customId } = interaction;
+
+      if (
+        ![
+          "form_postular_helper",
+          "form_postular_editor",
+          "form_postular_programador",
+          "form_postular_organizador",
+        ].includes(customId)
       )
-      .setFooter({ text: "SirgioBOT | Sistema de Postulaciones" })
-      .setTimestamp();
+        return;
 
-    await interaction.reply({ embeds: [confirm], ephemeral: true });
+      const nombre = interaction.fields.getTextInputValue("nombre");
+      const edad = interaction.fields.getTextInputValue("edad");
+      const tiempo = interaction.fields.getTextInputValue("tiempo");
+      const motivo = interaction.fields.getTextInputValue("motivo");
+      const experiencia = interaction.fields.getTextInputValue("experiencia");
+
+      const tipo =
+        customId === "form_postular_helper"
+          ? "🧭 Helper"
+          : customId === "form_postular_editor"
+          ? "🎬 Editor (Sirgio)"
+          : customId === "form_postular_programador"
+          ? "💻 Programador (Server)"
+          : "🎉 Organizador de eventos";
+
+      const embed = new EmbedBuilder()
+        .setTitle(`${tipo} - Nueva Postulación`)
+        .setColor("Green")
+        .addFields(
+          { name: "👤 Usuario", value: `${interaction.user}`, inline: true },
+          { name: "🕵️ Nombre / Apodo", value: nombre, inline: true },
+          { name: "🎂 Edad", value: edad, inline: true },
+          { name: "📅 Tiempo en el servidor", value: tiempo, inline: false },
+          { name: "💭 Motivación", value: motivo, inline: false },
+          { name: "🧰 Experiencia", value: experiencia, inline: false }
+        )
+        .setThumbnail(interaction.user.displayAvatarURL())
+        .setTimestamp();
+
+      // Canal donde se envían las postulaciones
+      const CANAL_STAFF = "1255251210173153342"; // 🔎 Canal de revisión
+      const canal = interaction.guild.channels.cache.get(CANAL_STAFF);
+      if (canal) await canal.send({ embeds: [embed] });
+
+      await interaction.reply({
+        content:
+          "✅ Tu postulación fue enviada correctamente. El equipo del staff la revisará pronto.",
+        ephemeral: true,
+      });
+    }
   });
 };
