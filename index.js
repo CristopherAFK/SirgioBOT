@@ -41,12 +41,17 @@ const client = new Client({
   ],
   partials: [Partials.Channel, Partials.Message, Partials.Reaction]
 });
+
+const { Collection } = require('discord.js');
+client.commands = new Collection();
+
 // =========================
-// CARGAR SISTEMA AUTOMOD
+// CARGAR SISTEMAS
 // =========================
-require("./automod")(client);
+require('./automod')(client);
 require('./welcome.js')(client);
 require('./postulaciones.js')(client);
+
 
 // STAFF ROLES (admin, mod, headadmin)
 const STAFF_ROLE_IDS = [
