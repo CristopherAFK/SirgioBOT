@@ -675,12 +675,19 @@ module.exports = (client) => {
       if (sensitiveFound && message.mentions.users.size > 0) {
         const mentioned = message.mentions.users.first();
         try {
-          const dmEmbed = new EmbedBuilder()
-            .setColor(0xffff00)
-            .setTitle("💬 Alerta: posible mensaje ofensivo")
-            .setDescription(`Hola ${mentioned.username}, si este mensaje te incomodó u ofendió, puedes crear un ticket en <#${TICKET_CHANNEL_ID}>.`)
-            .setFooter({ text: "SirgioBOT - Confidencial y privado" })
-            .setTimestamp();
+         const dmEmbed = new EmbedBuilder()
+  .setColor(0xffff00)
+  .setTitle("💬 Alerta: posible mensaje ofensivo")
+  .setDescription(
+    `Hola ${mentioned.username}, alguien dijo una palabra que podría ser ofensiva para ti.\n\n` +
+    `**Autor:** ${message.author.tag}\n` +
+    `**Palabra detectada:** "${sensitiveFound}"\n` +
+    `**Fecha y hora:** ${new Date().toLocaleString()}\n\n` +
+    `Si te sentiste ofendido o incómodo, por favor reporta al usuario en <#${TICKET_CHANNEL_ID}>.`
+  )
+  .setFooter({ text: "SirgioBOT - Confidencial y privado" })
+  .setTimestamp();
+
           await mentioned.send({ embeds: [dmEmbed] }).catch(() => {});
 
           // Log
@@ -714,12 +721,7 @@ module.exports = (client) => {
         return;
       }
 
-      // 3) Links
-      if (/(https?:\/\/[^\s]+)/gi.test(content)) {
-        await message.delete().catch(() => {});
-        await applyWarn(client, message.guild, message.author, member, "Envío de links no permitidos", null);
-        return;
-      }
+     
 
       // 4) Exceso de mayúsculas
       const lettersOnly = content.replace(/[^A-Za-z]/g, "");
