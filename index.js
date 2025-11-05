@@ -143,16 +143,17 @@ client.on("messageCreate", async (message) => {
       .setTimestamp();
 
     const menu = new StringSelectMenuBuilder()
-      .setCustomId("ticket_category_select")
-      .setPlaceholder("Selecciona una categoría")
-      .addOptions([
-        { label: "Discord Bots", value: "discord_bots", emoji: EMOJI_IDS.discord_bots },
-        { label: "Reportar usuario", value: "report_user", emoji: EMOJI_IDS.report_user },
-        { label: "Streams", value: "streams", emoji: EMOJI_IDS.streams },
-        { label: "Lives", value: "lives", emoji: EMOJI_IDS.lives },
-        { label: "Dudas", value: "dudas", emoji: EMOJI_IDS.dudas },
-        { label: "Otro", value: "otro", emoji: EMOJI_IDS.otro }
-      ]);
+  .setCustomId("ticket_category_select")
+  .setPlaceholder("Selecciona una categoría")
+  .addOptions([
+    { label: "Discord Bots", value: "discord_bots", emoji: EMOJI_IDS.discord_bots },
+    { label: "Reportar usuario", value: "report_user", emoji: EMOJI_IDS.report_user },
+    { label: "Streams", value: "streams", emoji: EMOJI_IDS.streams },
+    { label: "Lives", value: "lives", emoji: EMOJI_IDS.lives },
+    { label: "Dudas", value: "dudas", emoji: EMOJI_IDS.dudas },
+    { label: "Sanción injusta", value: "sancion_injusta", emoji: "🚫" },
+    { label: "Otro", value: "otro", emoji: EMOJI_IDS.otro }
+  ]);
 
     const row = new ActionRowBuilder().addComponents(menu);
     await message.channel.send({ embeds: [embed], components: [row] });
