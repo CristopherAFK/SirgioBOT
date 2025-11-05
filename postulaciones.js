@@ -1,276 +1,244 @@
-// postulaciones.js
-// SirgioBOT - Sistema de Postulaciones completo (único archivo)
-// Requisitos: discord.js v14, Node 18+
+// =========================
+// SirgioBOT - Sistema de Postulaciones
+// =========================
 
 const {
-  Client,
-  GatewayIntentBits,
-  REST,
-  Routes,
   SlashCommandBuilder,
+  EmbedBuilder,
   PermissionFlagsBits,
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
   ModalBuilder,
   TextInputBuilder,
   TextInputStyle,
-  EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
 } = require('discord.js');
 
-const POST_CHANNEL_ID = '1435091853308461179';       // canal donde llegan postulaciones (staff)
-const PANEL_CHANNEL_ID = '1435093988196618383';      // canal donde se puede usar /postular
-const STAFF_ROLE_1 = '1212891335929897030';          // staff principal
-const STAFF_ROLE_2 = '1229140504310972599';          // staff secundario autorizado
-let postulacionesAbiertas = false;
+const fs = require('fs');
 
-// =============================
-// Comandos slash
-// =============================
-const COMMANDS = [
-  new SlashCommandBuilder()
-    .setName('abrirpostulaciones')
-    .setDescription('Abre las postulaciones para todos.')
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
+// =========================
+// CONFIG
+// =========================
+const CANAL_POSTULACIONES = '1435091853308461179';
+const CANAL_COMANDOS = '1435093988196618383';
+const STAFF_ROLES = ['1212891335929897030', '1229140504310972599'];
 
-  new SlashCommandBuilder()
-    .setName('cerrarpostulaciones')
-    .setDescription('Cierra las postulaciones.')
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
+// Archivo donde se guarda el estado de las postulaciones
+const STATE_FILE = './postulaciones_estado.json';
 
-  new SlashCommandBuilder()
-    .setName('postular')
-    .setDescription('Postúlate a una categoría.')
-    .addStringOption(opt =>
-      opt
-        .setName('categoria')
-        .setDescription('Selecciona la categoría')
-        .setRequired(true)
-        .addChoices(
-          { name: 'Twitch MOD', value: 'twitch' },
-          { name: 'TikTok MOD', value: 'tiktok' },
-          { name: 'Discord Programador', value: 'programador' },
-          { name: 'Editor de Sirgio', value: 'editor' },
-          { name: 'Discord Helper', value: 'helper' }
-        )
-    ),
-].map(c => c.toJSON());
+// =========================
+// Estado global de postulaciones
+// =========================
+function obtenerEstado() {
+  try {
+    const data = fs.readFileSync(STATE_FILE, 'utf8');
+    const json = JSON.parse(data);
+    return json.abiertas;
+  } catch {
+    return false;
+  }
+}
 
-// =============================
-// Export principal
-// =============================
-module.exports = async (client) => {
-  // Registrar comandos (guild si existe GUILD_ID)
-  client.once('ready', async () => {
-    try {
-      const rest = new REST({ version: '10' }).setToken(process.env.TOKEN || client.token);
-      if (process.env.GUILD_ID) {
-        await rest.put(Routes.applicationGuildCommands(client.user.id, process.env.GUILD_ID), { body: COMMANDS });
-        console.log('✅ Comandos registrados en guild', process.env.GUILD_ID);
-      } else {
-        await rest.put(Routes.applicationCommands(client.user.id), { body: COMMANDS });
-        console.log('✅ Comandos registrados globalmente.');
-      }
-    } catch (err) {
-      console.error('Error registrando comandos:', err);
-    }
-    console.log(`${client.user.tag} listo.`);
-  });
+function guardarEstado(abiertas) {
+  fs.writeFileSync(STATE_FILE, JSON.stringify({ abiertas }, null, 2));
+}
 
-  // =============================
-  // Sistema principal
-  // =============================
+// =========================
+// EXPORTAR COMANDOS
+// =========================
+module.exports = (client) => {
   client.on('interactionCreate', async (interaction) => {
-    try {
-      // -----------------------
-      // Slash Commands
-      // -----------------------
-      if (interaction.isChatInputCommand()) {
-        const { commandName } = interaction;
+    if (!interaction.isChatInputCommand() && !interaction.isButton() && !interaction.isModalSubmit()) return;
 
-        // /abrirpostulaciones
-        if (commandName === 'abrirpostulaciones') {
-          if (!interaction.member.roles.cache.has(STAFF_ROLE_1) && !interaction.member.roles.cache.has(STAFF_ROLE_2)) {
-            return interaction.reply({ content: '❌ No tienes permiso para usar este comando.', ephemeral: true });
-          }
-          postulacionesAbiertas = true;
-          return interaction.reply({ content: '✅ Las postulaciones se han abierto. /postular disponible en <#' + PANEL_CHANNEL_ID + '>.', ephemeral: true });
-        }
-
-        // /cerrarpostulaciones
-        if (commandName === 'cerrarpostulaciones') {
-          if (!interaction.member.roles.cache.has(STAFF_ROLE_1) && !interaction.member.roles.cache.has(STAFF_ROLE_2)) {
-            return interaction.reply({ content: '❌ No tienes permiso para usar este comando.', ephemeral: true });
-          }
-          postulacionesAbiertas = false;
-          return interaction.reply({ content: '❌ Las postulaciones se han cerrado.', ephemeral: true });
-        }
-
-        // /postular
-        if (commandName === 'postular') {
-          if (interaction.channelId !== PANEL_CHANNEL_ID) {
-            return interaction.reply({ content: `❌ El comando /postular solo funciona en <#${PANEL_CHANNEL_ID}>.`, ephemeral: true });
-          }
-
-          // ✅ ahora si están abiertas, cualquiera puede usarlo
-          if (!postulacionesAbiertas && !interaction.member.roles.cache.has(STAFF_ROLE_1) && !interaction.member.roles.cache.has(STAFF_ROLE_2)) {
-            return interaction.reply({ content: '🚫 Las postulaciones están cerradas actualmente.', ephemeral: true });
-          }
-
-          const categoria = interaction.options.getString('categoria');
-          const modal = new ModalBuilder()
-            .setCustomId(`postu_modal::${categoria}`)
-            .setTitle(`Postulación — ${categoria.toUpperCase()}`);
-
-          const in1 = new TextInputBuilder().setCustomId('q_name').setLabel('Tu nombre/apodo').setStyle(TextInputStyle.Short);
-          const in2 = new TextInputBuilder().setCustomId('q_age').setLabel('Edad').setStyle(TextInputStyle.Short);
-          const in3 = new TextInputBuilder().setCustomId('q_exp').setLabel('¿Experiencia en esta área?').setStyle(TextInputStyle.Paragraph);
-          const in4 = new TextInputBuilder().setCustomId('q_time').setLabel('Tiempo semanal disponible').setStyle(TextInputStyle.Short);
-
-          const extraLabel =
-            categoria === 'twitch'
-              ? '¿Qué harías si alguien spamea o causa peleas?'
-              : categoria === 'tiktok'
-              ? '¿Tienes experiencia moderando chats en directo?'
-              : categoria === 'programador'
-              ? '¿Lenguajes o proyectos que manejas?'
-              : categoria === 'editor'
-              ? '¿Programas que usas para editar?'
-              : '¿Qué harías si un usuario necesita ayuda y no hay staff?';
-
-          const in5 = new TextInputBuilder().setCustomId('q_extra').setLabel(extraLabel).setStyle(TextInputStyle.Paragraph);
-
-          modal.addComponents(
-            new ActionRowBuilder().addComponents(in1),
-            new ActionRowBuilder().addComponents(in2),
-            new ActionRowBuilder().addComponents(in3),
-            new ActionRowBuilder().addComponents(in4),
-            new ActionRowBuilder().addComponents(in5)
-          );
-
-          return interaction.showModal(modal);
-        }
+    // =========================
+    // /postular
+    // =========================
+    if (interaction.commandName === 'postular') {
+      if (interaction.channel.id !== CANAL_COMANDOS) {
+        return interaction.reply({
+          content: `❌ Este comando solo puede usarse en <#${CANAL_COMANDOS}>.`,
+          ephemeral: true,
+        });
       }
 
-      // -----------------------
-      // Modal submit (postulación)
-      // -----------------------
-      if (interaction.isModalSubmit() && interaction.customId.startsWith('postu_modal::')) {
-        const categoria = interaction.customId.split('::')[1];
-        const name = interaction.fields.getTextInputValue('q_name') || 'No respondió';
-        const age = interaction.fields.getTextInputValue('q_age') || 'No respondió';
-        const exp = interaction.fields.getTextInputValue('q_exp') || 'No respondió';
-        const time = interaction.fields.getTextInputValue('q_time') || 'No respondió';
-        const extra = interaction.fields.getTextInputValue('q_extra') || 'No respondió';
+      const postulacionesAbiertas = obtenerEstado();
+      const tieneRolStaff = STAFF_ROLES.some((id) => interaction.member.roles.cache.has(id));
 
-        const texto = [
-          `📨 **Nueva Postulación - ${categoria.toUpperCase()}**`,
-          `👤 Usuario: ${interaction.user.tag} (${interaction.user.id})`,
-          '',
-          `• Nombre/apodo: ${name}`,
-          `• Edad: ${age}`,
-          `• Experiencia: ${exp}`,
-          `• Tiempo disponible: ${time}`,
-          `• Extra: ${extra}`
-        ].join('\n');
-
-        const row = new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setCustomId(`aceptar::${interaction.user.id}::${interaction.id}`).setLabel('Aceptar').setStyle(ButtonStyle.Success),
-          new ButtonBuilder().setCustomId(`rechazar::${interaction.user.id}::${interaction.id}`).setLabel('Rechazar').setStyle(ButtonStyle.Danger)
-        );
-
-        const postChannel = await client.channels.fetch(POST_CHANNEL_ID).catch(() => null);
-        if (!postChannel) return interaction.reply({ content: '❌ Error: canal no encontrado.', ephemeral: true });
-
-        await postChannel.send({ content: texto, components: [row] });
-        await interaction.reply({ content: '✅ Tu postulación fue enviada correctamente.', ephemeral: true });
-        return;
+      // Si las postulaciones están cerradas y no es staff
+      if (!postulacionesAbiertas && !tieneRolStaff) {
+        return interaction.reply({
+          content: '🚫 Las postulaciones están cerradas actualmente. Espera a que se abran nuevamente.',
+          ephemeral: true,
+        });
       }
 
-      // -----------------------
-      // Botones Aceptar / Rechazar
-      // -----------------------
-      if (interaction.isButton() && (interaction.customId.startsWith('aceptar::') || interaction.customId.startsWith('rechazar::'))) {
-        const member = interaction.member;
-        if (
-          !member.roles.cache.has(STAFF_ROLE_1) &&
-          !member.roles.cache.has(STAFF_ROLE_2) &&
-          !member.permissions.has(PermissionFlagsBits.ManageGuild)
-        ) {
-          return interaction.reply({ content: '❌ No tienes permiso para realizar esta acción.', ephemeral: true });
-        }
+      const categoria = interaction.options.getString('categoria');
+      let modal;
 
-        const parts = interaction.customId.split('::');
-        const accion = parts[0];
-        const userId = parts[1];
-        const originId = parts[2];
+      // Modal dinámico según categoría
+      const preguntasComunes = [
+        {
+          id: 'experiencia',
+          label: '¿Tienes experiencia en esta área?',
+          placeholder: 'Describe brevemente tu experiencia (opcional)',
+        },
+        {
+          id: 'disponibilidad',
+          label: '¿Cuánto tiempo puedes dedicar al rol?',
+          placeholder: 'Por ejemplo: 2 horas al día, fines de semana, etc.',
+        },
+        {
+          id: 'motivacion',
+          label: 'Motivo por el cual quieres unirte al equipo',
+          placeholder: 'Explica por qué te gustaría formar parte del equipo (opcional)',
+        },
+      ];
 
-        // Verificar si ya fue gestionada
-        if (interaction.message.components[0].components[0].data.disabled) {
-          return interaction.reply({ content: '⚠️ Esta postulación ya fue gestionada por otro miembro del staff.', ephemeral: true });
-        }
+      if (categoria === 'twitch') {
+        modal = new ModalBuilder()
+          .setCustomId('post_twitch')
+          .setTitle('Postulación - Twitch MOD');
+      } else if (categoria === 'tiktok') {
+        modal = new ModalBuilder()
+          .setCustomId('post_tiktok')
+          .setTitle('Postulación - Tiktok MOD');
+      } else if (categoria === 'programador') {
+        modal = new ModalBuilder()
+          .setCustomId('post_programador')
+          .setTitle('Postulación - Programador Discord');
+      } else if (categoria === 'editor') {
+        modal = new ModalBuilder()
+          .setCustomId('post_editor')
+          .setTitle('Postulación - Editor');
+      } else if (categoria === 'helper') {
+        modal = new ModalBuilder()
+          .setCustomId('post_helper')
+          .setTitle('Postulación - Discord Helper');
+      }
 
-        const modal = new ModalBuilder()
-          .setCustomId(`staff_motivo::${accion}::${userId}::${interaction.message.id}`)
-          .setTitle(accion === 'aceptar' ? 'Aceptar Postulación' : 'Rechazar Postulación');
+      if (!modal) return interaction.reply({ content: '❌ Categoría no válida.', ephemeral: true });
 
-        const motivoInput = new TextInputBuilder()
-          .setCustomId('staff_motivo_text')
-          .setLabel('Carta o motivo (opcional)')
+      // Crear inputs
+      const inputs = preguntasComunes.map((q) =>
+        new TextInputBuilder()
+          .setCustomId(q.id)
+          .setLabel(q.label)
           .setStyle(TextInputStyle.Paragraph)
-          .setRequired(false);
+          .setPlaceholder(q.placeholder)
+          .setRequired(false)
+      );
 
-        modal.addComponents(new ActionRowBuilder().addComponents(motivoInput));
-        return interaction.showModal(modal);
+      modal.addComponents(
+        new ActionRowBuilder().addComponents(inputs[0]),
+        new ActionRowBuilder().addComponents(inputs[1]),
+        new ActionRowBuilder().addComponents(inputs[2])
+      );
+
+      await interaction.showModal(modal);
+    }
+
+    // =========================
+    // /abrirpostulaciones
+    // =========================
+    if (interaction.commandName === 'abrirpostulaciones') {
+      if (!STAFF_ROLES.some((id) => interaction.member.roles.cache.has(id))) {
+        return interaction.reply({ content: '🚫 No tienes permisos para usar este comando.', ephemeral: true });
       }
 
-      // -----------------------
-      // Modal submit (motivo staff)
-      // -----------------------
-      if (interaction.isModalSubmit() && interaction.customId.startsWith('staff_motivo::')) {
-        const parts = interaction.customId.split('::');
-        const accion = parts[1];
-        const targetUserId = parts[2];
-        const messageId = parts[3];
+      guardarEstado(true);
+      return interaction.reply({ content: '✅ Las postulaciones han sido **abiertas**.', ephemeral: false });
+    }
 
-        const motivo = interaction.fields.getTextInputValue('staff_motivo_text') || 'Sin motivo especificado.';
-
-        try {
-          const ch = await client.channels.fetch(POST_CHANNEL_ID);
-          if (ch) {
-            const msg = await ch.messages.fetch(messageId).catch(() => null);
-            if (msg && msg.components?.length) {
-              const disabledRow = new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setLabel('Aceptar').setStyle(ButtonStyle.Success).setDisabled(true),
-                new ButtonBuilder().setLabel('Rechazar').setStyle(ButtonStyle.Danger).setDisabled(true)
-              );
-              await msg.edit({ components: [disabledRow] }).catch(() => {});
-            }
-          }
-        } catch {}
-
-        const targetUser = await client.users.fetch(targetUserId).catch(() => null);
-        const color = accion === 'aceptar' ? 0x2ecc71 : 0xe74c3c;
-        const title = accion === 'aceptar' ? '✅ Postulación Aceptada' : '❌ Postulación Rechazada';
-
-        const dmEmbed = new EmbedBuilder()
-          .setTitle(title)
-          .setDescription(`Tu postulación ha sido **${accion === 'aceptar' ? 'aceptada' : 'rechazada'}**.\n\n**Carta del staff:**\n${motivo}`)
-          .setColor(color)
-          .setTimestamp();
-
-        if (targetUser) await targetUser.send({ embeds: [dmEmbed] }).catch(() => {});
-
-        await interaction.reply({ content: `✅ Postulación ${accion === 'aceptar' ? 'aceptada' : 'rechazada'} y usuario notificado.`, ephemeral: true });
+    // =========================
+    // /cerrarpostulaciones
+    // =========================
+    if (interaction.commandName === 'cerrarpostulaciones') {
+      if (!STAFF_ROLES.some((id) => interaction.member.roles.cache.has(id))) {
+        return interaction.reply({ content: '🚫 No tienes permisos para usar este comando.', ephemeral: true });
       }
 
-    } catch (err) {
-      console.error('Error en interactionCreate (postulaciones):', err);
-      if (interaction && !interaction.replied && !interaction.deferred) {
-        try {
-          await interaction.reply({ content: 'Ocurrió un error interno.', ephemeral: true });
-        } catch {}
+      guardarEstado(false);
+      return interaction.reply({ content: '🔒 Las postulaciones han sido **cerradas**.', ephemeral: false });
+    }
+
+    // =========================
+    // Modal Enviado
+    // =========================
+    if (interaction.isModalSubmit()) {
+      if (!interaction.customId.startsWith('post_')) return;
+
+      const categoria = interaction.customId.split('_')[1];
+      const experiencia = interaction.fields.getTextInputValue('experiencia') || 'No respondió';
+      const disponibilidad = interaction.fields.getTextInputValue('disponibilidad') || 'No respondió';
+      const motivacion = interaction.fields.getTextInputValue('motivacion') || 'No respondió';
+
+      const embed = new EmbedBuilder()
+        .setTitle(`📋 Nueva Postulación (${categoria.toUpperCase()})`)
+        .setDescription(`**Usuario:** ${interaction.user.tag}\n**ID:** ${interaction.user.id}`)
+        .addFields(
+          { name: 'Experiencia', value: experiencia },
+          { name: 'Disponibilidad', value: disponibilidad },
+          { name: 'Motivo', value: motivacion }
+        )
+        .setColor('Blurple')
+        .setTimestamp();
+
+      const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId(`aceptar_${interaction.user.id}`).setLabel('✅ Aceptar').setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId(`rechazar_${interaction.user.id}`).setLabel('❌ Rechazar').setStyle(ButtonStyle.Danger)
+      );
+
+      const canal = interaction.guild.channels.cache.get(CANAL_POSTULACIONES);
+      if (canal) await canal.send({ embeds: [embed], components: [row] });
+
+      await interaction.reply({ content: '✅ Tu postulación ha sido enviada correctamente.', ephemeral: true });
+    }
+
+    // =========================
+    // Aceptar/Rechazar botones
+    // =========================
+    if (interaction.isButton()) {
+      const [accion, userId] = interaction.customId.split('_');
+      const mensaje = interaction.message;
+
+      // Verificar permisos
+      if (!STAFF_ROLES.some((id) => interaction.member.roles.cache.has(id))) {
+        return interaction.reply({ content: '🚫 No tienes permisos para gestionar postulaciones.', ephemeral: true });
       }
+
+      // Evitar múltiples respuestas
+      if (mensaje.embeds[0].footer?.text?.includes('gestionada')) {
+        return interaction.reply({
+          content: '⚠️ Esta postulación ya fue gestionada por otro miembro del staff.',
+          ephemeral: true,
+        });
+      }
+
+      const embed = EmbedBuilder.from(mensaje.embeds[0]);
+      const usuario = await interaction.guild.members.fetch(userId).catch(() => null);
+      const aceptada = accion === 'aceptar';
+
+      embed.setColor(aceptada ? 'Green' : 'Red');
+      embed.setFooter({ text: `Postulación ${aceptada ? 'aceptada' : 'rechazada'} por ${interaction.user.tag} | gestionada` });
+
+      await mensaje.edit({ embeds: [embed], components: [] });
+
+      if (usuario) {
+        const dm = new EmbedBuilder()
+          .setTitle(aceptada ? '✅ Postulación Aceptada' : '❌ Postulación Rechazada')
+          .setDescription(
+            aceptada
+              ? '¡Felicidades! 🎉 Tu postulación ha sido aceptada. Pronto un miembro del staff te contactará.'
+              : 'Lamentamos informarte que tu postulación fue rechazada. Gracias por tu interés, puedes intentarlo más adelante.'
+          )
+          .setColor(aceptada ? 'Green' : 'Red');
+        await usuario.send({ embeds: [dm] }).catch(() => {});
+      }
+
+      await interaction.reply({
+        content: aceptada ? '✅ Postulación aceptada correctamente.' : '❌ Postulación rechazada correctamente.',
+        ephemeral: true,
+      });
     }
   });
 };
