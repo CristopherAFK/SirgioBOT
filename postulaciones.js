@@ -24,6 +24,8 @@ const PANEL_CHANNEL_ID = '1435093988196618383';      // canal donde se puede usa
 const STAFF_ROLE_ID = '1212891335929897030';         // rol que puede usar /panelpostulaciones
 let postulacionesAbiertas = false;
 
+const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+
 const COMMANDS = [
   new SlashCommandBuilder()
     .setName('panelpostulaciones')
@@ -55,9 +57,9 @@ const COMMANDS = [
           { name: 'Editor de Sirgio', value: 'editor' },
           { name: 'Discord Helper', value: 'helper' }
         )
-    )
+    ),
     // 🔹 Aquí NO ponemos permisos, así todos pueden usarlo
-].map(c => c.toJSON());
+];map(c => c.toJSON());
 
     .addStringOption(opt => 
       opt.setName('categoria')
