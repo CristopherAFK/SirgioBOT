@@ -25,12 +25,36 @@ const STAFF_ROLE_ID = '1212891335929897030';         // rol que puede usar /pane
 let postulacionesAbiertas = false;
 
 const COMMANDS = [
-  new SlashCommandBuilder().setName('panelpostulaciones').setDescription('Envía el panel con las categorías de postulación.'),
-  new SlashCommandBuilder().setName('abrirpostulaciones').setDescription('Abre las postulaciones para que cualquier usuario pueda postularse.'),
-  new SlashCommandBuilder().setName('cerrarpostulaciones').setDescription('Cierra las postulaciones.'),
+  new SlashCommandBuilder()
+    .setName('panelpostulaciones')
+    .setDescription('Envía el panel con las categorías de postulación.')
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild), // solo staff
+  new SlashCommandBuilder()
+    .setName('abrirpostulaciones')
+    .setDescription('Abre las postulaciones para todos.')
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild), // solo staff
+  new SlashCommandBuilder()
+    .setName('cerrarpostulaciones')
+    .setDescription('Cierra las postulaciones.')
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild), // solo staff
   new SlashCommandBuilder()
     .setName('postular')
     .setDescription('Postularse a una categoría.')
+    .addStringOption(opt =>
+      opt.setName('categoria')
+        .setDescription('Selecciona la categoría')
+        .setRequired(true)
+        .addChoices(
+          { name: 'Twitch MOD', value: 'twitch' },
+          { name: 'TikTok MOD', value: 'tiktok' },
+          { name: 'Discord Programador', value: 'programador' },
+          { name: 'Editor de Sirgio', value: 'editor' },
+          { name: 'Discord Helper', value: 'helper' },
+        )
+    )
+    // 🔹 Aquí NO ponemos permisos, así todos pueden usarlo
+].map(c => c.toJSON());
+
     .addStringOption(opt => 
       opt.setName('categoria')
          .setDescription('Selecciona la categoría')
