@@ -29,19 +29,23 @@ const COMMANDS = [
     .setName('panelpostulaciones')
     .setDescription('Envía el panel con las categorías de postulación.')
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild), // solo staff
+
   new SlashCommandBuilder()
     .setName('abrirpostulaciones')
     .setDescription('Abre las postulaciones para todos.')
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild), // solo staff
+
   new SlashCommandBuilder()
     .setName('cerrarpostulaciones')
     .setDescription('Cierra las postulaciones.')
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild), // solo staff
+
   new SlashCommandBuilder()
     .setName('postular')
-    .setDescription('Postularse a una categoría.')
+    .setDescription('Postúlate a una categoría.')
     .addStringOption(opt =>
-      opt.setName('categoria')
+      opt
+        .setName('categoria')
         .setDescription('Selecciona la categoría')
         .setRequired(true)
         .addChoices(
@@ -49,7 +53,7 @@ const COMMANDS = [
           { name: 'TikTok MOD', value: 'tiktok' },
           { name: 'Discord Programador', value: 'programador' },
           { name: 'Editor de Sirgio', value: 'editor' },
-          { name: 'Discord Helper', value: 'helper' },
+          { name: 'Discord Helper', value: 'helper' }
         )
     )
     // 🔹 Aquí NO ponemos permisos, así todos pueden usarlo
