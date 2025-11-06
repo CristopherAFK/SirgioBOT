@@ -29,44 +29,44 @@ const categories = {
 
 const questions = {
   'tiktok_mod': [
-    { id: 'username', label: '¿Cuál es tu nombre de usuario en TikTok actualmente?', style: TextInputStyle.Short },
-    { id: 'why', label: '¿Por qué quieres ser moderador del canal de TikTok?', style: TextInputStyle.Paragraph },
-    { id: 'experience', label: '¿Tienes experiencia moderando en TikTok o redes sociales?', style: TextInputStyle.Paragraph },
-    { id: 'action', label: '¿Qué harías si ves un comentario ofensivo o spam?', style: TextInputStyle.Paragraph },
+    { id: 'username', label: 'Tu usuario actual en TikTok', style: TextInputStyle.Short },
+    { id: 'why', label: '¿Por qué quieres ser mod en TikTok?', style: TextInputStyle.Paragraph },
+    { id: 'experience', label: '¿Tienes experiencia moderando redes?', style: TextInputStyle.Paragraph },
+    { id: 'action', label: '¿Qué harías ante comentarios ofensivos?', style: TextInputStyle.Paragraph },
     { id: 'age', label: '¿Cuántos años tienes?', style: TextInputStyle.Short }
   ],
   'twitch_mod': [
-    { id: 'username', label: '¿Cuál es tu usuario en Twitch y nombre real?', style: TextInputStyle.Short },
-    { id: 'why', label: '¿Por qué quieres moderar los directos de Sirgio en Twitch?', style: TextInputStyle.Paragraph },
-    { id: 'experience', label: '¿Tienes experiencia moderando en Twitch o en directo?', style: TextInputStyle.Paragraph },
-    { id: 'action', label: '¿Cómo actuarías si un espectador insulta a otro?', style: TextInputStyle.Paragraph },
+    { id: 'username', label: 'Tu usuario en Twitch y nombre real', style: TextInputStyle.Short },
+    { id: 'why', label: '¿Por qué quieres moderar en Twitch?', style: TextInputStyle.Paragraph },
+    { id: 'experience', label: '¿Tienes experiencia moderando en directo?', style: TextInputStyle.Paragraph },
+    { id: 'action', label: '¿Qué harías si un espectador insulta a otro?', style: TextInputStyle.Paragraph },
     { id: 'age', label: '¿Cuántos años tienes?', style: TextInputStyle.Short }
   ],
   'editor': [
-    { id: 'name', label: '¿Cuál es tu nombre y/o alias?', style: TextInputStyle.Short },
-    { id: 'programs', label: '¿Qué programa(s) de edición utilizas?', style: TextInputStyle.Short },
-    { id: 'why', label: '¿Por qué te interesa editar contenido para Sirgio?', style: TextInputStyle.Paragraph },
-    { id: 'project', label: 'Cuéntanos un proyecto de edición que hayas completado', style: TextInputStyle.Paragraph },
-    { id: 'experience', label: '¿Cuál es tu experiencia editando videos/streams?', style: TextInputStyle.Paragraph }
+    { id: 'name', label: 'Tu nombre o alias', style: TextInputStyle.Short },
+    { id: 'programs', label: 'Programa(s) de edición que usas', style: TextInputStyle.Short },
+    { id: 'why', label: '¿Por qué quieres editar para Sirgio?', style: TextInputStyle.Paragraph },
+    { id: 'project', label: 'Describe un proyecto de edición tuyo', style: TextInputStyle.Paragraph },
+    { id: 'experience', label: 'Tu experiencia editando videos', style: TextInputStyle.Paragraph }
   ],
   'programador': [
-    { id: 'alias', label: '¿Cuál es tu alias y qué lenguajes/programas conoces?', style: TextInputStyle.Short },
-    { id: 'experience', label: '¿Tienes experiencia desarrollando bots para Discord?', style: TextInputStyle.Paragraph },
-    { id: 'why', label: '¿Por qué quieres programar para este servidor?', style: TextInputStyle.Paragraph },
-    { id: 'bugs', label: '¿Cómo manejarías reporte de bugs o solicitudes?', style: TextInputStyle.Paragraph },
-    { id: 'time', label: '¿Dispones de tiempo para mantenimiento regular del bot?', style: TextInputStyle.Paragraph }
+    { id: 'alias', label: 'Tu alias y lenguajes que conoces', style: TextInputStyle.Short },
+    { id: 'experience', label: '¿Has hecho bots o proyectos de Discord?', style: TextInputStyle.Paragraph },
+    { id: 'why', label: '¿Por qué quieres programar aquí?', style: TextInputStyle.Paragraph },
+    { id: 'bugs', label: '¿Cómo manejas bugs o solicitudes?', style: TextInputStyle.Paragraph },
+    { id: 'time', label: '¿Tienes tiempo para mantenimiento del bot?', style: TextInputStyle.Paragraph }
   ],
   'helper': [
-    { id: 'name', label: '¿Cuál es tu nombre/alias y cuánto tiempo llevas aquí?', style: TextInputStyle.Short },
-    { id: 'why', label: '¿Por qué quieres ser Helper y qué te motiva?', style: TextInputStyle.Paragraph },
-    { id: 'experience', label: '¿Tienes experiencia ayudando en Discord u otras comunidades?', style: TextInputStyle.Paragraph },
-    { id: 'problem', label: '¿Cómo reaccionarías si no sabes resolver un problema?', style: TextInputStyle.Paragraph },
-    { id: 'schedule', label: '¿En qué rangos horarios sueles estar conectado?', style: TextInputStyle.Short }
+    { id: 'name', label: 'Tu nombre o alias y tiempo aquí', style: TextInputStyle.Short },
+    { id: 'why', label: '¿Por qué quieres ser Helper?', style: TextInputStyle.Paragraph },
+    { id: 'experience', label: '¿Has ayudado en otras comunidades?', style: TextInputStyle.Paragraph },
+    { id: 'problem', label: '¿Qué haces si no sabes resolver algo?', style: TextInputStyle.Paragraph },
+    { id: 'schedule', label: '¿En qué horario estás activo?', style: TextInputStyle.Short }
   ]
 };
 
 // ============================================
-// EXPORTACIÓN: se ejecuta con require('./postulaciones')(client)
+// EXPORTACIÓN
 // ============================================
 module.exports = (client) => {
 
@@ -277,9 +277,9 @@ module.exports = (client) => {
 
         const messageInput = new TextInputBuilder()
           .setCustomId('staff_message')
-          .setLabel('Mensaje del Staff para el postulante')
+          .setLabel('Mensaje del Staff')
           .setStyle(TextInputStyle.Paragraph)
-          .setPlaceholder('Escribe un mensaje personalizado para el postulante...')
+          .setPlaceholder('Escribe un mensaje personalizado...')
           .setRequired(true);
 
         const actionRow = new ActionRowBuilder().addComponents(messageInput);
