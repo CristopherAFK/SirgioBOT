@@ -49,6 +49,7 @@ require('./automod')(client);
 require('./welcome.js')(client);
 require('./postulaciones')(client);
 require('./embed')(client);
+require('./anuncio')(client);
 
 
 // STAFF ROLES (admin, mod, headadmin)
