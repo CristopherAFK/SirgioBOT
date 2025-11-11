@@ -48,7 +48,7 @@ const client = new Client({
 require('./automod')(client);
 require('./welcome.js')(client);
 require('./postulaciones')(client);
-
+require('./embed')(client);
 
 
 // STAFF ROLES (admin, mod, headadmin)
