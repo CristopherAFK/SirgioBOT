@@ -723,16 +723,6 @@ module.exports = (client) => {
 
      
 
-      // 4) Exceso de mayúsculas
-      const lettersOnly = content.replace(/[^A-Za-z]/g, "");
-      const upperCount = (lettersOnly.match(/[A-Z]/g) || []).length;
-      const capsRatio = lettersOnly.length ? upperCount / lettersOnly.length : 0;
-      if (content.length > CAPS_LENGTH_THRESHOLD && capsRatio > CAPS_RATIO_THRESHOLD) {
-        await message.delete().catch(() => {});
-        await applyWarn(client, message.guild, message.author, member, "Uso excesivo de mayúsculas", null);
-        return;
-      }
-
       // 5) Spam por líneas
       const lines = content.split(/\r?\n/).length;
       if (lines > LINES_THRESHOLD) {
