@@ -50,6 +50,7 @@ require('./welcome.js')(client);
 require('./postulaciones')(client);
 require('./embed')(client);
 require('./anuncio')(client);
+require("./sistema_sugerencias")(client);
 
 
 // STAFF ROLES (admin, mod, headadmin)
