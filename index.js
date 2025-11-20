@@ -452,65 +452,6 @@ client.on("messageCreate", async (message) => {
     console.error("Error en comando de cierre de ticket:", err);
   }
 });
-client.on("interactionCreate", async interaction => {
-  // ================================
-  // BOTONES STAFF
-  // ================================
-  if (interaction.isButton()) {
-    const [action, messageId] = interaction.customId.split("-");
-
-    // Solo staff puede usar botones
-    if (!interaction.member.roles.cache.has(STAFF_ROLE)) {
-      return interaction.reply({
-        content: "❌ No tienes permisos para usar esto.",
-        ephemeral: true
-      });
-    }
-
-    // Crear modal
-    const modal = new ModalBuilder()
-      .setCustomId(`reason-${action}-${messageId}`)
-      .setTitle(action === "aprove" ? "Aprobar sugerencia" : "Rechazar sugerencia");
-
-    const reasonInput = new TextInputBuilder()
-      .setCustomId("reasonInput")
-      .setLabel("Escribe la razón")
-      .setStyle(TextInputStyle.Paragraph)
-      .setRequired(true);
-
-    modal.addComponents(new ActionRowBuilder().addComponents(reasonInput));
-
-    return interaction.showModal(modal);
-  }
-
-  // ================================
-  // MODAL: RAZÓN DE APROBACIÓN/RECHAZO
-  // ================================
-  if (interaction.isModalSubmit()) {
-    const [_, action, msgId] = interaction.customId.split("-");
-    const reason = interaction.fields.getTextInputValue("reasonInput");
-
-    const publicChannel = interaction.guild.channels.cache.get(SUGGESTIONS_CHANNEL);
-    const publicMessage = await publicChannel.messages.fetch(msgId);
-
-    const resultEmbed = new EmbedBuilder()
-      .setTitle(action === "aprove" ? "✅ Sugerencia aprobada" : "❌ Sugerencia rechazada")
-      .addFields(
-        { name: "Sugerencia", value: publicMessage.embeds[0].description },
-        { name: "Razón del staff", value: reason }
-      )
-      .setColor(action === "aprove" ? "#00FF7F" : "#FF3B3B")
-      .setTimestamp();
-
-    await publicMessage.reply({ embeds: [resultEmbed] });
-
-    return interaction.reply({
-      content: `✔ Has ${action === "aprove" ? "aprobado" : "rechazado"} la sugerencia.`,
-      ephemeral: true
-    });
-  }
-});
-
 
 // -------------------------
 // READY, Express y login
