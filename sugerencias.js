@@ -1,8 +1,5 @@
 // =========================================
-// Sistema de Sugerencias con ESTADOS en vivo
-// =========================================
-// Requisitos: discord.js v14+, Node 16+
-// Uso: require('./sugerencias.js')(client);
+// Sistema de Sugerencias FINAL y CORREGIDO
 // =========================================
 
 const {
@@ -17,9 +14,9 @@ const {
 } = require("discord.js");
 
 // CONFIG
-const CANAL_PUBLICO = "1440873532580954112";        // Canal público donde aparece la sugerencia
-const CANAL_STAFF = "1435091853308461179";          // Canal privado donde staff revisa
-const STAFF_ROLE = "1230949715127042098";           // Rol del staff
+const CANAL_PUBLICO = "1440873532580954112";
+const CANAL_STAFF = "1435091853308461179";
+const STAFF_ROLE = "1230949715127042098";
 
 module.exports = (client) => {
 
@@ -40,15 +37,19 @@ module.exports = (client) => {
     console.log("[Sugerencias] Comando /sugerir cargado.");
   });
 
-  // Al usar /sugerir
+
+  // ---------------------------------------------
+  // MANEJO DEL COMANDO /SUGERIR
+  // ---------------------------------------------
   client.on("interactionCreate", async (interaction) => {
+
     if (!interaction.isChatInputCommand()) return;
     if (interaction.commandName !== "sugerir") return;
 
     const texto = interaction.options.getString("texto");
     const canalPublico = await client.channels.fetch(CANAL_PUBLICO);
 
-    // Embed inicial en canal público (SIN REVISAR)
+    // EMBED PÚBLICO INICIAL
     const embedPublico = new EmbedBuilder()
       .setTitle("📩 Nueva Sugerencia")
       .setDescription(texto)
@@ -61,13 +62,13 @@ module.exports = (client) => {
 
     const msgPublica = await canalPublico.send({ embeds: [embedPublico] });
 
-    // Añadir reacciones de votación
-    await msgPublica.react("✅️");
-    await msgPublica.react("❌️");
+    // Reacciones (solo emojis seguros)
+    await msgPublica.react("👍");
+    await msgPublica.react("👎");
 
-    // Enviar al staff
+    // STAFF
     const embedStaff = new EmbedBuilder(embedPublico)
-      .setFooter({ text: `ID del mensaje público: ${msgPublica.id}` });
+      .setFooter({ text: `MSG:${msgPublica.id}` });
 
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
@@ -83,25 +84,29 @@ module.exports = (client) => {
     const canalStaff = await client.channels.fetch(CANAL_STAFF);
     await canalStaff.send({ embeds: [embedStaff], components: [row] });
 
+    // Respuesta correcta con FLAGS
     await interaction.reply({
-      content: "✅ Tu sugerencia ha sido enviada.",
-      ephemeral: true,
+      content: "Tu sugerencia fue enviada correctamente.",
+      flags: 64 // << EPHEMERAL
     });
   });
 
-  // Botones del staff
+
+  // ---------------------------------------------
+  // MANEJO DE BOTONES (solo staff)
+  // ---------------------------------------------
   client.on("interactionCreate", async (interaction) => {
     if (!interaction.isButton()) return;
 
-    // Sólo staff
+    // Verificar que sea staff
     if (!interaction.member.roles.cache.has(STAFF_ROLE)) {
       return interaction.reply({
         content: "❌ No tienes permisos.",
-        ephemeral: true,
+        flags: 64
       });
     }
 
-    // Crear modal
+    // Abrir modal
     const modal = new ModalBuilder()
       .setCustomId(
         interaction.customId === "aprobar_sug"
@@ -110,72 +115,58 @@ module.exports = (client) => {
       )
       .setTitle(
         interaction.customId === "aprobar_sug"
-          ? "Aprobar sugerencia"
-          : "Rechazar sugerencia"
+          ? "Aprobar Sugerencia"
+          : "Rechazar Sugerencia"
       );
 
-    const razon = new TextInputBuilder()
-      .setCustomId("razon")
-      .setLabel("Razón")
-      .setStyle(TextInputStyle.Paragraph)
-      .setRequired(true);
-
-    modal.addComponents(new ActionRowBuilder().addComponents(razon));
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder()
+          .setCustomId("razon")
+          .setLabel("Razón")
+          .setStyle(TextInputStyle.Paragraph)
+          .setRequired(true)
+      )
+    );
 
     await interaction.showModal(modal);
   });
 
-  // Procesar modal
+
+  // ---------------------------------------------
+  // MANEJO DE LOS MODALES (aprobado/rechazado)
+  // ---------------------------------------------
   client.on("interactionCreate", async (interaction) => {
     if (!interaction.isModalSubmit()) return;
 
     const razon = interaction.fields.getTextInputValue("razon");
     const aprobado = interaction.customId === "modal_aprobar";
 
-    // Obtener embed original del mensaje del staff
     const embed = interaction.message.embeds[0];
     if (!embed)
-      return interaction.reply({
-        content: "❌ Error al obtener la sugerencia.",
-        ephemeral: true,
-      });
+      return interaction.reply({ content: "Error interno.", flags: 64 });
 
-    // Extraer ID del mensaje público desde el footer
-    const footer = embed.footer?.text || "";
-    const publicMsgID = footer.replace("ID del mensaje público: ", "").trim();
+    // Extraer ID del mensaje público
+    const id = embed.footer.text.replace("MSG:", "");
 
-    // Buscar mensaje original
     const canalPublico = await client.channels.fetch(CANAL_PUBLICO);
-    const msgPublica = await canalPublico.messages.fetch(publicMsgID);
+    const mensajePublico = await canalPublico.messages.fetch(id);
 
-    // Crear embed actualizado
-    const embedActualizado = EmbedBuilder.from(msgPublica.embeds[0])
+    const embedEditado = EmbedBuilder.from(mensajePublico.embeds[0])
       .setFields(
         { name: "Autor", value: embed.fields[0].value },
-        {
-          name: "Estado",
-          value: aprobado
-            ? "✅ **Aprobada**"
-            : "❌ **Rechazada**",
-        },
-        {
-          name: "Razón",
-          value: razon
-        }
+        { name: "Estado", value: aprobado ? "✅ **Aprobada**" : "❌ **Rechazada**" },
+        { name: "Razón", value: razon }
       )
       .setColor(aprobado ? "Green" : "Red")
-      .setFooter({ text: `Revisado por: ${interaction.user.tag}` })
-      .setTimestamp();
+      .setFooter({ text: `Revisado por ${interaction.user.tag}` });
 
-    // Editar mensaje público
-    await msgPublica.edit({ embeds: [embedActualizado] });
+    await mensajePublico.edit({ embeds: [embedEditado] });
 
-    // Respuesta al staff
     await interaction.reply({
-      content: `✔ La sugerencia fue **${
-        aprobado ? "aprobada" : "rechazada"
-      }** correctamente.`,
-      ephemeral: true,
+      content: `La sugerencia fue ${aprobado ? "aprobada" : "rechazada"}.`,
+      flags: 64
     });
   });
+
 };
