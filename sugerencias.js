@@ -1,5 +1,5 @@
 // =========================================
-// Sistema de Sugerencias FINAL y CORREGIDO
+// SISTEMA DE SUGERENCIAS - VERSION FINAL
 // =========================================
 
 const {
@@ -10,7 +10,7 @@ const {
   ButtonStyle,
   ModalBuilder,
   TextInputBuilder,
-  TextInputStyle,
+  TextInputStyle
 } = require("discord.js");
 
 // CONFIG
@@ -20,153 +20,155 @@ const STAFF_ROLE = "1230949715127042098";
 
 module.exports = (client) => {
 
-  // Registrar comando /sugerir
+  // ========== Registrar el comando ==========
   client.on("ready", async () => {
-    const data = [
+    const comandos = [
       new SlashCommandBuilder()
         .setName("sugerir")
-        .setDescription("Envía una sugerencia.")
+        .setDescription("Envía una sugerencia al servidor.")
         .addStringOption(opt =>
           opt.setName("texto")
-             .setDescription("Escribe tu sugerencia")
-             .setRequired(true)
+            .setDescription("Tu sugerencia")
+            .setRequired(true)
         )
-    ].map(cmd => cmd.toJSON());
+    ].map(c => c.toJSON());
 
-    await client.application.commands.set(data);
+    await client.application.commands.set(comandos);
     console.log("[Sugerencias] Comando /sugerir cargado.");
   });
 
-
-  // ---------------------------------------------
-  // MANEJO DEL COMANDO /SUGERIR
-  // ---------------------------------------------
+  // ========== ÚNICO LISTENER DE INTERACCIONES ==========
   client.on("interactionCreate", async (interaction) => {
 
-    if (!interaction.isChatInputCommand()) return;
-    if (interaction.commandName !== "sugerir") return;
+    // -------------------------------------
+    // 💬 1. /sugerir
+    // -------------------------------------
+    if (interaction.isChatInputCommand() && interaction.commandName === "sugerir") {
 
-    const texto = interaction.options.getString("texto");
-    const canalPublico = await client.channels.fetch(CANAL_PUBLICO);
+      const texto = interaction.options.getString("texto");
+      const canalPublico = await client.channels.fetch(CANAL_PUBLICO);
 
-    // EMBED PÚBLICO INICIAL
-    const embedPublico = new EmbedBuilder()
-      .setTitle("📩 Nueva Sugerencia")
-      .setDescription(texto)
-      .addFields(
-        { name: "Autor", value: `<@${interaction.user.id}>` },
-        { name: "Estado", value: "🕓 **Sin revisar**" }
-      )
-      .setColor("#3498db")
-      .setTimestamp();
+      // Embed público
+      const embedPublico = new EmbedBuilder()
+        .setTitle("📩 Nueva Sugerencia")
+        .setDescription(texto)
+        .addFields(
+          { name: "Autor", value: `<@${interaction.user.id}>` },
+          { name: "Estado", value: "🕓 **Sin revisar**" }
+        )
+        .setColor("#3498db")
+        .setTimestamp();
 
-    const msgPublica = await canalPublico.send({ embeds: [embedPublico] });
+      const msgPublica = await canalPublico.send({ embeds: [embedPublico] });
 
-    // Reacciones (solo emojis seguros)
-    await msgPublica.react("👍");
-    await msgPublica.react("👎");
+      // Reacciones (sin emojis inválidos)
+      await msgPublica.react("👍");
+      await msgPublica.react("👎");
 
-    // STAFF
-    const embedStaff = new EmbedBuilder(embedPublico)
-      .setFooter({ text: `MSG:${msgPublica.id}` });
+      // Notificar al staff
+      const canalStaff = await client.channels.fetch(CANAL_STAFF);
 
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId("aprobar_sug")
-        .setLabel("Aprobar")
-        .setStyle(ButtonStyle.Success),
-      new ButtonBuilder()
-        .setCustomId("rechazar_sug")
-        .setLabel("Rechazar")
-        .setStyle(ButtonStyle.Danger)
-    );
+      const embedStaff = EmbedBuilder.from(embedPublico)
+        .setFooter({ text: `MSG:${msgPublica.id}` });
 
-    const canalStaff = await client.channels.fetch(CANAL_STAFF);
-    await canalStaff.send({ embeds: [embedStaff], components: [row] });
+      const botones = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId("aprobar")
+          .setLabel("Aprobar")
+          .setStyle(ButtonStyle.Success),
+        new ButtonBuilder()
+          .setCustomId("rechazar")
+          .setLabel("Rechazar")
+          .setStyle(ButtonStyle.Danger)
+      );
 
-    // Respuesta correcta con FLAGS
-    await interaction.reply({
-      content: "Tu sugerencia fue enviada correctamente.",
-      flags: 64 // << EPHEMERAL
-    });
-  });
+      await canalStaff.send({ embeds: [embedStaff], components: [botones] });
 
-
-  // ---------------------------------------------
-  // MANEJO DE BOTONES (solo staff)
-  // ---------------------------------------------
-  client.on("interactionCreate", async (interaction) => {
-    if (!interaction.isButton()) return;
-
-    // Verificar que sea staff
-    if (!interaction.member.roles.cache.has(STAFF_ROLE)) {
       return interaction.reply({
-        content: "❌ No tienes permisos.",
+        content: "Tu sugerencia fue enviada correctamente.",
         flags: 64
       });
     }
 
-    // Abrir modal
-    const modal = new ModalBuilder()
-      .setCustomId(
-        interaction.customId === "aprobar_sug"
-          ? "modal_aprobar"
-          : "modal_rechazar"
-      )
-      .setTitle(
-        interaction.customId === "aprobar_sug"
-          ? "Aprobar Sugerencia"
-          : "Rechazar Sugerencia"
-      );
 
-    modal.addComponents(
-      new ActionRowBuilder().addComponents(
-        new TextInputBuilder()
-          .setCustomId("razon")
-          .setLabel("Razón")
-          .setStyle(TextInputStyle.Paragraph)
-          .setRequired(true)
-      )
-    );
+    // -------------------------------------
+    // 🔘 2. BOTONES (solo staff)
+    // -------------------------------------
+    if (interaction.isButton()) {
 
-    await interaction.showModal(modal);
+      if (!interaction.member.roles.cache.has(STAFF_ROLE)) {
+        return interaction.reply({
+          content: "❌ No tienes permisos.",
+          flags: 64
+        });
+      }
+
+      const modal = new ModalBuilder()
+        .setCustomId(
+          interaction.customId === "aprobar"
+            ? "modal_aprobar"
+            : "modal_rechazar"
+        )
+        .setTitle(
+          interaction.customId === "aprobar"
+            ? "Aprobar Sugerencia"
+            : "Rechazar Sugerencia"
+        );
+
+      const razon = new TextInputBuilder()
+        .setCustomId("razon")
+        .setLabel("Razón")
+        .setStyle(TextInputStyle.Paragraph)
+        .setRequired(true);
+
+      modal.addComponents(new ActionRowBuilder().addComponents(razon));
+
+      return interaction.showModal(modal);
+    }
+
+
+    // -------------------------------------
+    // 📝 3. MODALES (staff)
+    // -------------------------------------
+    if (interaction.isModalSubmit()) {
+
+      const razon = interaction.fields.getTextInputValue("razon");
+      const aprobado = interaction.customId === "modal_aprobar";
+
+      const embed = interaction.message.embeds[0];
+      if (!embed) {
+        return interaction.reply({ content: "Error interno.", flags: 64 });
+      }
+
+      // Obtener ID del mensaje público
+      const idMsg = embed.footer.text.replace("MSG:", "");
+
+      const canalPublico = await client.channels.fetch(CANAL_PUBLICO);
+      const msgPublica = await canalPublico.messages.fetch(idMsg);
+
+      // Actualizar embed
+      const embedEditado = EmbedBuilder.from(msgPublica.embeds[0])
+        .setFields(
+          { name: "Autor", value: embed.fields[0].value },
+          {
+            name: "Estado",
+            value: aprobado
+              ? "✅ **Aprobada**"
+              : "❌ **Rechazada**"
+          },
+          { name: "Razón", value: razon }
+        )
+        .setColor(aprobado ? "Green" : "Red")
+        .setFooter({ text: `Revisado por ${interaction.user.tag}` })
+        .setTimestamp();
+
+      await msgPublica.edit({ embeds: [embedEditado] });
+
+      return interaction.reply({
+        content: `La sugerencia fue **${aprobado ? "aprobada" : "rechazada"}**.`,
+        flags: 64
+      });
+    }
+
   });
-
-
-  // ---------------------------------------------
-  // MANEJO DE LOS MODALES (aprobado/rechazado)
-  // ---------------------------------------------
-  client.on("interactionCreate", async (interaction) => {
-    if (!interaction.isModalSubmit()) return;
-
-    const razon = interaction.fields.getTextInputValue("razon");
-    const aprobado = interaction.customId === "modal_aprobar";
-
-    const embed = interaction.message.embeds[0];
-    if (!embed)
-      return interaction.reply({ content: "Error interno.", flags: 64 });
-
-    // Extraer ID del mensaje público
-    const id = embed.footer.text.replace("MSG:", "");
-
-    const canalPublico = await client.channels.fetch(CANAL_PUBLICO);
-    const mensajePublico = await canalPublico.messages.fetch(id);
-
-    const embedEditado = EmbedBuilder.from(mensajePublico.embeds[0])
-      .setFields(
-        { name: "Autor", value: embed.fields[0].value },
-        { name: "Estado", value: aprobado ? "✅ **Aprobada**" : "❌ **Rechazada**" },
-        { name: "Razón", value: razon }
-      )
-      .setColor(aprobado ? "Green" : "Red")
-      .setFooter({ text: `Revisado por ${interaction.user.tag}` });
-
-    await mensajePublico.edit({ embeds: [embedEditado] });
-
-    await interaction.reply({
-      content: `La sugerencia fue ${aprobado ? "aprobada" : "rechazada"}.`,
-      flags: 64
-    });
-  });
-
 };
