@@ -453,9 +453,183 @@ client.on("messageCreate", async (message) => {
   }
 });
 
+
+// ======================================================================
+// SISTEMA DE SUGERENCIAS — COMPLETAMENTE INTEGRADO
+// ======================================================================
+
+// CONFIG
+const SUGGEST_CHANNEL = "1440873532580954112";        // Canal público donde se muestran
+const STAFF_REVIEW_CHANNEL = "1435091853308461179";    // Canal donde las ve el staff
+const STAFF_ROLE = "1230949715127042098";              // Rol del staff
+
+// Colección de sugerencias activas
+if(!client.suggestions) client.suggestions = new Map();
+
+// ----------------------------------------------------------------------
+// Slash command /suggest
+// ----------------------------------------------------------------------
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isChatInputCommand()) return;
+
+  if (interaction.commandName === "suggest") {
+    const texto = interaction.options.getString("texto");
+
+    const canalPublico = await interaction.guild.channels.fetch(SUGGEST_CHANNEL).catch(() => null);
+    const canalStaff = await interaction.guild.channels.fetch(STAFF_REVIEW_CHANNEL).catch(() => null);
+
+    if (!canalPublico || !canalStaff) {
+      return interaction.reply({
+        content: "❌ No se pudo encontrar alguno de los canales configurados.",
+        ephemeral: true
+      });
+    }
+
+    // Embed público (donde votan todos)
+    const embedPublico = new EmbedBuilder()
+      .setAuthor({ name: interaction.user.username, iconURL: interaction.user.displayAvatarURL() })
+      .setDescription(`💡 **Nueva sugerencia:**\n${texto}`)
+      .setColor(0xFFA500)
+      .setTimestamp();
+
+    const mensajePublico = await canalPublico.send({ embeds: [embedPublico] });
+
+    // Añadir reacciones
+    try {
+      await mensajePublico.react("👍");
+      await mensajePublico.react("👎");
+    } catch (err) {
+      console.error("Error añadiendo reacciones:", err);
+    }
+
+    // Mensaje privado para el staff
+    const embedStaff = new EmbedBuilder()
+      .setAuthor({ name: interaction.user.username, iconURL: interaction.user.displayAvatarURL() })
+      .setTitle("📬 Nueva sugerencia para revisión del staff")
+      .setDescription(texto)
+      .setColor(0x00A6FF)
+      .addFields(
+        { name: "Usuario", value: `<@${interaction.user.id}>`, inline: true },
+        { name: "Mensaje Público", value: `[Ir al mensaje](${mensajePublico.url})`, inline: true }
+      )
+      .setTimestamp()
+      .setImage("attachment://gif.mp4"); // tu gif de 1 segundo
+
+    // Botones
+    const botones = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId("aprobar_sugerencia")
+        .setLabel("Aprobar")
+        .setStyle(ButtonStyle.Success),
+
+      new ButtonBuilder()
+        .setCustomId("rechazar_sugerencia")
+        .setLabel("Rechazar")
+        .setStyle(ButtonStyle.Danger)
+    );
+
+    // Enviar a canal staff con tu mp4
+    const mensajeStaff = await canalStaff.send({
+      embeds: [embedStaff],
+      components: [botones],
+      files: [{ attachment: "/opt/render/project/src/suggestion_gif.mp4", name: "gif.mp4" }]
+    });
+
+    // Guardar en memoria
+    client.suggestions.set(mensajeStaff.id, {
+      usuario: interaction.user.id,
+      texto,
+      mensajePublicoID: mensajePublico.id,
+      mensajeStaffID: mensajeStaff.id
+    });
+
+    interaction.reply({
+      content: "✅ Tu sugerencia ha sido enviada correctamente.",
+      ephemeral: true
+    });
+  }
+});
+
+// ----------------------------------------------------------------------
+// Botones de Aprobación / Rechazo
+// ----------------------------------------------------------------------
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isButton()) return;
+
+  const sugerencia = client.suggestions.get(interaction.message.id);
+  if (!sugerencia) return;
+
+  // Verificar rol staff
+  if (!interaction.member.roles.cache.has(STAFF_ROLE)) {
+    return interaction.reply({ content: "❌ No tienes permisos para usar estos botones.", ephemeral: true });
+  }
+
+  // Abrir modal
+  const modal = new ModalBuilder()
+    .setCustomId(interaction.customId + "_modal")
+    .setTitle(interaction.customId === "aprobar_sugerencia" ? "Razón de aprobación" : "Razón de rechazo");
+
+  const input = new TextInputBuilder()
+    .setCustomId("razon")
+    .setLabel("Escribe la razón:")
+    .setStyle(TextInputStyle.Paragraph)
+    .setRequired(true);
+
+  const row = new ActionRowBuilder().addComponents(input);
+
+  modal.addComponents(row);
+  await interaction.showModal(modal);
+});
+
+// ----------------------------------------------------------------------
+// Modal de aprobación / rechazo
+// ----------------------------------------------------------------------
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isModalSubmit()) return;
+
+  const razon = interaction.fields.getTextInputValue("razon");
+  const accion = interaction.customId.startsWith("aprobar") ? "Aprobada" : "Rechazada";
+
+  // Buscar sugerencia
+  let sugerencia;
+  for (const [, data] of client.suggestions.entries()) {
+    if (data.mensajeStaffID === interaction.message?.id) {
+      sugerencia = data;
+      break;
+    }
+  }
+  if (!sugerencia) return interaction.reply({ content: "❌ Error interno.", ephemeral: true });
+
+  const canalPublico = await interaction.guild.channels.fetch(SUGGEST_CHANNEL).catch(() => null);
+  if (!canalPublico) return interaction.reply("No se pudo encontrar canal público.");
+
+  const mensajePublico = await canalPublico.messages.fetch(sugerencia.mensajePublicoID).catch(() => null);
+
+  // Embed final que se edita en el canal público
+  const embedFinal = new EmbedBuilder()
+    .setAuthor({ name: interaction.user.username, iconURL: interaction.user.displayAvatarURL() })
+    .setDescription(`💡 **Sugerencia ${accion}**\n${sugerencia.texto}`)
+    .setColor(accion === "Aprobada" ? 0x28A745 : 0xE74C3C)
+    .addFields({ name: "Razón", value: razon })
+    .setTimestamp()
+    .setImage("attachment://gif.mp4");
+
+  if (mensajePublico) {
+    await mensajePublico.edit({
+      embeds: [embedFinal],
+      files: [{ attachment: "/opt/render/project/src/suggestion_gif.mp4", name: "gif.mp4" }]
+    });
+  }
+
+  await interaction.reply({ content: `✅ Sugerencia **${accion}**`, ephemeral: true });
+
+  // Eliminar de la lista interna
+  client.suggestions.delete(sugerencia.mensajeStaffID);
+});
 // -------------------------
 // READY, Express y login
 // -------------------------
+
 client.once("ready", () => {
   console.log(`✅ SirgioBOT conectado como ${client.user.tag}`);
   client.user.setActivity("LagSupport", { type: 3 });
