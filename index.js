@@ -42,11 +42,6 @@ const client = new Client({
   partials: [Partials.Channel, Partials.Message, Partials.Reaction]
 });
 
-// Necesario para sistema de sugerencias y comandos
-client.commands = new Collection();
-client.commandHandlers = new Collection();
-client.suggestions = {};
-
 // =========================
 // CARGAR SISTEMAS
 // =========================
@@ -55,7 +50,6 @@ require('./welcome.js')(client);
 require('./postulaciones')(client);
 require('./embed')(client);
 require('./anuncio')(client);
-require("./sistema_sugerencias")(client);
 
 
 // STAFF ROLES (admin, mod, headadmin)
