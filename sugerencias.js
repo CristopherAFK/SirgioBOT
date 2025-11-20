@@ -62,8 +62,8 @@ module.exports = (client) => {
     const msgPublica = await canalPublico.send({ embeds: [embedPublico] });
 
     // Añadir reacciones de votación
-    await msgPublica.react("👍");
-    await msgPublica.react("👎");
+    await msgPublica.react("✅️");
+    await msgPublica.react("❌️");
 
     // Enviar al staff
     const embedStaff = new EmbedBuilder(embedPublico)
