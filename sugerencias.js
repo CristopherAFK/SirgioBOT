@@ -1,5 +1,5 @@
 // =========================================
-// Sistema de Sugerencias Completo
+// Sistema de Sugerencias con ESTADOS en vivo
 // =========================================
 // Requisitos: discord.js v14+, Node 16+
 // Uso: require('./sugerencias.js')(client);
@@ -14,51 +14,62 @@ const {
   ModalBuilder,
   TextInputBuilder,
   TextInputStyle,
-  PermissionFlagsBits,
 } = require("discord.js");
 
 // CONFIG
-const SUGGESTIONS_PUBLIC = "1440873532580954112"; // Sugerencias (público)
-const STAFF_CHANNEL = "1435091853308461179"; // Canal privado donde revisa staff
-const STAFF_ROLE = "1230949715127042098"; // Rol de staff
+const CANAL_PUBLICO = "1440873532580954112";        // Canal público donde aparece la sugerencia
+const CANAL_STAFF = "1435091853308461179";          // Canal privado donde staff revisa
+const STAFF_ROLE = "1230949715127042098";           // Rol del staff
 
 module.exports = (client) => {
+
   // Registrar comando /sugerir
   client.on("ready", async () => {
     const data = [
       new SlashCommandBuilder()
         .setName("sugerir")
-        .setDescription("Envía una sugerencia al staff.")
-        .addStringOption((opt) =>
-          opt
-            .setName("texto")
-            .setDescription("Escribe tu sugerencia")
-            .setRequired(true)
-        ),
-    ].map((cmd) => cmd.toJSON());
+        .setDescription("Envía una sugerencia.")
+        .addStringOption(opt =>
+          opt.setName("texto")
+             .setDescription("Escribe tu sugerencia")
+             .setRequired(true)
+        )
+    ].map(cmd => cmd.toJSON());
 
     await client.application.commands.set(data);
     console.log("[Sugerencias] Comando /sugerir cargado.");
   });
 
-  // Listener del comando
+  // Al usar /sugerir
   client.on("interactionCreate", async (interaction) => {
     if (!interaction.isChatInputCommand()) return;
     if (interaction.commandName !== "sugerir") return;
 
     const texto = interaction.options.getString("texto");
+    const canalPublico = await client.channels.fetch(CANAL_PUBLICO);
 
-    const embed = new EmbedBuilder()
+    // Embed inicial en canal público (SIN REVISAR)
+    const embedPublico = new EmbedBuilder()
       .setTitle("📩 Nueva Sugerencia")
       .setDescription(texto)
-      .addFields({
-        name: "Autor",
-        value: `<@${interaction.user.id}>`,
-      })
-      .setColor("#00A6FF")
+      .addFields(
+        { name: "Autor", value: `<@${interaction.user.id}>` },
+        { name: "Estado", value: "🕓 **Sin revisar**" }
+      )
+      .setColor("#3498db")
       .setTimestamp();
 
-    const staffRow = new ActionRowBuilder().addComponents(
+    const msgPublica = await canalPublico.send({ embeds: [embedPublico] });
+
+    // Añadir reacciones de votación
+    await msgPublica.react("👍");
+    await msgPublica.react("👎");
+
+    // Enviar al staff
+    const embedStaff = new EmbedBuilder(embedPublico)
+      .setFooter({ text: `ID del mensaje público: ${msgPublica.id}` });
+
+    const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId("aprobar_sug")
         .setLabel("Aprobar")
@@ -69,103 +80,101 @@ module.exports = (client) => {
         .setStyle(ButtonStyle.Danger)
     );
 
-    const staffChannel = await client.channels.fetch(STAFF_CHANNEL);
-    const staffMessage = await staffChannel.send({
-      embeds: [embed],
-      components: [staffRow],
-    });
+    const canalStaff = await client.channels.fetch(CANAL_STAFF);
+    await canalStaff.send({ embeds: [embedStaff], components: [row] });
 
     await interaction.reply({
-      content: "✅ Tu sugerencia ha sido enviada al staff.",
+      content: "✅ Tu sugerencia ha sido enviada.",
       ephemeral: true,
     });
-
-    // Para guardar el ID del autor dentro del mensaje
-    staffMessage.sugerenciaAutor = interaction.user.id;
-    staffMessage.sugerenciaTexto = texto;
   });
 
-  // Manejo de botones del staff
+  // Botones del staff
   client.on("interactionCreate", async (interaction) => {
     if (!interaction.isButton()) return;
 
-    // Verificar que sea staff
+    // Sólo staff
     if (!interaction.member.roles.cache.has(STAFF_ROLE)) {
       return interaction.reply({
-        content: "❌ No tienes permisos para usar esto.",
+        content: "❌ No tienes permisos.",
         ephemeral: true,
       });
     }
 
-    const tipo = interaction.customId;
-
-    // Modal de razón
+    // Crear modal
     const modal = new ModalBuilder()
-      .setCustomId(tipo === "aprobar_sug" ? "modal_aprobar" : "modal_rechazar")
+      .setCustomId(
+        interaction.customId === "aprobar_sug"
+          ? "modal_aprobar"
+          : "modal_rechazar"
+      )
       .setTitle(
-        tipo === "aprobar_sug" ? "Aprobar sugerencia" : "Rechazar sugerencia"
+        interaction.customId === "aprobar_sug"
+          ? "Aprobar sugerencia"
+          : "Rechazar sugerencia"
       );
 
-    const razonInput = new TextInputBuilder()
+    const razon = new TextInputBuilder()
       .setCustomId("razon")
       .setLabel("Razón")
       .setStyle(TextInputStyle.Paragraph)
       .setRequired(true);
 
-    modal.addComponents(new ActionRowBuilder().addComponents(razonInput));
+    modal.addComponents(new ActionRowBuilder().addComponents(razon));
 
     await interaction.showModal(modal);
   });
 
-  // Cuando staff envía la razón en el modal
+  // Procesar modal
   client.on("interactionCreate", async (interaction) => {
     if (!interaction.isModalSubmit()) return;
 
     const razon = interaction.fields.getTextInputValue("razon");
-    const staff = interaction.user;
     const aprobado = interaction.customId === "modal_aprobar";
 
-    const mensajeOriginal = await interaction.channel.messages.fetch(
-      interaction.message?.id
-    ).catch(()=>null)
-
-    // Buscar embed original
-    const embedOriginal = interaction.message?.embeds?.[0];
-
-    // Si no existe, no se puede procesar
-    if (!embedOriginal)
+    // Obtener embed original del mensaje del staff
+    const embed = interaction.message.embeds[0];
+    if (!embed)
       return interaction.reply({
-        content: "❌ Error: no se pudo encontrar la sugerencia original.",
+        content: "❌ Error al obtener la sugerencia.",
         ephemeral: true,
       });
 
-    const autorID = embedOriginal.fields?.find((f) =>
-      f.name === "Autor"
-    )?.value.replace(/\D/g, "");
+    // Extraer ID del mensaje público desde el footer
+    const footer = embed.footer?.text || "";
+    const publicMsgID = footer.replace("ID del mensaje público: ", "").trim();
 
-    const canalPublico = await client.channels.fetch(SUGGESTIONS_PUBLIC);
+    // Buscar mensaje original
+    const canalPublico = await client.channels.fetch(CANAL_PUBLICO);
+    const msgPublica = await canalPublico.messages.fetch(publicMsgID);
 
-    const embedFinal = new EmbedBuilder()
-      .setTitle(aprobado ? "✅ Sugerencia Aprobada" : "❌ Sugerencia Rechazada")
-      .setDescription(embedOriginal.description)
-      .addFields(
-        { name: "Autor", value: `<@${autorID}>` },
-        { name: "Revisado por", value: `<@${staff.id}>` },
-        { name: "Razón", value: razon }
+    // Crear embed actualizado
+    const embedActualizado = EmbedBuilder.from(msgPublica.embeds[0])
+      .setFields(
+        { name: "Autor", value: embed.fields[0].value },
+        {
+          name: "Estado",
+          value: aprobado
+            ? "✅ **Aprobada**"
+            : "❌ **Rechazada**",
+        },
+        {
+          name: "Razón",
+          value: razon
+        }
       )
       .setColor(aprobado ? "Green" : "Red")
+      .setFooter({ text: `Revisado por: ${interaction.user.tag}` })
       .setTimestamp();
 
-    const msg = await canalPublico.send({ embeds: [embedFinal] });
+    // Editar mensaje público
+    await msgPublica.edit({ embeds: [embedActualizado] });
 
-    // Votaciones (reacciones)
-    await msg.react("👍");
-    await msg.react("👎");
-
+    // Respuesta al staff
     await interaction.reply({
-      content: `✔ La sugerencia ha sido ${
+      content: `✔ La sugerencia fue **${
         aprobado ? "aprobada" : "rechazada"
-      }.`,
+      }** correctamente.`,
       ephemeral: true,
     });
   });
