@@ -51,7 +51,7 @@ require('./postulaciones')(client);
 require('./embed')(client);
 require('./anuncio')(client);
 require('./sistemaSugerencias.js');
-require('./sistemaSugerencias.js')(client);
+
 
 // STAFF ROLES (admin, mod, headadmin)
 const STAFF_ROLE_IDS = [
