@@ -1,5 +1,5 @@
 // =========================================
-// SISTEMA DE SUGERENCIAS - VERSION FINAL
+// SISTEMA DE SUGERENCIAS - VERSION FINAL FIXED
 // =========================================
 
 const {
@@ -37,12 +37,12 @@ module.exports = (client) => {
     console.log("[Sugerencias] Comando /sugerir cargado.");
   });
 
-  // ========== ÚNICO LISTENER DE INTERACCIONES ==========
+  // ========== INTERACCIONES ==========
   client.on("interactionCreate", async (interaction) => {
 
-    // -------------------------------------
+    // =============================
     // 💬 1. /sugerir
-    // -------------------------------------
+    // =============================
     if (interaction.isChatInputCommand() && interaction.commandName === "sugerir") {
 
       const texto = interaction.options.getString("texto");
@@ -61,7 +61,7 @@ module.exports = (client) => {
 
       const msgPublica = await canalPublico.send({ embeds: [embedPublico] });
 
-      // Reacciones (sin emojis inválidos)
+      // Reacciones
       await msgPublica.react("👍");
       await msgPublica.react("👎");
 
@@ -73,11 +73,11 @@ module.exports = (client) => {
 
       const botones = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
-          .setCustomId("aprobar")
+          .setCustomId(`aprobar_${msgPublica.id}`)
           .setLabel("Aprobar")
           .setStyle(ButtonStyle.Success),
         new ButtonBuilder()
-          .setCustomId("rechazar")
+          .setCustomId(`rechazar_${msgPublica.id}`)
           .setLabel("Rechazar")
           .setStyle(ButtonStyle.Danger)
       );
@@ -91,9 +91,9 @@ module.exports = (client) => {
     }
 
 
-    // -------------------------------------
+    // =============================
     // 🔘 2. BOTONES (solo staff)
-    // -------------------------------------
+    // =============================
     if (interaction.isButton()) {
 
       if (!interaction.member.roles.cache.has(STAFF_ROLE)) {
@@ -103,14 +103,16 @@ module.exports = (client) => {
         });
       }
 
+      const [accion, idMsg] = interaction.customId.split("_");
+
       const modal = new ModalBuilder()
         .setCustomId(
-          interaction.customId === "aprobar"
-            ? "modal_aprobar"
-            : "modal_rechazar"
+          accion === "aprobar"
+            ? `modal_aprobar_${idMsg}`
+            : `modal_rechazar_${idMsg}`
         )
         .setTitle(
-          interaction.customId === "aprobar"
+          accion === "aprobar"
             ? "Aprobar Sugerencia"
             : "Rechazar Sugerencia"
         );
@@ -127,29 +129,24 @@ module.exports = (client) => {
     }
 
 
-    // -------------------------------------
+    // =============================
     // 📝 3. MODALES (staff)
-    // -------------------------------------
+    // =============================
     if (interaction.isModalSubmit()) {
 
       const razon = interaction.fields.getTextInputValue("razon");
-      const aprobado = interaction.customId === "modal_aprobar";
 
-      const embed = interaction.message.embeds[0];
-      if (!embed) {
-        return interaction.reply({ content: "Error interno.", flags: 64 });
-      }
-
-      // Obtener ID del mensaje público
-      const idMsg = embed.footer.text.replace("MSG:", "");
+      const [tipo, accion, idMsg] = interaction.customId.split("_");
+      const aprobado = accion === "aprobar";
 
       const canalPublico = await client.channels.fetch(CANAL_PUBLICO);
       const msgPublica = await canalPublico.messages.fetch(idMsg);
 
-      // Actualizar embed
-      const embedEditado = EmbedBuilder.from(msgPublica.embeds[0])
+      const embedOriginal = msgPublica.embeds[0];
+
+      const embedEditado = EmbedBuilder.from(embedOriginal)
         .setFields(
-          { name: "Autor", value: embed.fields[0].value },
+          { name: "Autor", value: embedOriginal.fields[0].value },
           {
             name: "Estado",
             value: aprobado
