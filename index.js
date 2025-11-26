@@ -467,12 +467,11 @@ client.on("messageCreate", async (message) => {
 // -------------------------
 // READY, Express y login
 // -------------------------
-client.once("ready", () => {
+client.once("ready", async () => {
   console.log(`✅ SirgioBOT conectado como ${client.user.tag}`);
   client.user.setActivity("LagSupport", { type: 3 });
-});
 
- // =========================
+  // =========================
   // REGISTRAR COMANDO /autoroles
   // =========================
   try {
@@ -486,6 +485,7 @@ client.once("ready", () => {
     console.error("❌ Error registrando /autoroles:", err);
   }
 });
+
 
 
 const app = express();
