@@ -196,6 +196,7 @@ client.on("interactionCreate", async (interaction) => {
 
     // ---- Select menu ----
     if (interaction.isStringSelectMenu() && interaction.customId === "ticket_category_select") {
+      const chosen = interaction.values[0];
       const userId = interaction.user.id;
 
       // Verificar ticket existente
@@ -214,12 +215,13 @@ client.on("interactionCreate", async (interaction) => {
 
       const embed = new EmbedBuilder()
         .setTitle("🟢 Confirmar apertura de ticket")
-        .setDescription(`${EMOJI_IDS[chosen] ? `<:${EMOJI_IDS[chosen].name}:${EMOJI_IDS[chosen].id}> ` : ""}Has elegido: **${chosen.replace(/_/g, " ")}**\n\nSi continúas se abrirá un ticket en el que podrás explicar tu problema.`)
+        .setDescription(`${EMOJI_IDS[chosen] ? `<:${EMOJI_IDS[chosen].name}:${EMOJI_IDS[chosen].id}> ` : ""}Has elegido: **${chosen.replace(/_/g, " ")}**\n\nSi continúas se abrirá un ticket.`)
         .setColor(0x00FF80)
         .setTimestamp();
 
       return interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
-    }
+}
+
 
     // ---- Botones ----
     if (interaction.isButton()) {
