@@ -186,9 +186,16 @@ client.on("messageCreate", async (message) => {
 // -------------------------
 client.on("interactionCreate", async (interaction) => {
   try {
-    // ---- Select menu: user eligió categoría ----
+
+    // ----- Slash Commands -----
+    if (interaction.isChatInputCommand()) {
+        if (interaction.commandName === "autoroles") {
+            return autoroles(client, interaction);
+        }
+    }
+
+    // ---- Select menu ----
     if (interaction.isStringSelectMenu() && interaction.customId === "ticket_category_select") {
-      const chosen = interaction.values[0];
       const userId = interaction.user.id;
 
       // Verificar ticket existente
