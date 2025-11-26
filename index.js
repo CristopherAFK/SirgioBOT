@@ -472,6 +472,22 @@ client.once("ready", () => {
   client.user.setActivity("LagSupport", { type: 3 });
 });
 
+ // =========================
+  // REGISTRAR COMANDO /autoroles
+  // =========================
+  try {
+    await client.application.commands.create({
+      name: "autoroles",
+      description: "Configura los autoroles del servidor"
+    });
+
+    console.log("✅ Comando /autoroles registrado correctamente.");
+  } catch (err) {
+    console.error("❌ Error registrando /autoroles:", err);
+  }
+});
+
+
 const app = express();
 app.get("/", (req, res) => res.send("SirgioBOT is alive!"));
 app.listen(process.env.PORT || 3000, () => console.log("🌐 Servidor web activo para mantener el bot despierto."));
