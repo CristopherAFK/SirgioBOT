@@ -12,8 +12,8 @@ module.exports = (client) => {
 
     const config = {
         paises: {
-            title: "Roles de Países",
-            color: 0xFF0000,
+            title: "Auto Roles de Países",
+            color: 0xFFA500,
             image: "https://media.discordapp.net/attachments/1225629661627682846/1422268955170443274/58_sin_titulo_20250929110844.png",
             roles: {
                 "🇻🇪": "1268383665168060517",
@@ -37,7 +37,7 @@ module.exports = (client) => {
             }
         },
         generos: {
-            title: "Roles de Géneros",
+            title: "Auto Roles de Géneros",
             color: 0x000000,
             image: "https://media.discordapp.net/attachments/1225629661627682846/1422283408935092376/58_sin_titulo_20250929120620.png",
             roles: {
@@ -48,8 +48,8 @@ module.exports = (client) => {
             }
         },
         juegos: {
-            title: "Roles de Videojuegos",
-            color: 0x0000FF,
+            title: "Auto Roles de Videojuegos",
+            color: 0x00D9FF,
             image: "https://media.discordapp.net/attachments/1225629661627682846/1422289906079629403/58_sin_titulo_20250929123134.png",
             roles: {
                 "⬛": "1350919243339923609",
@@ -66,8 +66,8 @@ module.exports = (client) => {
             }
         },
         anuncios: {
-            title: "Roles de Anuncios",
-            color: 0xFFA500,
+            title: "Auto Roles de Anuncios",
+            color: 0x39FF14,
             image: "https://media.discordapp.net/attachments/1225629661627682846/1422305674318053426/58_sin_titulo_20250929133434.png",
             roles: {
                 "🎉": "1268376127920148510",
