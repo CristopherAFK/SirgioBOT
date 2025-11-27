@@ -7,11 +7,14 @@ const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('
  * 1. Requiere este archivo en tu index.js principal: require('./autoroles.js')(client);
  * 2. Asegúrate de que tu bot tenga los INTENTS activados (GuildMessages, MessageContent, Guilds).
  * 3. Usa el comando !setup-autoroles en Discord.
+ * 
+ * IMPORTANTE: Si editas este archivo, asegúrate de usar emojis Unicode (🇻🇪) y no texto (:flag_ve:) en las claves.
+ * Los botones de Discord NO soportan el formato de texto (:nombre:).
  */
 
 module.exports = (client) => {
 
-    // Configuración de Roles con Emojis Unicode corregidos para evitar errores en botones
+    // Configuración de Roles con Emojis Unicode corregidos
     const config = {
         paises: {
             title: "Roles de Países",
@@ -29,7 +32,7 @@ module.exports = (client) => {
                 "🇵🇾": "1268384785403875350", // :flag_py:
                 "🇵🇦": "1268384817645359215", // :flag_pa:
                 "🇭🇳": "1268384915011932312", // :flag_hn:
-                "🇬🇹": "1268385050802651217", // :flag_gt:
+                "🇬🇹": "1268385256507965450", // :flag_gt:
                 "🇸🇻": "1268385050802651217", // :flag_sv:
                 "🇨🇷": "1413710208546508901", // :flag_cr:
                 "🇲🇽": "1268385311038246943", // :flag_mx:
@@ -88,9 +91,6 @@ module.exports = (client) => {
     client.on('messageCreate', async (message) => {
         if (message.author.bot) return;
         
-        // Log para depuración en consola de Render
-        // console.log(`Mensaje recibido: ${message.content}`);
-        
         if (message.content === '!setup-autoroles') {
             console.log("Intentando enviar paneles de autoroles...");
 
@@ -105,6 +105,9 @@ module.exports = (client) => {
                     const rows = [];
                     let currentRow = new ActionRowBuilder();
                     let buttonCount = 0;
+                    
+                    // Set para rastrear IDs duplicados en este panel y evitar error 50035
+                    const seenRoleIds = new Set();
 
                     for (const [emoji, roleId] of Object.entries(category.roles)) {
                         // Obtener nombre del rol
@@ -113,19 +116,32 @@ module.exports = (client) => {
                         
                         description += `${emoji} <@&${roleId}>\n\n`;
 
+                        // Generar Custom ID Único
+                        // Si un ID de rol se repite (ej: Guatemala y El Salvador tienen el mismo ID),
+                        // le agregamos un sufijo para que Discord no rechace el botón.
+                        let customId = `role_${roleId}`;
+                        if (seenRoleIds.has(roleId)) {
+                            customId = `role_${roleId}_dup${seenRoleIds.size}`;
+                        }
+                        seenRoleIds.add(roleId);
+
                         const button = new ButtonBuilder()
-                            .setCustomId(`role_${roleId}`)
+                            .setCustomId(customId)
                             .setLabel(roleName.length > 50 ? roleName.substring(0, 47) + '...' : roleName)
                             .setStyle(ButtonStyle.Secondary);
 
                         // Asignación segura de emojis
                         try {
-                            // Si es un emoji unicode directo, funcionará.
-                            // Si es un formato :alias:, fallará si no se maneja, pero aquí ya convertimos todo a unicode en 'config'.
-                            button.setEmoji(emoji); 
+                            // FIX CRÍTICO: Discord crashea si el emoji es texto ":alias:".
+                            // Solo permitimos Unicode o IDs.
+                            if (emoji.startsWith(':')) {
+                                // Es un alias de texto, saltamos el emoji para que el botón funcione (solo texto)
+                                // console.warn(`Emoji omitido por formato incompatible: ${emoji}`);
+                            } else {
+                                button.setEmoji(emoji); 
+                            }
                         } catch (e) {
                             console.warn(`No se pudo poner el emoji ${emoji} en el botón:`, e);
-                            // Si falla el emoji, el botón se crea sin él, solo con label
                         }
                         
                         currentRow.addComponents(button);
@@ -161,6 +177,10 @@ module.exports = (client) => {
         if (!interaction.isButton()) return;
         if (!interaction.customId.startsWith('role_')) return;
 
+        // Extraemos el ID del rol
+        // El formato puede ser "role_12345" o "role_12345_dup1" (si había duplicados)
+        // split('_') -> ["role", "12345", "dup1"]
+        // El ID siempre está en la posición 1
         const roleId = interaction.customId.split('_')[1];
         
         // Fetch rol si no está en caché
