@@ -49,8 +49,9 @@ require('./automod')(client);
 require('./welcome.js')(client);
 require('./postulaciones')(client);
 require('./embed')(client);
+require('./anuncio')(client);
 require('./autoroles.js')(client);
-require('./anuncio')(client):
+
 
 // STAFF ROLES (admin, mod, headadmin)
 const STAFF_ROLE_IDS = [
