@@ -1,180 +1,194 @@
-const { 
-  SlashCommandBuilder,
-  EmbedBuilder,
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle
-} = require("discord.js");
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
 
-// =========================
-// MAPAS DE ROLES
-// =========================
+/**
+ * Módulo de Autoroles
+ * 
+ * Instrucciones:
+ * 1. Requiere este archivo en tu index.js principal: require('./autoroles.js')(client);
+ * 2. Usa el comando !setup-autoroles (o el prefijo que uses) para enviar los paneles.
+ */
 
-const rolesPaises = {
-  "🇻🇪": "1268383665168060517",
-  "🇨🇴": "1268383284023525426",
-  "🇪🇨": "1268384015925252240",
-  "🇨🇱": "1268384143054471220",
-  "🇦🇷": "1268384222796582993",
-  "🇵🇪": "1268384464115994686",
-  "🇧🇴": "1268384560325066864",
-  "🇺🇾": "1268384709461934160",
-  "🇵🇾": "1268384785403875350",
-  "🇵🇦": "1268384817645359215",
-  "🇭🇳": "1268384915011932312",
-  "🇬🇹": "1268385050802651217",
-  "🇸🇻": "1268385050802651217",
-  "🇨🇷": "1413710208546508901",
-  "🇲🇽": "1268385311038246943",
-  "🇪🇸": "1268385402704756847",
-  "🇵🇷": "1268385447722356767",
-  "🇩🇴": "1268406577522806845"
-};
+module.exports = (client) => {
 
-const rolesGeneros = {
-  "🔒": "1268381141648277616",
-  "⚧️": "1268377460286951488",
-  "♂️": "1268377312227889223",
-  "♀️": "1268377374781739070"
-};
+    // Configuración de Roles
+    const config = {
+        paises: {
+            title: "Roles de Países",
+            color: 0xFF0000, // Rojo fuerte
+            image: "https://media.discordapp.net/attachments/1225629661627682846/1422268955170443274/58_sin_titulo_20250929110844.png",
+            roles: {
+                ":flag_ve:": "1268383665168060517",
+                ":flag_co:": "1268383284023525426",
+                ":flag_ec:": "1268384015925252240",
+                ":flag_cl:": "1268384143054471220",
+                ":flag_ar:": "1268384222796582993",
+                ":flag_pe:": "1268384464115994686",
+                ":flag_bo:": "1268384560325066864",
+                ":flag_uy:": "1268384709461934160",
+                ":flag_py:": "1268384785403875350",
+                ":flag_pa:": "1268384817645359215",
+                ":flag_hn:": "1268384915011932312",
+                ":flag_gt:": "1268385050802651217",
+                ":flag_sv:": "1268385050802651217",
+                ":flag_cr:": "1413710208546508901",
+                ":flag_mx:": "1268385311038246943",
+                ":flag_es:": "1268385402704756847",
+                ":flag_pr:": "1268385447722356767",
+                ":flag_do:": "1268406577522806845"
+            }
+        },
+        generos: {
+            title: "Roles de Géneros",
+            color: 0x000000, // Negro
+            image: "https://media.discordapp.net/attachments/1225629661627682846/1422283408935092376/58_sin_titulo_20250929120620.png",
+            roles: {
+                ":lock:": "1268381141648277616",
+                "⚧️": "1268377460286951488",
+                ":male_sign:": "1268377312227889223",
+                ":female_sign:": "1268377374781739070"
+            }
+        },
+        juegos: {
+            title: "Roles de Videojuegos",
+            color: 0x0000FF, // Azul fuerte
+            image: "https://media.discordapp.net/attachments/1225629661627682846/1422289906079629403/58_sin_titulo_20250929123134.png",
+            roles: {
+                ":black_large_square:": "1350919243339923609",
+                ":rocket:": "1350917758988324885",
+                ":orange_square:": "1350917038939308272",
+                ":star:": "1350918091873320980",
+                ":gun:": "1350917298051092651",
+                ":pick:": "1350917442557313257",
+                ":plunger:": "1413239980196626452",
+                ":microphone:": "1413240385521713222",
+                ":mosquito:": "1413243773990862968",
+                ":crown:": "1413243772703215679",
+                ":soccer:": "1413241320566161518"
+            }
+        },
+        anuncios: {
+            title: "Roles de Anuncios",
+            color: 0xFFA500, // Naranja
+            image: "https://media.discordapp.net/attachments/1225629661627682846/1422305674318053426/58_sin_titulo_20250929133434.png",
+            roles: {
+                ":tada:": "1268376127920148510",
+                ":tv:": "1268374279913996328",
+                ":musical_note:": "1268375078949621770",
+                ":space_invader:": "1268374348641865769",
+                ":vhs:": "1268375969823985744",
+                ":notes:": "1268376833720586332",
+                ":mega:": "1268374164595675309",
+                ":pencil:": "1268375562997600338"
+            }
+        }
+    };
 
-const rolesJuegos = {
-  "⬛": "1350919243339923609",
-  "🚀": "1350917758988324885",
-  "🟧": "1350917038939308272",
-  "⭐": "1350918091873320980",
-  "🔫": "1350917298051092651",
-  "⛏️": "1350917442557313257",
-  "🪠": "1413239980196626452",
-  "🎤": "1413240385521713222",
-  "🦟": "1413243773990862968",
-  "👑": "1413243772703215679",
-  "⚽": "1413241320566161518"
-};
+    // Evento para escuchar el comando de configuración
+    client.on('messageCreate', async (message) => {
+        if (message.author.bot) return;
+        
+        // Comando para enviar los paneles
+        if (message.content === '!setup-autoroles') {
+            // Verificar permisos (opcional, descomentar si es necesario)
+            // if (!message.member.permissions.has('Administrator')) return;
 
-const rolesAnuncios = {
-  "🎉": "1268376127920148510",
-  "📺": "1268374279913996328",
-  "🎵": "1268375078949621770",
-  "👾": "1268374348641865769",
-  "📼": "1268375969823985744",
-  "🎶": "1268376833720586332",
-  "📣": "1268374164595675309",
-  "📝": "1268375562997600338"
-};
+            for (const [key, category] of Object.entries(config)) {
+                const embed = new EmbedBuilder()
+                    .setTitle(category.title)
+                    .setColor(category.color)
+                    .setImage(category.image);
 
-// =========================
-// BANNERS
-// =========================
-const banners = {
-  paises: "https://media.discordapp.net/attachments/1225629661627682846/1422268955170443274/58_sin_titulo_20250929110844.png",
-  generos: "https://media.discordapp.net/attachments/1225629661627682846/1422283408935092376/58_sin_titulo_20250929120620.png",
-  juegos: "https://media.discordapp.net/attachments/1225629661627682846/1422289906079629403/58_sin_titulo_20250929123134.png",
-  anuncios: "https://media.discordapp.net/attachments/1225629661627682846/1422305674318053426/58_sin_titulo_20250929133434.png"
-};
+                // Crear descripción con un renglón por rol
+                let description = "";
+                const rows = [];
+                let currentRow = new ActionRowBuilder();
+                let buttonCount = 0;
 
-// =========================
-// FUNCIÓN PARA CREAR BOTONES
-// =========================
-function crearBotones(objRoles, prefix) {
-  const rows = [];
+                for (const [emoji, roleId] of Object.entries(category.roles)) {
+                    // Agregar a la descripción
+                    // Intentamos obtener el nombre del rol si está en caché, sino usamos el ID
+                    const role = message.guild.roles.cache.get(roleId);
+                    const roleName = role ? role.name : `Rol ${roleId}`;
+                    
+                    description += `${emoji} <@&${roleId}>\n\n`; // Doble salto de línea para dejar un renglón
 
-  for (const emoji in objRoles) {
-    rows.push(
-      new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-          .setCustomId(`${prefix}_${emoji}`)
-          .setLabel(emoji)
-          .setStyle(ButtonStyle.Primary)
-      )
-    );
-  }
+                    // Crear botón
+                    const button = new ButtonBuilder()
+                        .setCustomId(`role_${roleId}`)
+                        .setLabel(roleName.length > 80 ? roleName.substring(0, 77) + '...' : roleName) // Limite de caracteres en label
+                        .setStyle(ButtonStyle.Secondary)
+                        .setEmoji(emoji.replace(/:/g, '')); // Intentar limpiar el emoji si es formato texto, aunque para Custom Emojis se necesita el ID
 
-  return rows;
-}
+                    // Manejo básico de emojis para botones
+                    // Si el emoji es unicode (como ⚧️), funciona directo.
+                    // Si es custom (:flag_ve:), Discord.js necesita el ID o el nombre.
+                    // En este código asumiremos que el usuario pondrá el emoji correcto en el botón manualmente si falla,
+                    // pero intentamos pasarlo tal cual.
+                    
+                    // Nota: Para emojis custom en botones, se necesita el ID. 
+                    // Como el input tiene formato ":name:", puede fallar si no es unicode.
+                    // Usaremos el emoji tal cual en la descripción, y en el botón intentaremos mostrarlo.
+                    
+                    currentRow.addComponents(button);
+                    buttonCount++;
 
-module.exports = {
-  data: new SlashCommandBuilder()
-    .setName("autoroles")
-    .setDescription("Envia los embeds de autoroles"),
+                    if (buttonCount === 5) {
+                        rows.push(currentRow);
+                        currentRow = new ActionRowBuilder();
+                        buttonCount = 0;
+                    }
+                }
 
-  async execute(interaction) {
-    
-    // =============================
-    // EMBED PAISES
-    // =============================
-    const embedPaises = new EmbedBuilder()
-      .setColor("#ff0000")
-      .setTitle("🌍 | Autoroles de Países")
-      .setImage(banners.paises)
-      .setDescription(
-        Object.entries(rolesPaises)
-          .map(([emoji, id]) => `${emoji} → <@&${id}>`)
-          .join("\n\n")
-      );
+                if (buttonCount > 0) {
+                    rows.push(currentRow);
+                }
 
-    await interaction.channel.send({
-      embeds: [embedPaises],
-      components: crearBotones(rolesPaises, "pais")
+                embed.setDescription(description || "Selecciona tus roles abajo:");
+
+                await message.channel.send({ embeds: [embed], components: rows });
+            }
+            
+            message.reply('Paneles de autoroles enviados correctamente.');
+        }
     });
 
+    // Evento para manejar los clicks en los botones
+    client.on('interactionCreate', async (interaction) => {
+        if (!interaction.isButton()) return;
+        if (!interaction.customId.startsWith('role_')) return;
 
-    // =============================
-    // EMBED GENEROS
-    // =============================
-    const embedGeneros = new EmbedBuilder()
-      .setColor("#000000")
-      .setTitle("👤 | Autoroles de Género")
-      .setImage(banners.generos)
-      .setDescription(
-        Object.entries(rolesGeneros)
-          .map(([emoji, id]) => `${emoji} → <@&${id}>`)
-          .join("\n\n")
-      );
+        const roleId = interaction.customId.split('_')[1];
+        const role = interaction.guild.roles.cache.get(roleId);
 
-    await interaction.channel.send({
-      embeds: [embedGeneros],
-      components: crearBotones(rolesGeneros, "genero")
+        if (!role) {
+            return interaction.reply({ 
+                content: '❌ El rol configurado no se encuentra en este servidor.', 
+                ephemeral: true 
+            });
+        }
+
+        const member = interaction.member;
+        
+        try {
+            if (member.roles.cache.has(roleId)) {
+                await member.roles.remove(role);
+                await interaction.reply({ 
+                    content: `❌ Se te ha quitado el rol **${role.name}**.`, 
+                    ephemeral: true 
+                });
+            } else {
+                await member.roles.add(role);
+                await interaction.reply({ 
+                    content: `✅ Se te ha asignado el rol **${role.name}**.`, 
+                    ephemeral: true 
+                });
+            }
+        } catch (error) {
+            console.error(error);
+            await interaction.reply({ 
+                content: '❌ Hubo un error al gestionar el rol. Verifica que mi rol esté por encima del rol a asignar.', 
+                ephemeral: true 
+            });
+        }
     });
-
-
-    // =============================
-    // EMBED JUEGOS
-    // =============================
-    const embedJuegos = new EmbedBuilder()
-      .setColor("#0033ff")
-      .setTitle("🎮 | Autoroles de Juegos")
-      .setImage(banners.juegos)
-      .setDescription(
-        Object.entries(rolesJuegos)
-          .map(([emoji, id]) => `${emoji} → <@&${id}>`)
-          .join("\n\n")
-      );
-
-    await interaction.channel.send({
-      embeds: [embedJuegos],
-      components: crearBotones(rolesJuegos, "juego")
-    });
-
-
-    // =============================
-    // EMBED ANUNCIOS
-    // =============================
-    const embedAnuncios = new EmbedBuilder()
-      .setColor("#ff8c00")
-      .setTitle("📢 | Autoroles de Anuncios")
-      .setImage(banners.anuncios)
-      .setDescription(
-        Object.entries(rolesAnuncios)
-          .map(([emoji, id]) => `${emoji} → <@&${id}>`)
-          .join("\n\n")
-      );
-
-    await interaction.channel.send({
-      embeds: [embedAnuncios],
-      components: crearBotones(rolesAnuncios, "anuncio")
-    });
-
-    await interaction.reply({ content: "Autoroles enviados correctamente.", ephemeral: true });
-  }
 };
