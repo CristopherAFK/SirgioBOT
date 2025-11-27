@@ -50,8 +50,6 @@ require('./welcome.js')(client);
 require('./postulaciones')(client);
 require('./embed')(client);
 require('./anuncio')(client);
-const autoroles = require("./autoroles.js");
-
 
 
 // STAFF ROLES (admin, mod, headadmin)
@@ -171,16 +169,7 @@ client.on("messageCreate", async (message) => {
 // -------------------------
 client.on("interactionCreate", async (interaction) => {
   try {
-
-    // ----- Slash Commands -----
- if (interaction.isChatInputCommand()) {
-    if (interaction.commandName === "autoroles") {
-        return autoroles.execute(interaction);
-    }
-}
-
-
-    // ---- Select menu ----
+    // ---- Select menu: user eligió categoría ----
     if (interaction.isStringSelectMenu() && interaction.customId === "ticket_category_select") {
       const chosen = interaction.values[0];
       const userId = interaction.user.id;
@@ -201,13 +190,12 @@ client.on("interactionCreate", async (interaction) => {
 
       const embed = new EmbedBuilder()
         .setTitle("🟢 Confirmar apertura de ticket")
-        .setDescription(`${EMOJI_IDS[chosen] ? `<:${EMOJI_IDS[chosen].name}:${EMOJI_IDS[chosen].id}> ` : ""}Has elegido: **${chosen.replace(/_/g, " ")}**\n\nSi continúas se abrirá un ticket.`)
+        .setDescription(`${EMOJI_IDS[chosen] ? `<:${EMOJI_IDS[chosen].name}:${EMOJI_IDS[chosen].id}> ` : ""}Has elegido: **${chosen.replace(/_/g, " ")}**\n\nSi continúas se abrirá un ticket en el que podrás explicar tu problema.`)
         .setColor(0x00FF80)
         .setTimestamp();
 
       return interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
-}
-
+    }
 
     // ---- Botones ----
     if (interaction.isButton()) {
@@ -468,26 +456,10 @@ client.on("messageCreate", async (message) => {
 // -------------------------
 // READY, Express y login
 // -------------------------
-client.once("ready", async () => {
+client.once("ready", () => {
   console.log(`✅ SirgioBOT conectado como ${client.user.tag}`);
   client.user.setActivity("LagSupport", { type: 3 });
-
-  // =========================
-  // REGISTRAR COMANDO /autoroles
-  // =========================
-  try {
-    await client.application.commands.create({
-      name: "autoroles",
-      description: "Configura los autoroles del servidor"
-    });
-
-    console.log("✅ Comando /autoroles registrado correctamente.");
-  } catch (err) {
-    console.error("❌ Error registrando /autoroles:", err);
-  }
 });
-
-
 
 const app = express();
 app.get("/", (req, res) => res.send("SirgioBOT is alive!"));
