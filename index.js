@@ -173,11 +173,12 @@ client.on("interactionCreate", async (interaction) => {
   try {
 
     // ----- Slash Commands -----
-    if (interaction.isChatInputCommand()) {
-        if (interaction.commandName === "autoroles") {
-            return autoroles(client, interaction);
-        }
+ if (interaction.isChatInputCommand()) {
+    if (interaction.commandName === "autoroles") {
+        return autoroles.execute(interaction);
     }
+}
+
 
     // ---- Select menu ----
     if (interaction.isStringSelectMenu() && interaction.customId === "ticket_category_select") {
