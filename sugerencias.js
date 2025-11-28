@@ -161,6 +161,9 @@ module.exports = (client) => {
             publicMessage = await suggestionsChannel.send({ embeds: [publicEmbed] });
           }
 
+          await publicMessage.react('👍').catch(() => {});
+          await publicMessage.react('👎').catch(() => {});
+
           const staffEmbed = new EmbedBuilder()
             .setTitle(`📋 Nueva Sugerencia para Revisar`)
             .setDescription(`**Título:** ${title}\n\n**Descripción:**\n${description}`)
