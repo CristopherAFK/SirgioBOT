@@ -12,6 +12,7 @@ const {
   AttachmentBuilder
 } = require('discord.js');
 
+const GUILD_ID = '1212886282645147768';
 const SUGGESTIONS_CHANNEL_ID = '1440873532580954112';
 const STAFF_REVIEW_CHANNEL_ID = '1435091853308461179';
 const STAFF_ROLE_ID = '1230949715127042098';
@@ -55,20 +56,21 @@ module.exports = (client) => {
   client.once('ready', async () => {
     console.log('✅ Sistema de Sugerencias cargado');
 
-    const commands = [
-      new SlashCommandBuilder()
-        .setName('sugerir')
-        .setDescription('Envía una sugerencia para el servidor')
-    ];
-
     try {
-      const existingCommands = await client.application.commands.fetch();
-      const existingNames = existingCommands.map(cmd => cmd.name);
-      
-      for (const cmd of commands) {
-        if (!existingNames.includes(cmd.name)) {
-          await client.application.commands.create(cmd);
-          console.log(`🟢 Comando /${cmd.name} registrado`);
+      const guild = client.guilds.cache.get(GUILD_ID);
+      if (guild) {
+        const existingCommands = await guild.commands.fetch();
+        const hasCommand = existingCommands.some(cmd => cmd.name === 'sugerir');
+        
+        if (!hasCommand) {
+          const command = new SlashCommandBuilder()
+            .setName('sugerir')
+            .setDescription('Envía una sugerencia para el servidor');
+
+          await guild.commands.create(command);
+          console.log('🟢 Comando /sugerir registrado en el servidor');
+        } else {
+          console.log('✅ Comando /sugerir ya existe');
         }
       }
     } catch (error) {
