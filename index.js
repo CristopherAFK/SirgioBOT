@@ -53,6 +53,21 @@ require('./anuncio')(client);
 require('./autoroles.js')(client);
 require('./sugerencias.js')(client);
 
+// =========================
+// SISTEMA DE NOTIFICACIONES
+// =========================
+require('./notificaciones')(client, {
+  NOTIFICATION_CHANNEL_ID: process.env.NOTIFICATION_CHANNEL_ID,
+  YOUTUBE_CHANNEL_ID: process.env.YOUTUBE_CHANNEL_ID,
+  YOUTUBE_API_KEY: process.env.YOUTUBE_API_KEY,
+  TWITCH_CLIENT_ID: process.env.TWITCH_CLIENT_ID,
+  TWITCH_CLIENT_SECRET: process.env.TWITCH_CLIENT_SECRET,
+  TWITCH_USERNAME: process.env.TWITCH_USERNAME,
+  TIKTOK_USERNAME: process.env.TIKTOK_USERNAME,
+  ROLE_TO_MENTION: process.env.ROLE_TO_MENTION,
+  CHECK_INTERVAL_MINUTES: parseInt(process.env.CHECK_INTERVAL_MINUTES) || 5
+});
+
 
 // STAFF ROLES (admin, mod, headadmin)
 const STAFF_ROLE_IDS = [
