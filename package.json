@@ -1,0 +1,15 @@
+{
+  "name": "sirgiobot",
+  "version": "1.0.0",
+  "description": "Support del Lag",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "deploy-commands": "node deploy-commands.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.15.3",
+    "dotenv": "^16.3.1",
+    "express": "^4.19.2"
+  }
+}
