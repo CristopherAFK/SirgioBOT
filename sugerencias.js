@@ -153,12 +153,16 @@ module.exports = (client) => {
           if (fs.existsSync(ICON_PATH)) {
             const attachment = new AttachmentBuilder(ICON_PATH, { name: 'suggestion_icon.gif' });
             publicMessage = await suggestionsChannel.send({
+              content: '¡Nueva sugerencia!',
               embeds: [publicEmbed],
               files: [attachment]
             });
           } else {
             publicEmbed.setThumbnail(null);
-            publicMessage = await suggestionsChannel.send({ embeds: [publicEmbed] });
+            publicMessage = await suggestionsChannel.send({ 
+              content: '¡Nueva sugerencia!',
+              embeds: [publicEmbed] 
+            });
           }
 
           await publicMessage.react('👍').catch(() => {});
