@@ -20,6 +20,7 @@ const CANALES = [
 ];
 
 const NOTIFICATION_CHANNEL_ID = '1228731751006736426';
+const ROLE_TO_MENTION = '1268375969823985744';
 const CHECK_INTERVAL_MINUTES = 3;
 
 let data = {
@@ -111,7 +112,7 @@ module.exports = (client) => {
         .setTimestamp();
 
       await channel.send({ 
-        content: videoData.mensaje + '\n' + videoData.url,
+        content: `<@&${ROLE_TO_MENTION}>\n${videoData.mensaje}\n${videoData.url}`,
         embeds: [embed] 
       });
       
