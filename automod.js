@@ -883,25 +883,31 @@ module.exports = (client) => {
         }
       }
 
-      // 3. Detectar emojis excesivos (excluyendo emojis personalizados del servidor y todas las menciones)
-      // Remover todas las etiquetas de Discord antes de contar emojis:
-      // - Emojis personalizados: <:nombre:id> y <a:nombre:id>
-      // - Menciones de usuarios: <@userid> y <@!userid>
-      // - Menciones de roles: <@&roleid>
-      // - Menciones de canales: <#channelid>
-      const contentWithoutDiscordTags = content
-        .replace(/<a?:\w+:\d+>/g, "")  // Emojis personalizados
-        .replace(/<@!?\d+>/g, "")       // Menciones de usuarios
-        .replace(/<@&\d+>/g, "")        // Menciones de roles
-        .replace(/<#\d+>/g, "");        // Menciones de canales
+      // 3. Detectar emojis excesivos (excluyendo emojis personalizados del servidor, menciones y GIFs)
+      // No penalizar si el mensaje contiene GIFs
+      const hasGifAttachment = message.attachments && message.attachments.some(att => att.name && att.name.toLowerCase().endsWith('.gif'));
+      const hasGifLink = content.toLowerCase().includes('.gif');
       
-      const emojiCount = (contentWithoutDiscordTags.match(/\p{Emoji}/gu) || []).length;
-      if (emojiCount > EMOJI_THRESHOLD) {
-        await applyWarn(client, guild, user, member, `Demasiados emojis (${emojiCount})`, null);
-        try {
-          await message.delete();
-        } catch {}
-        return;
+      if (!hasGifAttachment && !hasGifLink) {
+        // Remover todas las etiquetas de Discord antes de contar emojis:
+        // - Emojis personalizados: <:nombre:id> y <a:nombre:id>
+        // - Menciones de usuarios: <@userid> y <@!userid>
+        // - Menciones de roles: <@&roleid>
+        // - Menciones de canales: <#channelid>
+        const contentWithoutDiscordTags = content
+          .replace(/<a?:\w+:\d+>/g, "")  // Emojis personalizados
+          .replace(/<@!?\d+>/g, "")       // Menciones de usuarios
+          .replace(/<@&\d+>/g, "")        // Menciones de roles
+          .replace(/<#\d+>/g, "");        // Menciones de canales
+        
+        const emojiCount = (contentWithoutDiscordTags.match(/\p{Emoji}/gu) || []).length;
+        if (emojiCount > EMOJI_THRESHOLD) {
+          await applyWarn(client, guild, user, member, `Demasiados emojis (${emojiCount})`, null);
+          try {
+            await message.delete();
+          } catch {}
+          return;
+        }
       }
 
       // 4. Detectar spam de líneas
