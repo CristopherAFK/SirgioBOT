@@ -274,7 +274,8 @@ module.exports = (client) => {
           .setName("mute")
           .setDescription("Mutea manualmente a un usuario (staff)")
           .addUserOption(o => o.setName("usuario").setDescription("Usuario a mutear").setRequired(true))
-          .addStringOption(o => o.setName("tiempo").setDescription("Duración (ej: 10m, 1h, 2d)").setRequired(true)),
+          .addStringOption(o => o.setName("tiempo").setDescription("Duración (ej: 10m, 1h, 2d)").setRequired(true))
+          .addStringOption(o => o.setName("motivo").setDescription("Motivo del mute").setRequired(false)),
         new SlashCommandBuilder()
           .setName("remove_mute")
           .setDescription("Quita el mute a un usuario (staff)")
@@ -490,6 +491,7 @@ module.exports = (client) => {
       if (interaction.commandName === "mute") {
         const user = interaction.options.getUser("usuario");
         const tiempo = interaction.options.getString("tiempo");
+        const motivo = interaction.options.getString("motivo") || "No especificado";
         const ms = parseDuration(tiempo);
         if (!ms) return interaction.reply({ content: "❌ Tiempo inválido.", ephemeral: true });
 
@@ -513,8 +515,19 @@ module.exports = (client) => {
           activeMutes.set(member.id, timeoutId);
 
           const logCh = guild.channels.cache.get(LOG_CHANNEL_ID);
-          if (logCh) logCh.send({ embeds: [new EmbedBuilder().setTitle("🔇 Mute manual").setDescription(`${user.tag} muteado por ${tiempo}`).setColor(0xffa500).setTimestamp()] }).catch(() => {});
-          return interaction.reply({ content: `✅ ${user.tag} muteado por ${tiempo}.`, ephemeral: true });
+          if (logCh) {
+            const logEmbed = new EmbedBuilder()
+              .setTitle("🔇 Mute manual")
+              .setDescription(`${user.tag} muteado por ${tiempo}`)
+              .addFields(
+                { name: "Motivo", value: motivo, inline: true },
+                { name: "Moderador", value: `<@${interaction.user.id}>`, inline: true }
+              )
+              .setColor(0xffa500)
+              .setTimestamp();
+            logCh.send({ embeds: [logEmbed] }).catch(() => {});
+          }
+          return interaction.reply({ content: `✅ ${user.tag} muteado por ${tiempo}.\n📝 Motivo: ${motivo}`, ephemeral: true });
         } catch (e) {
           console.error("Error:", e);
           return interaction.reply({ content: "❌ Error aplicando mute.", ephemeral: true });
