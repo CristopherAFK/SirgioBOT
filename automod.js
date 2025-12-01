@@ -103,6 +103,7 @@ const LINES_THRESHOLD = 5;
 const CAPS_LENGTH_THRESHOLD = 15;
 const CAPS_RATIO_THRESHOLD = 0.7;
 const INVITE_REGEX = /discord\.gg\/|discord\.com\/invite\//gi;
+const LINK_REGEX = /https?:\/\/[^\s]+|www\.[^\s]+|\b[a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9]?\.(com|co|es|org|net|io|dev|tv|gg|uk|us|fr|de|it|ru|cn|jp)\b/gi;
 const EMOJI_THRESHOLD = 10;
 
 function getMuteMinutesForWarnCount(count) {
@@ -862,6 +863,18 @@ module.exports = (client) => {
           await message.delete();
         } catch {}
         return;
+      }
+
+      // 2.5. Detectar links
+      if (LINK_REGEX.test(content)) {
+        const links = content.match(LINK_REGEX);
+        if (links && links.length > 0) {
+          await applyWarn(client, guild, user, member, `Compartir links no permitido (${links[0]})`, null);
+          try {
+            await message.delete();
+          } catch {}
+          return;
+        }
       }
 
       // 3. Detectar emojis excesivos (excluyendo emojis personalizados del servidor y todas las menciones)
