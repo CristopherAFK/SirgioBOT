@@ -78,6 +78,34 @@ module.exports = (client) => {
     }
   });
 
+  // Detectar mensajes normales en el canal de sugerencias y rechazarlos
+  client.on('messageCreate', async (message) => {
+    try {
+      // Ignorar bots
+      if (message.author.bot) return;
+      
+      // Verificar si el mensaje está en el canal de sugerencias
+      if (message.channelId === SUGGESTIONS_CHANNEL_ID) {
+        // Borrar el mensaje
+        await message.delete().catch(() => {});
+        
+        // Enviar mensaje privado al usuario
+        try {
+          await message.author.send({
+            content: '❌ **No se pueden enviar mensajes normales en el canal de sugerencias.**\n\n' +
+                     'Para hacer una sugerencia, usa el comando:\n' +
+                     '`/sugerir`\n\n' +
+                     '¡Gracias por tu comprensión! 😊'
+          });
+        } catch (dmError) {
+          console.log(`No se pudo enviar DM a ${message.author.tag}`);
+        }
+      }
+    } catch (error) {
+      console.error('Error en messageCreate:', error);
+    }
+  });
+
   client.on('interactionCreate', async (interaction) => {
     try {
       if (interaction.isChatInputCommand() && interaction.commandName === 'sugerir') {
