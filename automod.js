@@ -89,6 +89,7 @@ function getMuteMinutesForWarnCount(count) {
 const activeMutes = new Map();
 const activeVigilances = new Map();
 const userMessageHistory = new Map();
+const processedModals = new Set(); // Prevenir procesamiento duplicado de modales
 
 function cleanupExpiredWarns(client) {
   const now = Date.now();
@@ -320,6 +321,12 @@ module.exports = (client) => {
 
       // Manejador de modal para addwarn personalizado
       if (interaction.isModalSubmit() && interaction.customId.startsWith("addwarn_modal_")) {
+        // Prevenir procesamiento duplicado
+        const modalKey = `${interaction.user.id}_${interaction.id}`;
+        if (processedModals.has(modalKey)) return;
+        processedModals.add(modalKey);
+        setTimeout(() => processedModals.delete(modalKey), 5000); // Limpiar después de 5s
+
         const userId = interaction.customId.replace("addwarn_modal_", "");
         const razon = interaction.fields.getTextInputValue("razon_input");
         const tiempoStr = interaction.fields.getTextInputValue("mute_input") || "";
