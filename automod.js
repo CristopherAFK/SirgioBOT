@@ -271,6 +271,14 @@ module.exports = (client) => {
           .setName("reloadlists")
           .setDescription("Recarga las listas de palabras prohibidas (staff)"),
         new SlashCommandBuilder()
+          .setName("addword")
+          .setDescription("Agrega una palabra a la lista prohibida (staff)")
+          .addStringOption(o => o.setName("palabra").setDescription("Palabra a agregar").setRequired(true)),
+        new SlashCommandBuilder()
+          .setName("removeword")
+          .setDescription("Quita una palabra de la lista prohibida (staff)")
+          .addStringOption(o => o.setName("palabra").setDescription("Palabra a quitar").setRequired(true)),
+        new SlashCommandBuilder()
           .setName("mute")
           .setDescription("Mutea manualmente a un usuario (staff)")
           .addUserOption(o => o.setName("usuario").setDescription("Usuario a mutear").setRequired(true))
@@ -486,6 +494,71 @@ module.exports = (client) => {
       if (interaction.commandName === "reloadlists") {
         reloadWordLists();
         return interaction.reply({ content: `🔁 Listas recargadas: ${bannedWords.length} prohibidas, ${sensitiveWords.length} sensibles.`, ephemeral: true });
+      }
+
+      if (interaction.commandName === "addword") {
+        const palabra = interaction.options.getString("palabra").toLowerCase().trim();
+        if (!palabra) return interaction.reply({ content: "❌ La palabra no puede estar vacía.", ephemeral: true });
+
+        try {
+          const currentList = loadWords(BANNED_PATH);
+          if (currentList.includes(palabra)) {
+            return interaction.reply({ content: `⚠️ La palabra "${palabra}" ya está en la lista.`, ephemeral: true });
+          }
+
+          currentList.push(palabra);
+          fs.writeFileSync(BANNED_PATH, JSON.stringify({ words: currentList }, null, 2));
+          reloadWordLists();
+
+          const logCh = interaction.guild.channels.cache.get(LOG_CHANNEL_ID);
+          if (logCh) {
+            const logEmbed = new EmbedBuilder()
+              .setTitle("➕ Palabra añadida")
+              .setDescription(`Se agregó la palabra: **${palabra}**`)
+              .addFields({ name: "Moderador", value: `<@${interaction.user.id}>`, inline: true })
+              .setColor(0x00ff00)
+              .setTimestamp();
+            logCh.send({ embeds: [logEmbed] }).catch(() => {});
+          }
+
+          return interaction.reply({ content: `✅ Palabra "${palabra}" agregada a la lista prohibida.`, ephemeral: true });
+        } catch (e) {
+          console.error("Error agregando palabra:", e);
+          return interaction.reply({ content: "❌ Error al agregar la palabra.", ephemeral: true });
+        }
+      }
+
+      if (interaction.commandName === "removeword") {
+        const palabra = interaction.options.getString("palabra").toLowerCase().trim();
+        if (!palabra) return interaction.reply({ content: "❌ La palabra no puede estar vacía.", ephemeral: true });
+
+        try {
+          const currentList = loadWords(BANNED_PATH);
+          const index = currentList.indexOf(palabra);
+          if (index === -1) {
+            return interaction.reply({ content: `⚠️ La palabra "${palabra}" no está en la lista.`, ephemeral: true });
+          }
+
+          currentList.splice(index, 1);
+          fs.writeFileSync(BANNED_PATH, JSON.stringify({ words: currentList }, null, 2));
+          reloadWordLists();
+
+          const logCh = interaction.guild.channels.cache.get(LOG_CHANNEL_ID);
+          if (logCh) {
+            const logEmbed = new EmbedBuilder()
+              .setTitle("➖ Palabra removida")
+              .setDescription(`Se eliminó la palabra: **${palabra}**`)
+              .addFields({ name: "Moderador", value: `<@${interaction.user.id}>`, inline: true })
+              .setColor(0xff6600)
+              .setTimestamp();
+            logCh.send({ embeds: [logEmbed] }).catch(() => {});
+          }
+
+          return interaction.reply({ content: `✅ Palabra "${palabra}" removida de la lista prohibida.`, ephemeral: true });
+        } catch (e) {
+          console.error("Error removiendo palabra:", e);
+          return interaction.reply({ content: "❌ Error al remover la palabra.", ephemeral: true });
+        }
       }
 
       if (interaction.commandName === "mute") {
