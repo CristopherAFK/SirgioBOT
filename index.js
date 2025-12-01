@@ -369,6 +369,14 @@ client.on("messageCreate", async (message) => {
     if (!message.member) await message.guild.members.fetch(message.author.id).catch(()=>{});
     if (!isStaff(message.member)) return message.reply("❌ Solo el staff puede usar este comando.");
 
+    // Recargar datos para sincronizar con tickets de apelación creados desde automod
+    try {
+      const raw = fs.readFileSync(DATA_FILE, "utf8");
+      data = JSON.parse(raw);
+    } catch (err) {
+      console.warn("No se pudo recargar tickets.json:", err);
+    }
+
     const channel = message.channel;
     const ticket = data.channels[channel.id];
     if (!ticket) {
