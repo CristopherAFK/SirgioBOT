@@ -172,14 +172,24 @@ async function applyWarn(client, guild, user, member, reason, detectedWord = nul
     .setTimestamp()
     .setColor(warnCount === 1 ? 0x1e90ff : 0xff0000);
 
-  // Solo agregar botón si fue detectado por palabra prohibida
-  const components = [];
+  // Agregar botones según tipo de sanción
+  const row = new ActionRowBuilder();
+  
+  // Botón de palabras prohibidas solo si fue detectado por palabra prohibida
   if (detectedWord) {
-    const row = new ActionRowBuilder().addComponents(
+    row.addComponents(
       new ButtonBuilder().setCustomId("view_banned_words").setLabel("Ver palabras prohibidas").setStyle(ButtonStyle.Danger)
     );
-    components.push(row);
   }
+  
+  // Botón de apelación solo en sanciones (cuando hay mute)
+  if (muteMinutes > 0) {
+    row.addComponents(
+      new ButtonBuilder().setCustomId("appeal_sanction").setLabel("Apelar sanción").setStyle(ButtonStyle.Primary)
+    );
+  }
+  
+  const components = row.components.length > 0 ? [row] : [];
 
   try {
     await user.send({ embeds: [embed], components }).catch(() => {});
