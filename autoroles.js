@@ -34,6 +34,26 @@ module.exports = (client) => {
                 "🇪🇸": "1268385402704756847",
                 "🇵🇷": "1268385447722356767",
                 "🇩🇴": "1268406577522806845"
+            },
+            descriptions: {
+                "1268383665168060517": "Venezuela",
+                "1268383284023525426": "Colombia",
+                "1268384015925252240": "Ecuador",
+                "1268384143054471220": "Chile",
+                "1268384222796582993": "Argentina",
+                "1268384464115994686": "Perú",
+                "1268384560325066864": "Bolivia",
+                "1268384709461934160": "Uruguay",
+                "1268384785403875350": "Paraguay",
+                "1268384817645359215": "Panamá",
+                "1268384915011932312": "Honduras",
+                "1268385256507965450": "Guatemala",
+                "1268385050802651217": "El Salvador",
+                "1413710208546508901": "Costa Rica",
+                "1268385311038246943": "México",
+                "1268385402704756847": "España",
+                "1268385447722356767": "Puerto Rico",
+                "1268406577522806845": "República Dominicana"
             }
         },
         generos: {
@@ -42,9 +62,15 @@ module.exports = (client) => {
             image: "https://media.discordapp.net/attachments/1225629661627682846/1422283408935092376/58_sin_titulo_20250929120620.png",
             roles: {
                 "🔒": "1268381141648277616",
-                "⚧": "1268377460286951488", // Emoji simplificado
-                "♂": "1268377312227889223", // Emoji simplificado
-                "♀": "1268377374781739070"  // Emoji simplificado
+                "⚧": "1268377460286951488",
+                "♂": "1268377312227889223",
+                "♀": "1268377374781739070"
+            },
+            descriptions: {
+                "1268381141648277616": "Prefiero no decir",
+                "1268377460286951488": "No binario/Otro",
+                "1268377312227889223": "Hombre",
+                "1268377374781739070": "Mujer"
             }
         },
         juegos: {
@@ -63,6 +89,19 @@ module.exports = (client) => {
                 "🦟": "1413243773990862968",
                 "👑": "1413243772703215679",
                 "⚽": "1413241320566161518"
+            },
+            descriptions: {
+                "1350919243339923609": "Grand Theft Auto",
+                "1350917758988324885": "Roblox",
+                "1350917038939308272": "Minecraft",
+                "1350918091873320980": "Call of Duty",
+                "1350917298051092651": "Valorant",
+                "1350917442557313257": "Diablo",
+                "1413239980196626452": "Rust",
+                "1413240385521713222": "Among Us",
+                "1413243773990862968": "DayZ",
+                "1413243772703215679": "Palworld",
+                "1413241320566161518": "EA Sports FC"
             }
         },
         anuncios: {
@@ -78,6 +117,16 @@ module.exports = (client) => {
                 "🎶": "1268376833720586332",
                 "📣": "1268374164595675309",
                 "📝": "1268375562997600338"
+            },
+            descriptions: {
+                "1268376127920148510": "Eventos y sorteos",
+                "1268374279913996328": "Anuncios de streams",
+                "1268375078949621770": "Anuncios de música",
+                "1268374348641865769": "Anuncios de bots",
+                "1268375969823985744": "Ping a todos",
+                "1268376833720586332": "Nuevas canciones",
+                "1268374164595675309": "Anuncios generales",
+                "1268375562997600338": "Anuncios de cambios"
             }
         }
     };
@@ -106,8 +155,9 @@ module.exports = (client) => {
                     for (const [emoji, roleId] of Object.entries(category.roles)) {
                         const role = message.guild.roles.cache.get(roleId);
                         const roleName = role ? role.name : `Rol ${roleId}`;
+                        const roleDescription = category.descriptions[roleId] || "Sin descripción";
                         
-                        description += `${emoji} <@&${roleId}>\n\n`;
+                        description += `${emoji} <@&${roleId}> - *${roleDescription}*\n\n`;
 
                         let customId = `role_${roleId}`;
                         if (seenRoleIds.has(roleId)) {
