@@ -109,15 +109,19 @@ module.exports = (client) => {
       new ActionRowBuilder().addComponents(pie)
     );
 
-    await interaction.showModal(modal);
-
-    // Guardar canal y color temporalmente
+    // Guardar canal y color temporalmente ANTES de mostrar el modal
     client.embedTempData = {
       [interaction.user.id]: {
         channel: interaction.options.getChannel("canal") || interaction.channel,
         color: interaction.options.getString("color") || "#00FF80",
       },
     };
+
+    try {
+      await interaction.showModal(modal);
+    } catch (err) {
+      console.error('Error mostrando modal de embed:', err.message);
+    }
   });
 
   // Al enviar el modal
@@ -152,11 +156,20 @@ module.exports = (client) => {
     if (imagen) embed.setImage(imagen);
     if (pie) embed.setFooter({ text: pie });
 
-    await canal.send({ embeds: [embed] });
-
-    await interaction.reply({
-      content: `✅ Embed enviado correctamente en ${canal}`,
-      ephemeral: true,
-    });
+    try {
+      await canal.send({ embeds: [embed] });
+      await interaction.reply({
+        content: `✅ Embed enviado correctamente en ${canal}`,
+        ephemeral: true,
+      });
+    } catch (err) {
+      console.error('Error enviando embed:', err.message);
+      try {
+        await interaction.reply({
+          content: '❌ Hubo un error al enviar el embed.',
+          ephemeral: true,
+        });
+      } catch {}
+    }
   });
 };
