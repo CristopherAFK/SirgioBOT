@@ -119,13 +119,13 @@ module.exports = (client) => {
                 "📝": "1268375562997600338"
             },
             descriptions: {
-                "1268376127920148510": "Eventos y sorteos",
-                "1268374279913996328": "Anuncios de streams",
-                "1268375078949621770": "Anuncios de música",
-                "1268374348641865769": "Anuncios de bots",
-                "1268375969823985744": "Ping a todos",
-                "1268376833720586332": "Nuevas canciones",
-                "1268374164595675309": "Anuncios generales",
+                "1268376127920148510": "Notificaciones de eventos",
+                "1268374279913996328": "Anuncios de Directos en youtube",
+                "1268375078949621770": "Notificaciones de Lives en tiktok",
+                "1268374348641865769": "Notificaciones de Streams",
+                "1268375969823985744": "Notificaciones de nuevos videos en youtube",
+                "1268376833720586332": "Notificaciones de nuevos tiktoks",
+                "1268374164595675309": "avisos generales",
                 "1268375562997600338": "Anuncios de cambios"
             }
         }
