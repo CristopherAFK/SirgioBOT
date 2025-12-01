@@ -598,16 +598,21 @@ module.exports = (client) => {
         return;
       }
 
-      // 5. Detectar abuso de mayúsculas
+      // 5. Detectar abuso de mayúsculas (excluyendo emojis del servidor)
       if (content.length > CAPS_LENGTH_THRESHOLD) {
-        const capsCount = (content.match(/[A-Z]/g) || []).length;
-        const capsRatio = capsCount / content.length;
-        if (capsRatio > CAPS_RATIO_THRESHOLD) {
-          await applyWarn(client, guild, user, member, "Abuso de mayúsculas", null);
-          try {
-            await message.delete();
-          } catch {}
-          return;
+        // Remover emojis personalizados del servidor: <:nombre:id> y <a:nombre:id>
+        const contentWithoutEmojis = content.replace(/<a?:\w+:\d+>/g, "");
+        
+        if (contentWithoutEmojis.length > CAPS_LENGTH_THRESHOLD) {
+          const capsCount = (contentWithoutEmojis.match(/[A-Z]/g) || []).length;
+          const capsRatio = capsCount / contentWithoutEmojis.length;
+          if (capsRatio > CAPS_RATIO_THRESHOLD) {
+            await applyWarn(client, guild, user, member, "Abuso de mayúsculas", null);
+            try {
+              await message.delete();
+            } catch {}
+            return;
+          }
         }
       }
 
