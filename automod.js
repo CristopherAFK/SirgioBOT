@@ -172,14 +172,18 @@ async function applyWarn(client, guild, user, member, reason, detectedWord = nul
     .setTimestamp()
     .setColor(warnCount === 1 ? 0x1e90ff : 0xff0000);
 
-  // Solo agregar botón si fue detectado por palabra prohibida
-  const components = [];
+  // Agregar botones
+  const row1 = new ActionRowBuilder();
   if (detectedWord) {
-    const row = new ActionRowBuilder().addComponents(
+    row1.addComponents(
       new ButtonBuilder().setCustomId("view_banned_words").setLabel("Ver palabras prohibidas").setStyle(ButtonStyle.Danger)
     );
-    components.push(row);
   }
+  row1.addComponents(
+    new ButtonBuilder().setCustomId("appeal_sanction").setLabel("Apelar sanción").setStyle(ButtonStyle.Primary)
+  );
+  
+  const components = [row1];
 
   try {
     await user.send({ embeds: [embed], components }).catch(() => {});
@@ -324,6 +328,30 @@ module.exports = (client) => {
         return interaction.reply({ embeds: [embed], ephemeral: true });
       }
 
+      // Botón "Apelar sanción"
+      if (interaction.isButton() && interaction.customId === "appeal_sanction") {
+        const ticketCh = interaction.guild.channels.cache.get(TICKET_CHANNEL_ID);
+        if (!ticketCh) return interaction.reply({ content: "❌ Canal de tickets no encontrado.", ephemeral: true });
+
+        const appealEmbed = new EmbedBuilder()
+          .setTitle("📋 Nueva Apelación de Sanción")
+          .setDescription(`<@${interaction.user.id}> ha apelado una sanción.`)
+          .addFields(
+            { name: "Usuario", value: `${interaction.user.tag} (${interaction.user.id})`, inline: true },
+            { name: "Fecha", value: `<t:${Math.floor(Date.now() / 1000)}:f>`, inline: true }
+          )
+          .setColor(0xff9900)
+          .setTimestamp();
+
+        try {
+          await ticketCh.send({ embeds: [appealEmbed] }).catch(() => {});
+          return interaction.reply({ content: "✅ Tu apelación ha sido enviada al canal de tickets. El staff la revisará pronto.", ephemeral: true });
+        } catch (e) {
+          console.error("Error enviando apelación:", e);
+          return interaction.reply({ content: "❌ Error enviando la apelación.", ephemeral: true });
+        }
+      }
+
       // Manejador de modal para addwarn personalizado
       if (interaction.isModalSubmit() && interaction.customId.startsWith("addwarn_modal_")) {
         // Prevenir procesamiento duplicado
@@ -364,15 +392,18 @@ module.exports = (client) => {
           .setTimestamp()
           .setColor(warnCount === 1 ? 0x1e90ff : 0xff0000);
 
-        // Incluir botón si el staff lo indica
-        const components = [];
+        // Incluir botones
+        const row1 = new ActionRowBuilder();
         if (buttonStr.toLowerCase() === "si") {
-          components.push(
-            new ActionRowBuilder().addComponents(
-              new ButtonBuilder().setCustomId("view_banned_words").setLabel("Ver palabras prohibidas").setStyle(ButtonStyle.Danger)
-            )
+          row1.addComponents(
+            new ButtonBuilder().setCustomId("view_banned_words").setLabel("Ver palabras prohibidas").setStyle(ButtonStyle.Danger)
           );
         }
+        row1.addComponents(
+          new ButtonBuilder().setCustomId("appeal_sanction").setLabel("Apelar sanción").setStyle(ButtonStyle.Primary)
+        );
+        
+        const components = [row1];
 
         try {
           await user.send({ embeds: [embed], components }).catch(() => {});
@@ -605,7 +636,7 @@ module.exports = (client) => {
           }, ms);
           activeMutes.set(member.id, timeoutId);
 
-          // Enviar embed al usuario muteado (sin botón)
+          // Enviar embed al usuario muteado con botón de apelación
           const userEmbed = new EmbedBuilder()
             .setTitle("🔇 Has sido muteado")
             .setColor(0xff0000)
@@ -621,8 +652,12 @@ module.exports = (client) => {
             .setFooter({ text: "Si crees que esto fue un error, contacta al staff del servidor." })
             .setTimestamp();
 
+          const appealRow = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId("appeal_sanction").setLabel("Apelar sanción").setStyle(ButtonStyle.Primary)
+          );
+
           try {
-            await user.send({ embeds: [userEmbed] }).catch(() => {});
+            await user.send({ embeds: [userEmbed], components: [appealRow] }).catch(() => {});
           } catch (e) {
             console.log("No se pudo enviar DM al usuario muteado");
           }
