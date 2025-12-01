@@ -8,7 +8,11 @@ const {
   ButtonBuilder,
   ButtonStyle,
   ChannelType,
-  PermissionFlagsBits
+  PermissionFlagsBits,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
+  StringSelectMenuBuilder
 } = require("discord.js");
 
 const GUILD_ID = "1212886282645147768";
@@ -249,9 +253,8 @@ module.exports = (client) => {
           .addSubcommand((s) => s.setName("status").setDescription("Muestra estado del AutoMod")),
         new SlashCommandBuilder()
           .setName("addwarn")
-          .setDescription("Agrega una advertencia manual a un usuario")
-          .addUserOption((o) => o.setName("usuario").setDescription("Usuario objetivo").setRequired(true))
-          .addStringOption((o) => o.setName("razon").setDescription("Motivo").setRequired(true)),
+          .setDescription("Agrega una advertencia manual personalizada (abre modal)")
+          .addUserOption((o) => o.setName("usuario").setDescription("Usuario objetivo").setRequired(true)),
         new SlashCommandBuilder()
           .setName("removewarn")
           .setDescription("Elimina la última advertencia de un usuario")
@@ -306,6 +309,99 @@ module.exports = (client) => {
         return interaction.reply({ embeds: [embed], ephemeral: true });
       }
 
+      // Manejador de modal para addwarn personalizado
+      if (interaction.isModalSubmit() && interaction.customId.startsWith("addwarn_modal_")) {
+        const userId = interaction.customId.replace("addwarn_modal_", "");
+        const razon = interaction.fields.getTextInputValue("razon_input");
+        const tiempoStr = interaction.fields.getTextInputValue("mute_input") || "";
+        const buttonStr = interaction.fields.getTextInputValue("button_input") || "si";
+
+        const guild = interaction.guild;
+        const user = await client.users.fetch(userId).catch(() => null);
+        if (!user) return interaction.reply({ content: "❌ Usuario no encontrado.", ephemeral: true });
+
+        const member = await guild.members.fetch(userId).catch(() => null);
+        const ms = tiempoStr ? parseDuration(tiempoStr) : 0;
+
+        // Aplicar warn con configuración personalizada
+        if (!warnings[userId]) warnings[userId] = [];
+        warnings[userId].push({ reason: `Advertencia manual: ${razon}`, date: new Date().toISOString(), detectedWord: null });
+        saveWarnings();
+
+        const warnCount = warnings[userId].length;
+        const muteMinutes = ms > 0 ? Math.ceil(ms / 60000) : getMuteMinutesForWarnCount(warnCount);
+
+        // Crear embed personalizado
+        const embed = new EmbedBuilder()
+          .setTitle(warnCount === 1 ? "⚠️ Advertencia detectada" : "⛔ Infracción detectada")
+          .setDescription(
+            warnCount === 1
+              ? `Has recibido una advertencia por: **${razon}**.\n\nPor favor evita este comportamiento.`
+              : `Has cometido una infracción por: **${razon}**.\n\nHas sido muteado por **${muteMinutes} minutos**.`
+          )
+          .setFooter({ text: "SirgioBOT - Moderación manual" })
+          .setTimestamp()
+          .setColor(warnCount === 1 ? 0x1e90ff : 0xff0000);
+
+        // Incluir botón si el staff lo indica
+        const components = [];
+        if (buttonStr.toLowerCase() === "si") {
+          components.push(
+            new ActionRowBuilder().addComponents(
+              new ButtonBuilder().setCustomId("view_banned_words").setLabel("Ver palabras prohibidas").setStyle(ButtonStyle.Danger)
+            )
+          );
+        }
+
+        try {
+          await user.send({ embeds: [embed], components }).catch(() => {});
+        } catch (e) {}
+
+        // Aplicar mute si se especificó tiempo
+        if (ms > 0 && member) {
+          try {
+            await member.roles.add(MUTED_ROLE_ID).catch(() => {});
+            if (activeMutes.has(member.id)) {
+              clearTimeout(activeMutes.get(member.id));
+              activeMutes.delete(member.id);
+            }
+            const timeoutId = setTimeout(async () => {
+              try {
+                const refreshed = await guild.members.fetch(member.id).catch(() => null);
+                if (refreshed) await refreshed.roles.remove(MUTED_ROLE_ID).catch(() => {});
+              } catch {}
+              activeMutes.delete(member.id);
+            }, ms);
+            activeMutes.set(member.id, timeoutId);
+          } catch (e) {
+            console.error("Error aplicando mute:", e);
+          }
+        }
+
+        // Log en canal
+        try {
+          const logCh = guild?.channels.cache.get(LOG_CHANNEL_ID);
+          if (logCh) {
+            const logEmbed = new EmbedBuilder()
+              .setColor(ms > 0 ? 0xff0000 : 0xffff00)
+              .setTitle(ms > 0 ? "⛔ Sanción personalizada" : "⚠️ Advertencia personalizada")
+              .addFields(
+                { name: "Usuario", value: `${user.tag} (${user.id})`, inline: true },
+                { name: "Razón", value: razon, inline: true },
+                { name: "Warns", value: `${warnCount}`, inline: true },
+                { name: "Mute", value: ms > 0 ? `${muteMinutes}m` : "Advertencia", inline: true },
+                { name: "Botón", value: buttonStr.toLowerCase() === "si" ? "Sí" : "No", inline: true }
+              )
+              .setTimestamp();
+            logCh.send({ embeds: [logEmbed] }).catch(() => {});
+          }
+        } catch (e) {
+          console.error("Error en log:", e);
+        }
+
+        return interaction.reply({ content: `✅ Advertencia personalizada aplicada a ${user.tag}.`, ephemeral: true });
+      }
+
       if (!interaction.isChatInputCommand()) return;
 
       const isStaffOrOwner =
@@ -327,11 +423,38 @@ module.exports = (client) => {
 
       if (interaction.commandName === "addwarn") {
         const user = interaction.options.getUser("usuario");
-        const reason = interaction.options.getString("razon");
-        const guild = interaction.guild;
-        const member = await guild.members.fetch(user.id).catch(() => null);
-        await applyWarn(client, guild, user, member, `Advertencia manual: ${reason}`, null);
-        return interaction.reply({ content: `⚠️ Advertencia añadida a ${user.tag}.`, ephemeral: true });
+        const modal = new ModalBuilder()
+          .setCustomId(`addwarn_modal_${user.id}`)
+          .setTitle("Agregar Advertencia Personalizada");
+
+        const razonInput = new TextInputBuilder()
+          .setCustomId("razon_input")
+          .setLabel("Razón de la advertencia")
+          .setStyle(TextInputStyle.Short)
+          .setRequired(true)
+          .setPlaceholder("Ej: Spam, comportamiento tóxico");
+
+        const muteInput = new TextInputBuilder()
+          .setCustomId("mute_input")
+          .setLabel("Tiempo de mute (opcional)")
+          .setStyle(TextInputStyle.Short)
+          .setRequired(false)
+          .setPlaceholder("Ej: 10m, 1h, 2d o dejar vacío para solo advertencia");
+
+        const buttonInput = new TextInputBuilder()
+          .setCustomId("button_input")
+          .setLabel("¿Mostrar botón 'ver palabras prohibidas'?")
+          .setStyle(TextInputStyle.Short)
+          .setRequired(false)
+          .setPlaceholder("si/no (por defecto: si)");
+
+        modal.addComponents(
+          new ActionRowBuilder().addComponents(razonInput),
+          new ActionRowBuilder().addComponents(muteInput),
+          new ActionRowBuilder().addComponents(buttonInput)
+        );
+
+        return interaction.showModal(modal);
       }
 
       if (interaction.commandName === "removewarn") {
