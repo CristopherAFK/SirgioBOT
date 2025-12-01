@@ -58,6 +58,11 @@ require('./sugerencias.js')(client);
 // =========================
 require('./notificaciones')(client);
 
+// =========================
+// SISTEMA DE AVISOS
+// =========================
+require('./avisos')(client);
+
 
 // STAFF ROLES (admin, mod, headadmin)
 const STAFF_ROLE_IDS = [
