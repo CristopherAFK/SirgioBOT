@@ -701,8 +701,10 @@ module.exports = (client) => {
         return;
       }
 
-      // 3. Detectar emojis excesivos
-      const emojiCount = (content.match(/\p{Emoji}/gu) || []).length;
+      // 3. Detectar emojis excesivos (excluyendo emojis personalizados del servidor)
+      // Remover emojis personalizados del servidor: <:nombre:id> y <a:nombre:id>
+      const contentWithoutServerEmojis = content.replace(/<a?:\w+:\d+>/g, "");
+      const emojiCount = (contentWithoutServerEmojis.match(/\p{Emoji}/gu) || []).length;
       if (emojiCount > EMOJI_THRESHOLD) {
         await applyWarn(client, guild, user, member, `Demasiados emojis (${emojiCount})`, null);
         try {
