@@ -864,11 +864,19 @@ module.exports = (client) => {
         return;
       }
 
-      // 3. Detectar emojis excesivos (excluyendo emojis personalizados del servidor y menciones)
-      // Remover emojis personalizados del servidor: <:nombre:id> y <a:nombre:id>
-      // También remover menciones: <@userid> para evitar contar emojis dentro de ellas
-      const contentWithoutServerEmojis = content.replace(/<a?:\w+:\d+>/g, "").replace(/<@!?\d+>/g, "");
-      const emojiCount = (contentWithoutServerEmojis.match(/\p{Emoji}/gu) || []).length;
+      // 3. Detectar emojis excesivos (excluyendo emojis personalizados del servidor y todas las menciones)
+      // Remover todas las etiquetas de Discord antes de contar emojis:
+      // - Emojis personalizados: <:nombre:id> y <a:nombre:id>
+      // - Menciones de usuarios: <@userid> y <@!userid>
+      // - Menciones de roles: <@&roleid>
+      // - Menciones de canales: <#channelid>
+      const contentWithoutDiscordTags = content
+        .replace(/<a?:\w+:\d+>/g, "")  // Emojis personalizados
+        .replace(/<@!?\d+>/g, "")       // Menciones de usuarios
+        .replace(/<@&\d+>/g, "")        // Menciones de roles
+        .replace(/<#\d+>/g, "");        // Menciones de canales
+      
+      const emojiCount = (contentWithoutDiscordTags.match(/\p{Emoji}/gu) || []).length;
       if (emojiCount > EMOJI_THRESHOLD) {
         await applyWarn(client, guild, user, member, `Demasiados emojis (${emojiCount})`, null);
         try {
