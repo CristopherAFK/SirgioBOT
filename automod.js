@@ -23,6 +23,8 @@ const IGNORED_CHANNELS = ["1258524941289263254", "1313723272290111559"];
 const BOT_OWNER_ID = "1032482231677108224";
 const TICKET_CHANNEL_ID = "1228438600497102960";
 const VIGIL_CATEGORY_ID = "1255251210173153342";
+const TICKET_CATEGORY_ID = "1228437209628020736";
+const TICKETS_DATA_FILE = path.join(__dirname, "tickets.json");
 
 const WARNS_PATH = path.join(__dirname, "warns.json");
 const BANNED_PATH = path.join(__dirname, "bannedWords.json");
@@ -68,6 +70,31 @@ function reloadWordLists() {
   bannedWords = loadWords(BANNED_PATH);
   sensitiveWords = loadWords(SENSITIVE_PATH);
 }
+
+// Funciones para tickets
+let ticketData = { lastTicket: 0, userHasTicket: {}, channels: {} };
+function loadTicketData() {
+  try {
+    if (fs.existsSync(TICKETS_DATA_FILE)) {
+      const raw = fs.readFileSync(TICKETS_DATA_FILE, "utf8");
+      ticketData = JSON.parse(raw);
+    }
+  } catch (e) {
+    console.error("Error cargando tickets.json:", e);
+  }
+}
+function saveTicketData() {
+  try {
+    fs.writeFileSync(TICKETS_DATA_FILE, JSON.stringify(ticketData, null, 2));
+  } catch (e) {
+    console.error("Error guardando tickets.json:", e);
+  }
+}
+function sanitizeChannelName(name) {
+  return name.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").slice(0, 90);
+}
+
+loadTicketData();
 
 // Configuración de detección
 const SPAM_WINDOW_MS = 7000;
@@ -334,31 +361,81 @@ module.exports = (client) => {
         return interaction.reply({ embeds: [embed], ephemeral: true });
       }
 
-      // Botón "Apelar sanción"
+      // Botón "Apelar sanción" - crear ticket automático
       if (interaction.isButton() && interaction.customId === "appeal_sanction") {
         try {
-          // Obtener la guild (funciona en DMs y en el servidor)
           const guild = interaction.guild || client.guilds.cache.get(GUILD_ID);
           if (!guild) return interaction.reply({ content: "❌ No se pudo obtener el servidor.", ephemeral: true });
 
-          const ticketCh = guild.channels.cache.get(TICKET_CHANNEL_ID);
-          if (!ticketCh) return interaction.reply({ content: "❌ Canal de tickets no encontrado.", ephemeral: true });
+          // Verificar si el usuario ya tiene un ticket
+          if (ticketData.userHasTicket[interaction.user.id]) {
+            const existingId = ticketData.userHasTicket[interaction.user.id];
+            const existingCh = guild.channels.cache.get(existingId) || await guild.channels.fetch(existingId).catch(() => null);
+            return interaction.reply({ content: `❗️ Ya tienes un ticket abierto: ${existingCh ? existingCh.toString() : existingId}`, ephemeral: true });
+          }
 
-          const appealEmbed = new EmbedBuilder()
-            .setTitle("📋 Nueva Apelación de Sanción")
-            .setDescription(`<@${interaction.user.id}> ha apelado una sanción.`)
-            .addFields(
-              { name: "Usuario", value: `${interaction.user.tag} (${interaction.user.id})`, inline: true },
-              { name: "Fecha", value: `<t:${Math.floor(Date.now() / 1000)}:f>`, inline: true }
-            )
+          // Crear nuevo ticket
+          ticketData.lastTicket = (ticketData.lastTicket || 0) + 1;
+          const number = String(ticketData.lastTicket).padStart(3, "0");
+          const username = interaction.user.username || "user";
+          const chanName = sanitizeChannelName(`apelacion-${username}-${number}`);
+
+          const overwrites = [
+            { id: guild.id, deny: ["ViewChannel"] },
+            { id: interaction.user.id, allow: ["ViewChannel", "SendMessages", "ReadMessageHistory"] },
+            { id: client.user.id, allow: ["ViewChannel", "SendMessages", "ManageChannels", "ReadMessageHistory"] },
+            ...STAFF_ROLE_IDS.map(roleId => ({
+              id: roleId,
+              allow: ["ViewChannel", "SendMessages", "ReadMessageHistory"]
+            }))
+          ];
+
+          let channel;
+          try {
+            channel = await guild.channels.create({
+              name: chanName,
+              type: ChannelType.GuildText,
+              parent: TICKET_CATEGORY_ID,
+              permissionOverwrites: overwrites,
+              reason: `Ticket de apelación creado por ${interaction.user.tag}`
+            });
+          } catch (err) {
+            channel = await guild.channels.create({
+              name: chanName,
+              type: ChannelType.GuildText,
+              permissionOverwrites: overwrites,
+              reason: `Ticket de apelación creado por ${interaction.user.tag}`
+            });
+          }
+
+          // Guardar referencias
+          ticketData.userHasTicket[interaction.user.id] = channel.id;
+          ticketData.channels[channel.id] = {
+            ownerId: interaction.user.id,
+            number,
+            category: "apelacion",
+            createdAt: new Date().toISOString(),
+            claimedBy: null
+          };
+          saveTicketData();
+
+          // Mensaje en el canal del ticket
+          const claimBtn = new ButtonBuilder().setCustomId(`claim_ticket_${channel.id}`).setLabel("🧑‍💼 Atender ticket").setStyle(ButtonStyle.Primary);
+          const row = new ActionRowBuilder().addComponents(claimBtn);
+
+          const embedTicket = new EmbedBuilder()
+            .setTitle("📋 Apelación de Sanción")
+            .setDescription(`<@${interaction.user.id}> ha apelado una sanción.\n\nEl staff revisará tu caso en breve.`)
             .setColor(0xff9900)
+            .setFooter({ text: `Ticket #${number}` })
             .setTimestamp();
 
-          await ticketCh.send({ embeds: [appealEmbed] }).catch(() => {});
-          return interaction.reply({ content: "✅ Tu apelación ha sido enviada al canal de tickets. El staff la revisará pronto.", ephemeral: true });
+          await channel.send({ content: `<@${interaction.user.id}>`, embeds: [embedTicket], components: [row] });
+
+          return interaction.reply({ content: `✅ Ticket de apelación creado: ${channel}`, ephemeral: true });
         } catch (e) {
-          console.error("Error enviando apelación:", e);
-          return interaction.reply({ content: "❌ Error enviando la apelación.", ephemeral: true });
+          console.error("Error creando ticket de apelación:", e);
+          return interaction.reply({ content: "❌ Error creando el ticket.", ephemeral: true });
         }
       }
 
