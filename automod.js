@@ -865,15 +865,21 @@ module.exports = (client) => {
         return;
       }
 
-      // 2.5. Detectar links
+      // 2.5. Detectar links (excluyendo GIFs embebidos de Discord)
       if (LINK_REGEX.test(content)) {
         const links = content.match(LINK_REGEX);
         if (links && links.length > 0) {
-          await applyWarn(client, guild, user, member, `Compartir links no permitido (${links[0]})`, null);
-          try {
-            await message.delete();
-          } catch {}
-          return;
+          // Filtrar GIFs (no penalizar por compartir GIFs)
+          const nonGifLinks = links.filter(link => !link.toLowerCase().endsWith('.gif'));
+          
+          if (nonGifLinks.length > 0) {
+            // El sistema de warns ya es progresivo: primera vez advertencia, repetir = mute gradual
+            await applyWarn(client, guild, user, member, `Compartir links no permitido (${nonGifLinks[0]})`, null);
+            try {
+              await message.delete();
+            } catch {}
+            return;
+          }
         }
       }
 
