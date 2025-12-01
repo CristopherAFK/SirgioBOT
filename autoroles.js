@@ -58,7 +58,7 @@ module.exports = (client) => {
         },
         generos: {
             title: "Auto Roles de Géneros",
-            color: #ff0000 ,
+            color: 0xFF0000,
             image: "https://media.discordapp.net/attachments/1225629661627682846/1422283408935092376/58_sin_titulo_20250929120620.png",
             roles: {
                 "🔒": "1268381141648277616",
