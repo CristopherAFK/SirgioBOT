@@ -7,7 +7,7 @@ module.exports = (client) => {
 
     const content = message.content.toLowerCase().trim();
 
-    if (content === '!aviso') {
+    if (content === '!aviso' || content === '!avisos') {
       try {
         await message.delete();
       } catch (err) {
