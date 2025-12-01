@@ -578,6 +578,12 @@ module.exports = (client) => {
             clearTimeout(activeMutes.get(member.id));
             activeMutes.delete(member.id);
           }
+          
+          // Calcular tiempos
+          const now = new Date();
+          const endTime = new Date(now.getTime() + ms);
+          const muteMinutes = Math.ceil(ms / 60000);
+          
           const timeoutId = setTimeout(async () => {
             try {
               const refreshed = await guild.members.fetch(member.id).catch(() => null);
@@ -587,6 +593,29 @@ module.exports = (client) => {
           }, ms);
           activeMutes.set(member.id, timeoutId);
 
+          // Enviar embed al usuario muteado
+          const userEmbed = new EmbedBuilder()
+            .setTitle("🔇 Has sido muteado")
+            .setColor(0xff0000)
+            .setThumbnail(interaction.guild.iconURL({ dynamic: true }))
+            .addFields(
+              { name: "📌 Servidor", value: guild.name, inline: false },
+              { name: "⏱️ Duración", value: `${muteMinutes} minutos`, inline: true },
+              { name: "🕐 Inicio", value: `<t:${Math.floor(now.getTime() / 1000)}:f>`, inline: true },
+              { name: "🕑 Fin del mute", value: `<t:${Math.floor(endTime.getTime() / 1000)}:f>`, inline: true },
+              { name: "👮 Moderador", value: `${interaction.user.tag}`, inline: true },
+              { name: "📝 Motivo", value: motivo, inline: false }
+            )
+            .setFooter({ text: "Si crees que esto fue un error, contacta al staff del servidor." })
+            .setTimestamp();
+
+          try {
+            await user.send({ embeds: [userEmbed] }).catch(() => {});
+          } catch (e) {
+            console.log("No se pudo enviar DM al usuario muteado");
+          }
+
+          // Log en canal
           const logCh = guild.channels.cache.get(LOG_CHANNEL_ID);
           if (logCh) {
             const logEmbed = new EmbedBuilder()
@@ -594,7 +623,8 @@ module.exports = (client) => {
               .setDescription(`${user.tag} muteado por ${tiempo}`)
               .addFields(
                 { name: "Motivo", value: motivo, inline: true },
-                { name: "Moderador", value: `<@${interaction.user.id}>`, inline: true }
+                { name: "Moderador", value: `<@${interaction.user.id}>`, inline: true },
+                { name: "Fin del mute", value: `<t:${Math.floor(endTime.getTime() / 1000)}:f>`, inline: false }
               )
               .setColor(0xffa500)
               .setTimestamp();
