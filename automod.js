@@ -336,20 +336,24 @@ module.exports = (client) => {
 
       // Botón "Apelar sanción"
       if (interaction.isButton() && interaction.customId === "appeal_sanction") {
-        const ticketCh = interaction.guild.channels.cache.get(TICKET_CHANNEL_ID);
-        if (!ticketCh) return interaction.reply({ content: "❌ Canal de tickets no encontrado.", ephemeral: true });
-
-        const appealEmbed = new EmbedBuilder()
-          .setTitle("📋 Nueva Apelación de Sanción")
-          .setDescription(`<@${interaction.user.id}> ha apelado una sanción.`)
-          .addFields(
-            { name: "Usuario", value: `${interaction.user.tag} (${interaction.user.id})`, inline: true },
-            { name: "Fecha", value: `<t:${Math.floor(Date.now() / 1000)}:f>`, inline: true }
-          )
-          .setColor(0xff9900)
-          .setTimestamp();
-
         try {
+          // Obtener la guild (funciona en DMs y en el servidor)
+          const guild = interaction.guild || client.guilds.cache.get(GUILD_ID);
+          if (!guild) return interaction.reply({ content: "❌ No se pudo obtener el servidor.", ephemeral: true });
+
+          const ticketCh = guild.channels.cache.get(TICKET_CHANNEL_ID);
+          if (!ticketCh) return interaction.reply({ content: "❌ Canal de tickets no encontrado.", ephemeral: true });
+
+          const appealEmbed = new EmbedBuilder()
+            .setTitle("📋 Nueva Apelación de Sanción")
+            .setDescription(`<@${interaction.user.id}> ha apelado una sanción.`)
+            .addFields(
+              { name: "Usuario", value: `${interaction.user.tag} (${interaction.user.id})`, inline: true },
+              { name: "Fecha", value: `<t:${Math.floor(Date.now() / 1000)}:f>`, inline: true }
+            )
+            .setColor(0xff9900)
+            .setTimestamp();
+
           await ticketCh.send({ embeds: [appealEmbed] }).catch(() => {});
           return interaction.reply({ content: "✅ Tu apelación ha sido enviada al canal de tickets. El staff la revisará pronto.", ephemeral: true });
         } catch (e) {
