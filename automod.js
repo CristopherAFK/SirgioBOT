@@ -172,12 +172,17 @@ async function applyWarn(client, guild, user, member, reason, detectedWord = nul
     .setTimestamp()
     .setColor(warnCount === 1 ? 0x1e90ff : 0xff0000);
 
-  const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId("view_banned_words").setLabel("Ver palabras prohibidas").setStyle(ButtonStyle.Danger)
-  );
+  // Solo agregar botón si fue detectado por palabra prohibida
+  const components = [];
+  if (detectedWord) {
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId("view_banned_words").setLabel("Ver palabras prohibidas").setStyle(ButtonStyle.Danger)
+    );
+    components.push(row);
+  }
 
   try {
-    await user.send({ embeds: [embed], components: [row] }).catch(() => {});
+    await user.send({ embeds: [embed], components }).catch(() => {});
   } catch (e) {}
 
   if (muteMinutes > 0 && member) {
@@ -600,7 +605,7 @@ module.exports = (client) => {
           }, ms);
           activeMutes.set(member.id, timeoutId);
 
-          // Enviar embed al usuario muteado
+          // Enviar embed al usuario muteado (sin botón)
           const userEmbed = new EmbedBuilder()
             .setTitle("🔇 Has sido muteado")
             .setColor(0xff0000)
