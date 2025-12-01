@@ -172,18 +172,14 @@ async function applyWarn(client, guild, user, member, reason, detectedWord = nul
     .setTimestamp()
     .setColor(warnCount === 1 ? 0x1e90ff : 0xff0000);
 
-  // Agregar botones
-  const row1 = new ActionRowBuilder();
+  // Solo agregar botón si fue detectado por palabra prohibida
+  const components = [];
   if (detectedWord) {
-    row1.addComponents(
+    const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId("view_banned_words").setLabel("Ver palabras prohibidas").setStyle(ButtonStyle.Danger)
     );
+    components.push(row);
   }
-  row1.addComponents(
-    new ButtonBuilder().setCustomId("appeal_sanction").setLabel("Apelar sanción").setStyle(ButtonStyle.Primary)
-  );
-  
-  const components = [row1];
 
   try {
     await user.send({ embeds: [embed], components }).catch(() => {});
@@ -364,6 +360,7 @@ module.exports = (client) => {
         const razon = interaction.fields.getTextInputValue("razon_input");
         const tiempoStr = interaction.fields.getTextInputValue("mute_input") || "";
         const buttonStr = interaction.fields.getTextInputValue("button_input") || "si";
+        const appealStr = interaction.fields.getTextInputValue("appeal_input") || "no";
 
         const guild = interaction.guild;
         const user = await client.users.fetch(userId).catch(() => null);
@@ -392,18 +389,20 @@ module.exports = (client) => {
           .setTimestamp()
           .setColor(warnCount === 1 ? 0x1e90ff : 0xff0000);
 
-        // Incluir botones
+        // Incluir botones según configuración del staff
         const row1 = new ActionRowBuilder();
         if (buttonStr.toLowerCase() === "si") {
           row1.addComponents(
             new ButtonBuilder().setCustomId("view_banned_words").setLabel("Ver palabras prohibidas").setStyle(ButtonStyle.Danger)
           );
         }
-        row1.addComponents(
-          new ButtonBuilder().setCustomId("appeal_sanction").setLabel("Apelar sanción").setStyle(ButtonStyle.Primary)
-        );
+        if (appealStr.toLowerCase() === "si") {
+          row1.addComponents(
+            new ButtonBuilder().setCustomId("appeal_sanction").setLabel("Apelar sanción").setStyle(ButtonStyle.Primary)
+          );
+        }
         
-        const components = [row1];
+        const components = row1.components.length > 0 ? [row1] : [];
 
         try {
           await user.send({ embeds: [embed], components }).catch(() => {});
@@ -442,7 +441,8 @@ module.exports = (client) => {
                 { name: "Razón", value: razon, inline: true },
                 { name: "Warns", value: `${warnCount}`, inline: true },
                 { name: "Mute", value: ms > 0 ? `${muteMinutes}m` : "Advertencia", inline: true },
-                { name: "Botón", value: buttonStr.toLowerCase() === "si" ? "Sí" : "No", inline: true }
+                { name: "Ver palabras prohibidas", value: buttonStr.toLowerCase() === "si" ? "Sí" : "No", inline: true },
+                { name: "Botón apelación", value: appealStr.toLowerCase() === "si" ? "Sí" : "No", inline: true }
               )
               .setTimestamp();
             logCh.send({ embeds: [logEmbed] }).catch(() => {});
@@ -500,10 +500,18 @@ module.exports = (client) => {
           .setRequired(false)
           .setPlaceholder("si/no (por defecto: si)");
 
+        const appealInput = new TextInputBuilder()
+          .setCustomId("appeal_input")
+          .setLabel("¿Mostrar botón 'Apelar sanción'?")
+          .setStyle(TextInputStyle.Short)
+          .setRequired(false)
+          .setPlaceholder("si/no (por defecto: no)");
+
         modal.addComponents(
           new ActionRowBuilder().addComponents(razonInput),
           new ActionRowBuilder().addComponents(muteInput),
-          new ActionRowBuilder().addComponents(buttonInput)
+          new ActionRowBuilder().addComponents(buttonInput),
+          new ActionRowBuilder().addComponents(appealInput)
         );
 
         return interaction.showModal(modal);
