@@ -361,8 +361,27 @@ module.exports = (client) => {
         return interaction.reply({ embeds: [embed], ephemeral: true });
       }
 
-      // Botón "Apelar sanción" - crear ticket automático
+      // Botón "Apelar sanción" - mostrar confirmación
       if (interaction.isButton() && interaction.customId === "appeal_sanction") {
+        const confirmId = `confirm_appeal_${interaction.user.id}_${Date.now()}`;
+        const cancelId = `cancel_appeal_${interaction.user.id}_${Date.now()}`;
+        
+        const confirmBtn = new ButtonBuilder().setCustomId(confirmId).setLabel("✅ Sí, apelar").setStyle(ButtonStyle.Success);
+        const cancelBtn = new ButtonBuilder().setCustomId(cancelId).setLabel("❌ Cancelar").setStyle(ButtonStyle.Danger);
+        const row = new ActionRowBuilder().addComponents(confirmBtn, cancelBtn);
+
+        const embed = new EmbedBuilder()
+          .setTitle("⚠️ Confirmación de Apelación")
+          .setDescription("¿Realmente crees que el staff tuvo un error con tu sanción y deseas apelar?\n\nPor favor, sé honesto y cuidadoso con tus palabras. El staff revisará tu apelación y tomará la decisión correspondiente.")
+          .setColor(0xff9900)
+          .setFooter({ text: "Esta acción creará un ticket de apelación" })
+          .setTimestamp();
+
+        return interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
+      }
+
+      // Botón "Confirmar apelación"
+      if (interaction.isButton() && interaction.customId.startsWith("confirm_appeal_")) {
         try {
           const guild = interaction.guild || client.guilds.cache.get(GUILD_ID);
           if (!guild) return interaction.reply({ content: "❌ No se pudo obtener el servidor.", ephemeral: true });
@@ -421,7 +440,7 @@ module.exports = (client) => {
 
           // Mensaje en el canal del ticket
           const claimBtn = new ButtonBuilder().setCustomId(`claim_ticket_${channel.id}`).setLabel("🧑‍💼 Atender ticket").setStyle(ButtonStyle.Primary);
-          const row = new ActionRowBuilder().addComponents(claimBtn);
+          const ticketRow = new ActionRowBuilder().addComponents(claimBtn);
 
           const embedTicket = new EmbedBuilder()
             .setTitle("📋 Apelación de Sanción")
@@ -430,13 +449,18 @@ module.exports = (client) => {
             .setFooter({ text: `Ticket #${number}` })
             .setTimestamp();
 
-          await channel.send({ content: `<@${interaction.user.id}>`, embeds: [embedTicket], components: [row] });
+          await channel.send({ content: `<@${interaction.user.id}>`, embeds: [embedTicket], components: [ticketRow] });
 
           return interaction.reply({ content: `✅ Ticket de apelación creado: ${channel}`, ephemeral: true });
         } catch (e) {
           console.error("Error creando ticket de apelación:", e);
           return interaction.reply({ content: "❌ Error creando el ticket.", ephemeral: true });
         }
+      }
+
+      // Botón "Cancelar apelación"
+      if (interaction.isButton() && interaction.customId.startsWith("cancel_appeal_")) {
+        return interaction.reply({ content: "❌ Apelación cancelada.", ephemeral: true });
       }
 
       // Manejador de modal para addwarn personalizado
