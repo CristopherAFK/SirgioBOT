@@ -841,9 +841,9 @@ module.exports = (client) => {
           // Crear canal de vigilancia
           const chanName = sanitizeChannelName(`vigilancia-${user.username}`);
           
+          // Solo staff puede ver el canal
           const overwrites = [
             { id: guild.id, deny: ["ViewChannel"] },
-            { id: user.id, allow: ["ViewChannel", "ReadMessageHistory"] },
             { id: client.user.id, allow: ["ViewChannel", "SendMessages", "ManageChannels", "ReadMessageHistory"] },
             ...STAFF_ROLE_IDS.map(roleId => ({ id: roleId, allow: ["ViewChannel", "SendMessages", "ReadMessageHistory"] }))
           ];
@@ -937,6 +937,57 @@ module.exports = (client) => {
       }
     } catch (err) {
       console.error("Error en interaction:", err);
+    }
+  });
+
+  // Registrar mensajes de usuarios vigilados
+  client.on("messageCreate", async (message) => {
+    if (message.author.bot) return;
+
+    try {
+      const userId = message.author.id;
+      const vigilance = activeVigilances.get(userId);
+      
+      if (vigilance) {
+        const guild = message.guild;
+        if (!guild) return;
+        
+        const vigilanceChannel = await guild.channels.fetch(vigilance.channelId).catch(() => null);
+        if (!vigilanceChannel) {
+          activeVigilances.delete(userId);
+          return;
+        }
+
+        const now = new Date();
+        const timeString = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+        const dateString = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
+        
+        const recordEmbed = new EmbedBuilder()
+          .setTitle("📝 Nuevo Mensaje")
+          .setAuthor({
+            name: message.author.tag,
+            iconURL: message.author.displayAvatarURL({ dynamic: true })
+          })
+          .setDescription(message.content || "*[Sin contenido]*")
+          .addFields(
+            { name: "📅 Fecha", value: dateString, inline: true },
+            { name: "🕐 Hora", value: timeString, inline: true },
+            { name: "#️⃣ Canal", value: `<#${message.channelId}>`, inline: true }
+          )
+          .setColor(0x3498db)
+          .setFooter({ text: `ID: ${message.id}` })
+          .setTimestamp();
+
+        // Agregar adjuntos si los hay
+        if (message.attachments && message.attachments.size > 0) {
+          const attachmentList = message.attachments.map(att => `[${att.name}](${att.url})`).join("\n");
+          recordEmbed.addFields({ name: "📎 Adjuntos", value: attachmentList, inline: false });
+        }
+
+        await vigilanceChannel.send({ embeds: [recordEmbed] }).catch(() => {});
+      }
+    } catch (error) {
+      console.error("Error registrando mensaje vigilado:", error);
     }
   });
 
