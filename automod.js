@@ -826,6 +826,115 @@ module.exports = (client) => {
           return interaction.reply({ content: "❌ Error.", ephemeral: true });
         }
       }
+
+      if (interaction.commandName === "vigilar") {
+        const user = interaction.options.getUser("usuario");
+        const tiempoStr = interaction.options.getString("tiempo");
+        const guild = interaction.guild;
+        const member = await guild.members.fetch(user.id).catch(() => null);
+        if (!member) return interaction.reply({ content: "❌ Miembro no encontrado.", ephemeral: true });
+
+        try {
+          const ms = tiempoStr === "0" ? 0 : parseDuration(tiempoStr);
+          if (ms === null) return interaction.reply({ content: "❌ Tiempo inválido.", ephemeral: true });
+
+          // Crear canal de vigilancia
+          const chanName = sanitizeChannelName(`vigilancia-${user.username}`);
+          
+          const overwrites = [
+            { id: guild.id, deny: ["ViewChannel"] },
+            { id: user.id, allow: ["ViewChannel", "ReadMessageHistory"] },
+            { id: client.user.id, allow: ["ViewChannel", "SendMessages", "ManageChannels", "ReadMessageHistory"] },
+            ...STAFF_ROLE_IDS.map(roleId => ({ id: roleId, allow: ["ViewChannel", "SendMessages", "ReadMessageHistory"] }))
+          ];
+
+          const vigilanceChannel = await guild.channels.create({
+            name: chanName,
+            type: ChannelType.GuildText,
+            parent: VIGIL_CATEGORY_ID,
+            permissionOverwrites: overwrites,
+            reason: `Vigilancia iniciada por ${interaction.user.tag}`
+          }).catch(() => null);
+
+          if (!vigilanceChannel) return interaction.reply({ content: "❌ Error creando canal de vigilancia.", ephemeral: true });
+
+          const vigilanceEmbed = new EmbedBuilder()
+            .setTitle("👁️ Vigilancia Iniciada")
+            .setDescription(`Se ha iniciado vigilancia para ${user.tag}`)
+            .addFields(
+              { name: "Usuario", value: `${user.tag} (${user.id})`, inline: true },
+              { name: "Iniciado por", value: `<@${interaction.user.id}>`, inline: true },
+              { name: "Duración", value: ms === 0 ? "Indefinida" : `${Math.ceil(ms / 60000)} minutos`, inline: true }
+            )
+            .setColor(0xffa500)
+            .setTimestamp();
+
+          await vigilanceChannel.send({ embeds: [vigilanceEmbed] }).catch(() => {});
+
+          activeVigilances.set(user.id, { channelId: vigilanceChannel.id, endTime: ms > 0 ? Date.now() + ms : null });
+
+          if (ms > 0) {
+            setTimeout(async () => {
+              try {
+                await vigilanceChannel.delete().catch(() => {});
+              } catch {}
+              activeVigilances.delete(user.id);
+            }, ms);
+          }
+
+          const logCh = guild.channels.cache.get(LOG_CHANNEL_ID);
+          if (logCh) {
+            logCh.send({
+              embeds: [new EmbedBuilder()
+                .setTitle("👁️ Vigilancia iniciada")
+                .setDescription(`Vigilancia iniciada para ${user.tag}`)
+                .addFields(
+                  { name: "Duración", value: ms === 0 ? "Indefinida" : `${Math.ceil(ms / 60000)} minutos`, inline: true },
+                  { name: "Moderador", value: `<@${interaction.user.id}>`, inline: true }
+                )
+                .setColor(0xffa500)
+                .setTimestamp()]
+            }).catch(() => {});
+          }
+
+          return interaction.reply({ content: `✅ Vigilancia iniciada para ${user.tag} en ${vigilanceChannel}`, ephemeral: true });
+        } catch (e) {
+          console.error("Error en vigilancia:", e);
+          return interaction.reply({ content: "❌ Error iniciando vigilancia.", ephemeral: true });
+        }
+      }
+
+      if (interaction.commandName === "cerrar_vigilancia") {
+        const user = interaction.options.getUser("usuario");
+        const guild = interaction.guild;
+
+        try {
+          const vigilance = activeVigilances.get(user.id);
+          if (!vigilance) return interaction.reply({ content: `❌ No hay vigilancia activa para ${user.tag}.`, ephemeral: true });
+
+          const channel = await guild.channels.fetch(vigilance.channelId).catch(() => null);
+          if (channel) await channel.delete().catch(() => {});
+
+          activeVigilances.delete(user.id);
+
+          const logCh = guild.channels.cache.get(LOG_CHANNEL_ID);
+          if (logCh) {
+            logCh.send({
+              embeds: [new EmbedBuilder()
+                .setTitle("👁️ Vigilancia cerrada")
+                .setDescription(`Vigilancia cerrada para ${user.tag}`)
+                .addFields({ name: "Moderador", value: `<@${interaction.user.id}>`, inline: true })
+                .setColor(0xff0000)
+                .setTimestamp()]
+            }).catch(() => {});
+          }
+
+          return interaction.reply({ content: `✅ Vigilancia cerrada para ${user.tag}.`, ephemeral: true });
+        } catch (e) {
+          console.error("Error cerrando vigilancia:", e);
+          return interaction.reply({ content: "❌ Error cerrando vigilancia.", ephemeral: true });
+        }
+      }
     } catch (err) {
       console.error("Error en interaction:", err);
     }
