@@ -1029,22 +1029,36 @@ module.exports = (client) => {
       if (LINK_REGEX.test(content)) {
         const links = content.match(LINK_REGEX);
         if (links && links.length > 0) {
-          // Filtrar GIFs (no penalizar por compartir GIFs)
-          // Incluye enlaces de Tenor, GIPHY y otros servicios de GIFs
-          const nonGifLinks = links.filter(link => {
+          // Filtrar GIFs, servicios de música y video
+          const nonAllowedLinks = links.filter(link => {
             const lowerLink = link.toLowerCase();
+            
             // Excluir si termina en .gif
             if (lowerLink.endsWith('.gif')) return false;
+            
             // Excluir dominios de servicios de GIFs
             if (lowerLink.includes('tenor.com')) return false;
             if (lowerLink.includes('giphy.com')) return false;
             if (lowerLink.includes('gfycat.com')) return false;
+            
+            // Excluir servicios de video
+            if (lowerLink.includes('youtube.com')) return false;
+            if (lowerLink.includes('youtu.be')) return false;
+            
+            // Excluir servicios de música
+            if (lowerLink.includes('spotify.com')) return false;
+            if (lowerLink.includes('soundcloud.com')) return false;
+            if (lowerLink.includes('music.apple.com')) return false;
+            if (lowerLink.includes('deezer.com')) return false;
+            if (lowerLink.includes('tidal.com')) return false;
+            if (lowerLink.includes('music.youtube.com')) return false;
+            
             return true;
           });
           
-          if (nonGifLinks.length > 0) {
+          if (nonAllowedLinks.length > 0) {
             // El sistema de warns ya es progresivo: primera vez advertencia, repetir = mute gradual
-            await applyWarn(client, guild, user, member, `Compartir links no permitido (${nonGifLinks[0]})`, null);
+            await applyWarn(client, guild, user, member, `Compartir links no permitido (${nonAllowedLinks[0]})`, null);
             try {
               await message.delete();
             } catch {}
