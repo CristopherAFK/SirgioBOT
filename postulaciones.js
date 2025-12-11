@@ -1,3 +1,5 @@
+const fs = require('fs');
+const path = require('path');
 const { 
   SlashCommandBuilder, 
   ModalBuilder, 
@@ -10,14 +12,33 @@ const {
   PermissionFlagsBits 
 } = require('discord.js');
 
-// ===============================
-// CONFIGURACIÓN
-// ===============================
 const POSTULACIONES_CHANNEL_ID = '1435093988196618383';
 const SUBMISSIONS_CHANNEL_ID = '1435091853308461179';
 const STAFF_ROLE_ID = '1212891335929897030';
+const STATUS_FILE = path.join(__dirname, 'postulaciones_status.json');
 
 let postulacionesAbiertas = false;
+
+function loadStatus() {
+  try {
+    if (fs.existsSync(STATUS_FILE)) {
+      const data = JSON.parse(fs.readFileSync(STATUS_FILE, 'utf8'));
+      postulacionesAbiertas = data.open || false;
+    }
+  } catch (e) {
+    console.error('Error cargando estado de postulaciones:', e);
+  }
+}
+
+function saveStatus() {
+  try {
+    fs.writeFileSync(STATUS_FILE, JSON.stringify({ open: postulacionesAbiertas }, null, 2));
+  } catch (e) {
+    console.error('Error guardando estado de postulaciones:', e);
+  }
+}
+
+loadStatus();
 
 const categories = {
   'tiktok_mod': 'TikTok MOD',
@@ -65,13 +86,12 @@ const questions = {
   ]
 };
 
-// ============================================
-// EXPORTACIÓN
-// ============================================
 module.exports = (client) => {
 
   client.once('ready', async () => {
-    console.log(`✅ Sistema de Postulaciones listo en ${client.user.tag}`);
+    console.log(`✅ Sistema de Postulaciones listo (Estado: ${postulacionesAbiertas ? 'ABIERTAS' : 'CERRADAS'})`);
+
+    const GUILD_ID = "1212886282645147768";
 
     const commands = [
       new SlashCommandBuilder()
@@ -91,19 +111,24 @@ module.exports = (client) => {
         ),
       new SlashCommandBuilder()
         .setName('abrir_postulaciones')
-        .setDescription('Abrir el sistema de postulaciones')
+        .setDescription('Abrir el sistema de postulaciones (Staff)')
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
       new SlashCommandBuilder()
         .setName('cerrar_postulaciones')
-        .setDescription('Cerrar el sistema de postulaciones')
-        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+        .setDescription('Cerrar el sistema de postulaciones (Staff)')
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+      new SlashCommandBuilder()
+        .setName('estado_postulaciones')
+        .setDescription('Ver el estado actual de las postulaciones')
     ];
 
     try {
-      await client.application.commands.set(commands);
-      console.log('🟢 Comandos de postulaciones registrados con éxito');
+      for (const command of commands) {
+        await client.application.commands.create(command.toJSON(), GUILD_ID);
+      }
+      console.log('🟢 Comandos de postulaciones registrados');
     } catch (error) {
-      console.error('Error registrando comandos:', error);
+      console.error('Error registrando comandos de postulaciones:', error);
     }
   });
 
@@ -112,13 +137,53 @@ module.exports = (client) => {
       const { commandName } = interaction;
 
       if (commandName === 'abrir_postulaciones') {
+        const member = interaction.member;
+        const hasStaffRole = member.roles.cache.has(STAFF_ROLE_ID) || member.permissions.has(PermissionFlagsBits.Administrator);
+        
+        if (!hasStaffRole) {
+          return interaction.reply({ content: '❌ No tienes permisos para usar este comando.', ephemeral: true });
+        }
+
         postulacionesAbiertas = true;
-        await interaction.reply({ content: '✅ Las postulaciones han sido abiertas.', ephemeral: true });
+        saveStatus();
+
+        const embed = new EmbedBuilder()
+          .setTitle('📋 Postulaciones Abiertas')
+          .setDescription('Las postulaciones han sido **abiertas**.\n\nLos usuarios ahora pueden postularse usando el comando `/postular`.')
+          .setColor(0x00ff00)
+          .setTimestamp();
+
+        await interaction.reply({ embeds: [embed] });
       }
 
       if (commandName === 'cerrar_postulaciones') {
+        const member = interaction.member;
+        const hasStaffRole = member.roles.cache.has(STAFF_ROLE_ID) || member.permissions.has(PermissionFlagsBits.Administrator);
+        
+        if (!hasStaffRole) {
+          return interaction.reply({ content: '❌ No tienes permisos para usar este comando.', ephemeral: true });
+        }
+
         postulacionesAbiertas = false;
-        await interaction.reply({ content: '🔒 Las postulaciones han sido cerradas.', ephemeral: true });
+        saveStatus();
+
+        const embed = new EmbedBuilder()
+          .setTitle('🔒 Postulaciones Cerradas')
+          .setDescription('Las postulaciones han sido **cerradas**.\n\nLos usuarios ya no pueden postularse hasta que se vuelvan a abrir.')
+          .setColor(0xff0000)
+          .setTimestamp();
+
+        await interaction.reply({ embeds: [embed] });
+      }
+
+      if (commandName === 'estado_postulaciones') {
+        const embed = new EmbedBuilder()
+          .setTitle('📊 Estado de Postulaciones')
+          .setDescription(`Las postulaciones están actualmente: **${postulacionesAbiertas ? '✅ ABIERTAS' : '🔒 CERRADAS'}**`)
+          .setColor(postulacionesAbiertas ? 0x00ff00 : 0xff0000)
+          .setTimestamp();
+
+        await interaction.reply({ embeds: [embed], ephemeral: true });
       }
 
       if (commandName === 'postular') {
@@ -133,7 +198,7 @@ module.exports = (client) => {
 
         if (!postulacionesAbiertas && !hasStaffRole) {
           return interaction.reply({ 
-            content: '❌ Las postulaciones están actualmente cerradas.', 
+            content: '❌ Las postulaciones están actualmente cerradas. Espera a que se anuncie la apertura.', 
             ephemeral: true 
           });
         }
@@ -200,13 +265,21 @@ module.exports = (client) => {
 
         const row = new ActionRowBuilder().addComponents(acceptButton, rejectButton);
 
-        const submissionsChannel = await client.channels.fetch(SUBMISSIONS_CHANNEL_ID);
-        await submissionsChannel.send({ embeds: [embed], components: [row] });
+        try {
+          const submissionsChannel = await client.channels.fetch(SUBMISSIONS_CHANNEL_ID);
+          await submissionsChannel.send({ embeds: [embed], components: [row] });
 
-        await interaction.reply({ 
-          content: '✅ Tu postulación ha sido enviada correctamente. Recibirás una respuesta por mensaje directo.', 
-          ephemeral: true 
-        });
+          await interaction.reply({ 
+            content: '✅ Tu postulación ha sido enviada correctamente. Recibirás una respuesta por mensaje directo.', 
+            ephemeral: true 
+          });
+        } catch (error) {
+          console.error('Error enviando postulación:', error);
+          await interaction.reply({ 
+            content: '❌ Error al enviar la postulación. Intenta de nuevo más tarde.', 
+            ephemeral: true 
+          });
+        }
       }
 
       if (interaction.customId.startsWith('message|')) {

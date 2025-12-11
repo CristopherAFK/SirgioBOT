@@ -1,12 +1,4 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-
-/**
- * Módulo de Autoroles
- * 
- * Instrucciones:
- * 1. Requiere este archivo en tu index.js principal: require('./autoroles.js')(client);
- * 2. Usa el comando !setup-autoroles en Discord.
- */
+const { EmbedBuilder } = require('discord.js');
 
 module.exports = (client) => {
 
@@ -131,14 +123,20 @@ module.exports = (client) => {
         }
     };
 
+    const allRoleEmojis = {};
+    for (const [key, category] of Object.entries(config)) {
+        for (const [emoji, roleId] of Object.entries(category.roles)) {
+            allRoleEmojis[emoji] = roleId;
+        }
+    }
+
     client.on('messageCreate', async (message) => {
         if (message.author.bot) return;
         
         if (message.content === '!setup-autoroles') {
-            console.log("Iniciando envío de paneles...");
+            console.log("Iniciando envío de paneles con reacciones...");
             let successCount = 0;
 
-            // Iteramos sobre cada categoría
             for (const [key, category] of Object.entries(config)) {
                 try {
                     const embed = new EmbedBuilder()
@@ -146,52 +144,29 @@ module.exports = (client) => {
                         .setColor(category.color)
                         .setImage(category.image);
 
-                    let description = "";
-                    const rows = [];
-                    let currentRow = new ActionRowBuilder();
-                    let buttonCount = 0;
-                    const seenRoleIds = new Set();
+                    let description = "**Reacciona con el emoji correspondiente para obtener el rol:**\n\n";
 
                     for (const [emoji, roleId] of Object.entries(category.roles)) {
-                        const role = message.guild.roles.cache.get(roleId);
-                        const roleName = role ? role.name : `Rol ${roleId}`;
                         const roleDescription = category.descriptions[roleId] || "Sin descripción";
-                        
-                        description += `${emoji} <@&${roleId}> - *${roleDescription}*\n\n`;
+                        description += `${emoji} → <@&${roleId}> - *${roleDescription}*\n\n`;
+                    }
 
-                        let customId = `role_${roleId}`;
-                        if (seenRoleIds.has(roleId)) {
-                            customId = `role_${roleId}_dup${seenRoleIds.size}`;
-                        }
-                        seenRoleIds.add(roleId);
+                    embed.setDescription(description);
+                    embed.setFooter({ text: "Reacciona para obtener/quitar el rol" });
 
-                        const button = new ButtonBuilder()
-                            .setCustomId(customId)
-                            .setLabel(roleName.length > 50 ? roleName.substring(0, 47) + '...' : roleName)
-                            .setStyle(ButtonStyle.Secondary);
+                    const sentMessage = await message.channel.send({ embeds: [embed] });
 
-                        if (!emoji.startsWith(':')) {
-                            button.setEmoji(emoji);
-                        }
-                        
-                        currentRow.addComponents(button);
-                        buttonCount++;
-
-                        if (buttonCount === 5) {
-                            rows.push(currentRow);
-                            currentRow = new ActionRowBuilder();
-                            buttonCount = 0;
+                    for (const emoji of Object.keys(category.roles)) {
+                        try {
+                            await sentMessage.react(emoji);
+                            await new Promise(resolve => setTimeout(resolve, 500));
+                        } catch (err) {
+                            console.error(`Error añadiendo reacción ${emoji}:`, err.message);
                         }
                     }
 
-                    if (buttonCount > 0) {
-                        rows.push(currentRow);
-                    }
-
-                    embed.setDescription(description || "Selecciona tus roles:");
-                    await message.channel.send({ embeds: [embed], components: rows });
                     successCount++;
-                    console.log(`✅ Panel ${category.title} enviado.`);
+                    console.log(`✅ Panel ${category.title} enviado con reacciones.`);
 
                 } catch (error) {
                     console.error(`❌ Error en panel ${category.title}:`, error);
@@ -203,34 +178,87 @@ module.exports = (client) => {
         }
     });
 
-    client.on('interactionCreate', async (interaction) => {
-        if (!interaction.isButton()) return;
-        if (!interaction.customId.startsWith('role_')) return;
+    client.on('messageReactionAdd', async (reaction, user) => {
+        if (user.bot) return;
 
-        const roleId = interaction.customId.split('_')[1];
-        let role = interaction.guild.roles.cache.get(roleId);
-        
-        if (!role) {
-            try { role = await interaction.guild.roles.fetch(roleId); } 
-            catch (e) { console.error(e); }
-        }
-
-        if (!role) {
-            return interaction.reply({ content: '❌ Rol no encontrado.', ephemeral: true });
-        }
-
-        const member = interaction.member;
         try {
-            if (member.roles.cache.has(roleId)) {
-                await member.roles.remove(role);
-                await interaction.reply({ content: `❌ Rol **${role.name}** removido.`, ephemeral: true });
-            } else {
-                await member.roles.add(role);
-                await interaction.reply({ content: `✅ Rol **${role.name}** asignado.`, ephemeral: true });
+            if (reaction.partial) {
+                await reaction.fetch();
             }
         } catch (error) {
-            console.error(error);
-            await interaction.reply({ content: '❌ Error de permisos.', ephemeral: true });
+            console.error('Error fetching reaction:', error);
+            return;
+        }
+
+        const emoji = reaction.emoji.name;
+        const roleId = allRoleEmojis[emoji];
+
+        if (!roleId) return;
+
+        try {
+            const guild = reaction.message.guild;
+            if (!guild) return;
+
+            const member = await guild.members.fetch(user.id);
+            const role = guild.roles.cache.get(roleId) || await guild.roles.fetch(roleId);
+
+            if (!role) {
+                console.error(`Rol no encontrado: ${roleId}`);
+                return;
+            }
+
+            if (!member.roles.cache.has(roleId)) {
+                await member.roles.add(role);
+                console.log(`✅ Rol ${role.name} añadido a ${user.tag}`);
+                
+                try {
+                    await user.send({ content: `✅ Rol **${role.name}** asignado en ${guild.name}` });
+                } catch {}
+            }
+        } catch (error) {
+            console.error('Error añadiendo rol:', error);
+        }
+    });
+
+    client.on('messageReactionRemove', async (reaction, user) => {
+        if (user.bot) return;
+
+        try {
+            if (reaction.partial) {
+                await reaction.fetch();
+            }
+        } catch (error) {
+            console.error('Error fetching reaction:', error);
+            return;
+        }
+
+        const emoji = reaction.emoji.name;
+        const roleId = allRoleEmojis[emoji];
+
+        if (!roleId) return;
+
+        try {
+            const guild = reaction.message.guild;
+            if (!guild) return;
+
+            const member = await guild.members.fetch(user.id);
+            const role = guild.roles.cache.get(roleId) || await guild.roles.fetch(roleId);
+
+            if (!role) {
+                console.error(`Rol no encontrado: ${roleId}`);
+                return;
+            }
+
+            if (member.roles.cache.has(roleId)) {
+                await member.roles.remove(role);
+                console.log(`❌ Rol ${role.name} removido de ${user.tag}`);
+                
+                try {
+                    await user.send({ content: `❌ Rol **${role.name}** removido en ${guild.name}` });
+                } catch {}
+            }
+        } catch (error) {
+            console.error('Error removiendo rol:', error);
         }
     });
 };

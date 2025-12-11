@@ -1,4 +1,4 @@
-// automod.js - Sistema mejorado de moderación automática
+// automod.js - Sistema mejorado de moderación automática con MongoDB
 const fs = require("fs");
 const path = require("path");
 const {
@@ -12,13 +12,19 @@ const {
   ModalBuilder,
   TextInputBuilder,
   TextInputStyle,
-  StringSelectMenuBuilder
+  StringSelectMenuBuilder,
+  AttachmentBuilder
 } = require("discord.js");
 
 const GUILD_ID = "1212886282645147768";
-const LOG_CHANNEL_ID = "1434002832016801842";
+const LOG_CHANNEL_ID = "1434002802551783516";
 const MUTED_ROLE_ID = "1430271610358726717";
-const STAFF_ROLE_IDS = ["1230949715127042098", "1229140504310972599"];
+const HELPER_ROLE_ID = "1230949752733175888";
+const MOD_ROLE_ID = "1229140504310972599";
+const ADMIN_ROLE_ID = "1212891335929897030";
+const HEAD_ADMIN_ROLE_ID = "1230952139015327755";
+const STAFF_ROLE_IDS = [HELPER_ROLE_ID, MOD_ROLE_ID, ADMIN_ROLE_ID, HEAD_ADMIN_ROLE_ID];
+const CAN_BAN_ROLE_IDS = [MOD_ROLE_ID, ADMIN_ROLE_ID, HEAD_ADMIN_ROLE_ID];
 const IGNORED_CHANNELS = ["1258524941289263254", "1313723272290111559"];
 const BOT_OWNER_ID = "1032482231677108224";
 const TICKET_CHANNEL_ID = "1228438600497102960";
@@ -30,7 +36,32 @@ const WARNS_PATH = path.join(__dirname, "warns.json");
 const BANNED_PATH = path.join(__dirname, "bannedWords.json");
 const SENSITIVE_PATH = path.join(__dirname, "sensitiveWords.json");
 
-// Crear archivos si no existen
+const SANCTION_CATEGORIES = [
+  { value: "flood", label: "Flood", emoji: "🌊" },
+  { value: "spam", label: "Spam", emoji: "📢" },
+  { value: "wall_of_text", label: "Wall of Text", emoji: "📄" },
+  { value: "bypass_automod", label: "Bypass de AutoMod", emoji: "🔓" },
+  { value: "vacio_legal", label: "Vacío legal", emoji: "⚖️" },
+  { value: "romper_norma", label: "Romper Norma", emoji: "📜" },
+  { value: "hacks_eventos", label: "Hacks en eventos", emoji: "🎮" },
+  { value: "bypass_palabras", label: "Bypass de palabras prohibidas", emoji: "🚫" },
+  { value: "canal_incorrecto", label: "Uso de canales incorrecto", emoji: "📍" },
+  { value: "mencion_cp", label: "Mención de CP", emoji: "⛔" },
+  { value: "publicidad", label: "Hacer publicidad", emoji: "📣" },
+  { value: "perfil_inapropiado", label: "Perfil inapropiado/comprometido", emoji: "👤" },
+  { value: "amenaza", label: "Amenaza", emoji: "⚠️" },
+  { value: "intento_raid", label: "Intento de Raid", emoji: "💥" },
+  { value: "ticket_innecesario", label: "Ticket innecesario", emoji: "🎫" },
+  { value: "seguridad", label: "Seguridad", emoji: "🔒" },
+  { value: "acoso", label: "Acoso", emoji: "😠" },
+  { value: "contenido_nsfw", label: "Contenido NSFW", emoji: "🔞" },
+  { value: "desinformacion", label: "Desinformación", emoji: "❌" },
+  { value: "trolleo", label: "Trolleo", emoji: "🤡" },
+  { value: "otro", label: "Otro", emoji: "📝" }
+];
+
+const HIDDEN_WORDS = ["fabio", "alle", "zuri", "error", "errorcode", "alleza", "itsalejo", "ist alejo", "imalejandro"];
+
 if (!fs.existsSync(WARNS_PATH)) fs.writeFileSync(WARNS_PATH, JSON.stringify({}, null, 2));
 if (!fs.existsSync(BANNED_PATH)) fs.writeFileSync(BANNED_PATH, JSON.stringify({ words: [] }, null, 2));
 if (!fs.existsSync(SENSITIVE_PATH)) fs.writeFileSync(SENSITIVE_PATH, JSON.stringify({ words: [] }, null, 2));
@@ -45,6 +76,14 @@ function loadWords(filePath) {
   } catch (e) {
     console.error("Error cargando palabras:", filePath, e);
     return [];
+  }
+}
+
+function saveWords(filePath, words) {
+  try {
+    fs.writeFileSync(filePath, JSON.stringify({ words }, null, 2));
+  } catch (e) {
+    console.error("Error guardando palabras:", e);
   }
 }
 
@@ -71,7 +110,6 @@ function reloadWordLists() {
   sensitiveWords = loadWords(SENSITIVE_PATH);
 }
 
-// Funciones para tickets
 let ticketData = { lastTicket: 0, userHasTicket: {}, channels: {} };
 function loadTicketData() {
   try {
@@ -91,12 +129,19 @@ function saveTicketData() {
   }
 }
 function sanitizeChannelName(name) {
-  return name.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").slice(0, 90);
+  if (!name) return "";
+  return name
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9 _\-–—|]/gu, "")
+    .trim()
+    .replace(/\s+/g, "-")
+    .slice(0, 90)
+    .toLowerCase();
 }
 
 loadTicketData();
 
-// Configuración de detección
 const SPAM_WINDOW_MS = 7000;
 const SPAM_THRESHOLD = 5;
 const LINES_THRESHOLD = 5;
@@ -117,7 +162,7 @@ function getMuteMinutesForWarnCount(count) {
 const activeMutes = new Map();
 const activeVigilances = new Map();
 const userMessageHistory = new Map();
-const processedModals = new Set(); // Prevenir procesamiento duplicado de modales
+const processedModals = new Set();
 
 function cleanupExpiredWarns(client) {
   const now = Date.now();
@@ -149,17 +194,47 @@ function cleanupExpiredWarns(client) {
   if (changed) saveWarnings();
 }
 
+function normalizeText(text) {
+  if (!text) return "";
+  return text
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[0-9]/g, (d) => {
+      const map = { "0": "o", "1": "i", "3": "e", "4": "a", "5": "s", "7": "t", "8": "b", "9": "g" };
+      return map[d] || d;
+    })
+    .replace(/[@]/g, "a")
+    .replace(/[$]/g, "s")
+    .replace(/[!|1]/g, "i")
+    .replace(/[€]/g, "e")
+    .replace(/[.,:;_\-*#~´`'^°+]+/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function findBannedWordInText(text) {
   if (!text) return null;
   const lower = text.toLowerCase();
-  for (const w of bannedWords) {
+  const normalized = normalizeText(text);
+  
+  const allBannedWords = [...bannedWords, ...HIDDEN_WORDS];
+  
+  for (const w of allBannedWords) {
     if (!w) continue;
-    const phrase = w.trim();
+    const phrase = w.trim().toLowerCase();
+    const normalizedPhrase = normalizeText(phrase);
+    
     if (phrase.includes(" ")) {
-      if (lower.includes(phrase)) return w;
+      if (lower.includes(phrase) || normalized.includes(normalizedPhrase)) return w;
     } else {
       const re = new RegExp(`\\b${phrase.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&")}\\b`, "u");
-      if (re.test(lower)) return w;
+      const reNorm = new RegExp(`\\b${normalizedPhrase.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&")}\\b`, "u");
+      if (re.test(lower) || reNorm.test(normalized)) return w;
+      
+      const noSpaces = lower.replace(/\s+/g, "");
+      const noSpacesNorm = normalized.replace(/\s+/g, "");
+      if (noSpaces.includes(phrase) || noSpacesNorm.includes(normalizedPhrase)) return w;
     }
   }
   return null;
@@ -181,6 +256,29 @@ function parseDuration(input) {
   }
 }
 
+function formatDuration(ms) {
+  if (!ms || ms <= 0) return "Permanente";
+  const seconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+  
+  if (days > 0) return `${days}d ${hours % 24}h`;
+  if (hours > 0) return `${hours}h ${minutes % 60}m`;
+  if (minutes > 0) return `${minutes}m`;
+  return `${seconds}s`;
+}
+
+function isStaff(member) {
+  if (!member) return false;
+  return member.roles.cache.some(r => STAFF_ROLE_IDS.includes(r.id));
+}
+
+function canBan(member) {
+  if (!member) return false;
+  return member.roles.cache.some(r => CAN_BAN_ROLE_IDS.includes(r.id));
+}
+
 async function applyWarn(client, guild, user, member, reason, detectedWord = null) {
   if (!warnings[user.id]) warnings[user.id] = [];
   warnings[user.id].push({ reason, date: new Date().toISOString(), detectedWord });
@@ -188,6 +286,8 @@ async function applyWarn(client, guild, user, member, reason, detectedWord = nul
 
   const warnCount = warnings[user.id].length;
   const muteMinutes = getMuteMinutesForWarnCount(warnCount);
+
+  const isHiddenWord = detectedWord && HIDDEN_WORDS.includes(detectedWord.toLowerCase());
 
   const embed = new EmbedBuilder()
     .setTitle(warnCount === 1 ? "⚠️ Advertencia detectada" : "⛔ Infracción detectada")
@@ -200,17 +300,14 @@ async function applyWarn(client, guild, user, member, reason, detectedWord = nul
     .setTimestamp()
     .setColor(warnCount === 1 ? 0x1e90ff : 0xff0000);
 
-  // Agregar botones según tipo de sanción
   const row = new ActionRowBuilder();
   
-  // Botón de palabras prohibidas solo si fue detectado por palabra prohibida
-  if (detectedWord) {
+  if (detectedWord && !isHiddenWord) {
     row.addComponents(
       new ButtonBuilder().setCustomId("view_banned_words").setLabel("Ver palabras prohibidas").setStyle(ButtonStyle.Danger)
     );
   }
   
-  // Botón de apelación solo en sanciones (cuando hay mute)
   if (muteMinutes > 0) {
     row.addComponents(
       new ButtonBuilder().setCustomId("appeal_sanction").setLabel("Apelar sanción").setStyle(ButtonStyle.Primary)
@@ -261,18 +358,6 @@ async function applyWarn(client, guild, user, member, reason, detectedWord = nul
   return { warnCount, muteMinutes };
 }
 
-function sanitizeChannelName(name) {
-  if (!name) return "";
-  return name
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-zA-Z0-9 _\-–—|]/gu, "")
-    .trim()
-    .replace(/\s+/g, "-")
-    .slice(0, 90)
-    .toLowerCase();
-}
-
 module.exports = (client) => {
   let automodEnabled = true;
 
@@ -288,6 +373,8 @@ module.exports = (client) => {
     setInterval(() => cleanupExpiredWarns(client), 24 * 60 * 60 * 1000);
 
     try {
+      const categoryChoices = SANCTION_CATEGORIES.slice(0, 25).map(c => ({ name: c.label, value: c.value }));
+      
       const commands = [
         new SlashCommandBuilder()
           .setName("automod")
@@ -296,20 +383,36 @@ module.exports = (client) => {
           .addSubcommand((s) => s.setName("off").setDescription("Desactiva el AutoMod"))
           .addSubcommand((s) => s.setName("status").setDescription("Muestra estado del AutoMod")),
         new SlashCommandBuilder()
-          .setName("addwarn")
-          .setDescription("Agrega una advertencia manual personalizada (abre modal)")
-          .addUserOption((o) => o.setName("usuario").setDescription("Usuario objetivo").setRequired(true)),
+          .setName("sancion")
+          .setDescription("Aplica una sanción a un usuario (warn/mute/ban)")
+          .addUserOption(o => o.setName("usuario").setDescription("Usuario a sancionar").setRequired(true))
+          .addStringOption(o => o.setName("tipo").setDescription("Tipo de sanción").setRequired(true)
+            .addChoices(
+              { name: "⚠️ Warn (Advertencia)", value: "warn" },
+              { name: "🔇 Mute (Silenciar)", value: "mute" },
+              { name: "🔨 Ban (Baneo)", value: "ban" }
+            ))
+          .addStringOption(o => o.setName("categoria").setDescription("Categoría de la infracción").setRequired(true)
+            .addChoices(...categoryChoices))
+          .addStringOption(o => o.setName("razon").setDescription("Razón detallada (obligatoria para 'Romper Norma')").setRequired(false))
+          .addStringOption(o => o.setName("tiempo").setDescription("Duración (ej: 10m, 1h, 2d) - Para mute/ban").setRequired(false))
+          .addIntegerOption(o => o.setName("veces").setDescription("Veces que cometió la infracción").setRequired(false))
+          .addStringOption(o => o.setName("infracciones_adicionales").setDescription("Otras infracciones cometidas (separadas por coma)").setRequired(false))
+          .addAttachmentOption(o => o.setName("prueba").setDescription("Archivo de prueba (imagen/video)").setRequired(false)),
         new SlashCommandBuilder()
-          .setName("removewarn")
-          .setDescription("Elimina la última advertencia de un usuario")
+          .setName("panelautomod")
+          .setDescription("Muestra el panel de moderación para el staff"),
+        new SlashCommandBuilder()
+          .setName("viewwarns")
+          .setDescription("Muestra las advertencias de un usuario")
           .addUserOption((o) => o.setName("usuario").setDescription("Usuario objetivo").setRequired(true)),
         new SlashCommandBuilder()
           .setName("resetwarns")
           .setDescription("Resetea todas las advertencias de un usuario")
           .addUserOption((o) => o.setName("usuario").setDescription("Usuario objetivo").setRequired(true)),
         new SlashCommandBuilder()
-          .setName("viewwarns")
-          .setDescription("Muestra las advertencias de un usuario")
+          .setName("removewarn")
+          .setDescription("Elimina la última advertencia de un usuario")
           .addUserOption((o) => o.setName("usuario").setDescription("Usuario objetivo").setRequired(true)),
         new SlashCommandBuilder()
           .setName("reloadlists")
@@ -323,12 +426,6 @@ module.exports = (client) => {
           .setDescription("Quita una palabra de la lista prohibida (staff)")
           .addStringOption(o => o.setName("palabra").setDescription("Palabra a quitar").setRequired(true)),
         new SlashCommandBuilder()
-          .setName("mute")
-          .setDescription("Mutea manualmente a un usuario (staff)")
-          .addUserOption(o => o.setName("usuario").setDescription("Usuario a mutear").setRequired(true))
-          .addStringOption(o => o.setName("tiempo").setDescription("Duración (ej: 10m, 1h, 2d)").setRequired(true))
-          .addStringOption(o => o.setName("motivo").setDescription("Motivo del mute").setRequired(false)),
-        new SlashCommandBuilder()
           .setName("remove_mute")
           .setDescription("Quita el mute a un usuario (staff)")
           .addUserOption(o => o.setName("usuario").setDescription("Usuario objetivo").setRequired(true)),
@@ -340,10 +437,25 @@ module.exports = (client) => {
         new SlashCommandBuilder()
           .setName("cerrar_vigilancia")
           .setDescription("Cierra el canal de vigilancia (staff)")
-          .addUserOption(o => o.setName("usuario").setDescription("Usuario").setRequired(true))
+          .addUserOption(o => o.setName("usuario").setDescription("Usuario").setRequired(true)),
+        new SlashCommandBuilder()
+          .setName("mantenimiento")
+          .setDescription("Activa/desactiva el modo mantenimiento del servidor")
+          .addStringOption(o => o.setName("accion").setDescription("Activar o desactivar").setRequired(true)
+            .addChoices(
+              { name: "Activar", value: "on" },
+              { name: "Desactivar", value: "off" }
+            )),
+        new SlashCommandBuilder()
+          .setName("ping_role")
+          .setDescription("Hace ping a un rol específico")
+          .addRoleOption(o => o.setName("rol").setDescription("Rol a mencionar").setRequired(true))
+          .addStringOption(o => o.setName("mensaje").setDescription("Mensaje opcional").setRequired(false))
       ].map((c) => c.toJSON());
 
-      await client.application.commands.set(commands, GUILD_ID);
+      for (const command of commands) {
+        await client.application.commands.create(command, GUILD_ID);
+      }
       console.log("🟢 Comandos de AutoMod registrados");
     } catch (err) {
       console.error("Error registrando comandos:", err);
@@ -362,7 +474,6 @@ module.exports = (client) => {
         return interaction.reply({ embeds: [embed], ephemeral: true });
       }
 
-      // Botón "Apelar sanción" - mostrar confirmación
       if (interaction.isButton() && interaction.customId === "appeal_sanction") {
         const confirmId = `confirm_appeal_${interaction.user.id}_${Date.now()}`;
         const cancelId = `cancel_appeal_${interaction.user.id}_${Date.now()}`;
@@ -381,20 +492,18 @@ module.exports = (client) => {
         return interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
       }
 
-      // Botón "Confirmar apelación"
       if (interaction.isButton() && interaction.customId.startsWith("confirm_appeal_")) {
         try {
           const guild = interaction.guild || client.guilds.cache.get(GUILD_ID);
           if (!guild) return interaction.reply({ content: "❌ No se pudo obtener el servidor.", ephemeral: true });
 
-          // Verificar si el usuario ya tiene un ticket
+          loadTicketData();
           if (ticketData.userHasTicket[interaction.user.id]) {
             const existingId = ticketData.userHasTicket[interaction.user.id];
             const existingCh = guild.channels.cache.get(existingId) || await guild.channels.fetch(existingId).catch(() => null);
             return interaction.reply({ content: `❗️ Ya tienes un ticket abierto: ${existingCh ? existingCh.toString() : existingId}`, ephemeral: true });
           }
 
-          // Crear nuevo ticket
           ticketData.lastTicket = (ticketData.lastTicket || 0) + 1;
           const number = String(ticketData.lastTicket).padStart(3, "0");
           const username = interaction.user.username || "user";
@@ -428,7 +537,6 @@ module.exports = (client) => {
             });
           }
 
-          // Guardar referencias
           ticketData.userHasTicket[interaction.user.id] = channel.id;
           ticketData.channels[channel.id] = {
             ownerId: interaction.user.id,
@@ -439,7 +547,6 @@ module.exports = (client) => {
           };
           saveTicketData();
 
-          // Mensaje en el canal del ticket
           const claimBtn = new ButtonBuilder().setCustomId(`claim_ticket_${channel.id}`).setLabel("🧑‍💼 Atender ticket").setStyle(ButtonStyle.Primary);
           const ticketRow = new ActionRowBuilder().addComponents(claimBtn);
 
@@ -459,78 +566,142 @@ module.exports = (client) => {
         }
       }
 
-      // Botón "Cancelar apelación"
       if (interaction.isButton() && interaction.customId.startsWith("cancel_appeal_")) {
         return interaction.reply({ content: "❌ Apelación cancelada.", ephemeral: true });
       }
 
-      // Manejador de modal para addwarn personalizado
-      if (interaction.isModalSubmit() && interaction.customId.startsWith("addwarn_modal_")) {
-        // Prevenir procesamiento duplicado
-        const modalKey = `${interaction.user.id}_${interaction.id}`;
-        if (processedModals.has(modalKey)) return;
-        processedModals.add(modalKey);
-        setTimeout(() => processedModals.delete(modalKey), 5000); // Limpiar después de 5s
+      if (interaction.isButton() && interaction.customId.startsWith("panel_")) {
+        const action = interaction.customId.replace("panel_", "");
+        
+        if (!isStaff(interaction.member)) {
+          return interaction.reply({ content: "❌ Solo el staff puede usar este panel.", ephemeral: true });
+        }
 
-        const userId = interaction.customId.replace("addwarn_modal_", "");
-        const razon = interaction.fields.getTextInputValue("razon_input");
-        const tiempoStr = interaction.fields.getTextInputValue("mute_input") || "";
-        const buttonStr = interaction.fields.getTextInputValue("button_input") || "si";
-        const appealStr = interaction.fields.getTextInputValue("appeal_input") || "no";
+        if (action === "warn" || action === "mute" || action === "ban") {
+          if (action === "ban" && !canBan(interaction.member)) {
+            return interaction.reply({ content: "❌ Solo los moderadores o superiores pueden banear usuarios.", ephemeral: true });
+          }
+
+          const modal = new ModalBuilder()
+            .setCustomId(`panel_sancion_${action}_${Date.now()}`)
+            .setTitle(`Aplicar ${action.toUpperCase()}`);
+
+          const userInput = new TextInputBuilder()
+            .setCustomId("user_id")
+            .setLabel("ID del usuario")
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true)
+            .setPlaceholder("Ej: 123456789012345678");
+
+          const reasonInput = new TextInputBuilder()
+            .setCustomId("reason")
+            .setLabel("Razón")
+            .setStyle(TextInputStyle.Paragraph)
+            .setRequired(true);
+
+          const durationInput = new TextInputBuilder()
+            .setCustomId("duration")
+            .setLabel("Duración (solo mute/ban)")
+            .setStyle(TextInputStyle.Short)
+            .setRequired(false)
+            .setPlaceholder("Ej: 10m, 1h, 2d");
+
+          modal.addComponents(
+            new ActionRowBuilder().addComponents(userInput),
+            new ActionRowBuilder().addComponents(reasonInput),
+            new ActionRowBuilder().addComponents(durationInput)
+          );
+
+          return interaction.showModal(modal);
+        }
+
+        if (action === "send_message") {
+          const modal = new ModalBuilder()
+            .setCustomId(`panel_message_${Date.now()}`)
+            .setTitle("Enviar mensaje a canal");
+
+          const channelInput = new TextInputBuilder()
+            .setCustomId("channel_id")
+            .setLabel("ID del canal")
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true);
+
+          const messageInput = new TextInputBuilder()
+            .setCustomId("message")
+            .setLabel("Mensaje")
+            .setStyle(TextInputStyle.Paragraph)
+            .setRequired(true);
+
+          const embedInput = new TextInputBuilder()
+            .setCustomId("as_embed")
+            .setLabel("¿Como embed? (si/no)")
+            .setStyle(TextInputStyle.Short)
+            .setRequired(false)
+            .setPlaceholder("no");
+
+          modal.addComponents(
+            new ActionRowBuilder().addComponents(channelInput),
+            new ActionRowBuilder().addComponents(messageInput),
+            new ActionRowBuilder().addComponents(embedInput)
+          );
+
+          return interaction.showModal(modal);
+        }
+      }
+
+      if (interaction.isModalSubmit() && interaction.customId.startsWith("panel_sancion_")) {
+        const parts = interaction.customId.split("_");
+        const actionType = parts[2];
+        const userId = interaction.fields.getTextInputValue("user_id").trim();
+        const reason = interaction.fields.getTextInputValue("reason");
+        const duration = interaction.fields.getTextInputValue("duration") || "";
 
         const guild = interaction.guild;
         const user = await client.users.fetch(userId).catch(() => null);
         if (!user) return interaction.reply({ content: "❌ Usuario no encontrado.", ephemeral: true });
 
         const member = await guild.members.fetch(userId).catch(() => null);
-        const ms = tiempoStr ? parseDuration(tiempoStr) : 0;
 
-        // Aplicar warn con configuración personalizada
-        if (!warnings[userId]) warnings[userId] = [];
-        warnings[userId].push({ reason: `Advertencia manual: ${razon}`, date: new Date().toISOString(), detectedWord: null });
-        saveWarnings();
+        if (actionType === "warn") {
+          if (!warnings[userId]) warnings[userId] = [];
+          warnings[userId].push({ reason: `Advertencia manual: ${reason}`, date: new Date().toISOString(), detectedWord: null });
+          saveWarnings();
 
-        const warnCount = warnings[userId].length;
-        const muteMinutes = ms > 0 ? Math.ceil(ms / 60000) : getMuteMinutesForWarnCount(warnCount);
+          const warnCount = warnings[userId].length;
+          const embed = new EmbedBuilder()
+            .setTitle("⚠️ Advertencia recibida")
+            .setDescription(`Has recibido una advertencia por: **${reason}**`)
+            .setColor(0xffff00)
+            .setFooter({ text: "SirgioBOT - Moderación" })
+            .setTimestamp();
 
-        // Crear embed personalizado
-        const embed = new EmbedBuilder()
-          .setTitle(warnCount === 1 ? "⚠️ Advertencia detectada" : "⛔ Infracción detectada")
-          .setDescription(
-            warnCount === 1
-              ? `Has recibido una advertencia por: **${razon}**.\n\nPor favor evita este comportamiento.`
-              : `Has cometido una infracción por: **${razon}**.\n\nHas sido muteado por **${muteMinutes} minutos**.`
-          )
-          .setFooter({ text: "SirgioBOT - Moderación manual" })
-          .setTimestamp()
-          .setColor(warnCount === 1 ? 0x1e90ff : 0xff0000);
+          await user.send({ embeds: [embed] }).catch(() => {});
 
-        // Incluir botones según configuración del staff
-        const row1 = new ActionRowBuilder();
-        if (buttonStr.toLowerCase() === "si") {
-          row1.addComponents(
-            new ButtonBuilder().setCustomId("view_banned_words").setLabel("Ver palabras prohibidas").setStyle(ButtonStyle.Danger)
-          );
+          const logCh = guild.channels.cache.get(LOG_CHANNEL_ID);
+          if (logCh) {
+            const logEmbed = new EmbedBuilder()
+              .setColor(0xffff00)
+              .setTitle("⚠️ Advertencia aplicada")
+              .addFields(
+                { name: "Usuario", value: `${user.tag} (${userId})`, inline: true },
+                { name: "Staff", value: `${interaction.user.tag}`, inline: true },
+                { name: "Razón", value: reason, inline: false },
+                { name: "Warns totales", value: `${warnCount}`, inline: true }
+              )
+              .setTimestamp();
+            logCh.send({ embeds: [logEmbed] }).catch(() => {});
+          }
+
+          return interaction.reply({ content: `✅ Advertencia aplicada a ${user.tag}`, ephemeral: true });
         }
-        if (appealStr.toLowerCase() === "si") {
-          row1.addComponents(
-            new ButtonBuilder().setCustomId("appeal_sanction").setLabel("Apelar sanción").setStyle(ButtonStyle.Primary)
-          );
-        }
-        
-        const components = row1.components.length > 0 ? [row1] : [];
 
-        try {
-          await user.send({ embeds: [embed], components }).catch(() => {});
-        } catch (e) {}
-
-        // Aplicar mute si se especificó tiempo
-        if (ms > 0 && member) {
-          try {
+        if (actionType === "mute") {
+          const ms = parseDuration(duration) || 10 * 60 * 1000;
+          
+          if (member) {
             await member.roles.add(MUTED_ROLE_ID).catch(() => {});
             if (activeMutes.has(member.id)) {
               clearTimeout(activeMutes.get(member.id));
-              activeMutes.delete(member.id);
             }
             const timeoutId = setTimeout(async () => {
               try {
@@ -540,454 +711,549 @@ module.exports = (client) => {
               activeMutes.delete(member.id);
             }, ms);
             activeMutes.set(member.id, timeoutId);
-          } catch (e) {
-            console.error("Error aplicando mute:", e);
           }
-        }
 
-        // Log en canal
-        try {
-          const logCh = guild?.channels.cache.get(LOG_CHANNEL_ID);
+          const embed = new EmbedBuilder()
+            .setTitle("🔇 Has sido silenciado")
+            .setDescription(`Has sido muteado por: **${reason}**\n\nDuración: **${formatDuration(ms)}**`)
+            .setColor(0xff0000)
+            .setFooter({ text: "SirgioBOT - Moderación" })
+            .setTimestamp();
+
+          const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId("appeal_sanction").setLabel("Apelar sanción").setStyle(ButtonStyle.Primary)
+          );
+
+          await user.send({ embeds: [embed], components: [row] }).catch(() => {});
+
+          const logCh = guild.channels.cache.get(LOG_CHANNEL_ID);
           if (logCh) {
             const logEmbed = new EmbedBuilder()
-              .setColor(ms > 0 ? 0xff0000 : 0xffff00)
-              .setTitle(ms > 0 ? "⛔ Sanción personalizada" : "⚠️ Advertencia personalizada")
+              .setColor(0xff0000)
+              .setTitle("🔇 Mute aplicado")
               .addFields(
-                { name: "Usuario", value: `${user.tag} (${user.id})`, inline: true },
-                { name: "Razón", value: razon, inline: true },
-                { name: "Warns", value: `${warnCount}`, inline: true },
-                { name: "Mute", value: ms > 0 ? `${muteMinutes}m` : "Advertencia", inline: true },
-                { name: "Ver palabras prohibidas", value: buttonStr.toLowerCase() === "si" ? "Sí" : "No", inline: true },
-                { name: "Botón apelación", value: appealStr.toLowerCase() === "si" ? "Sí" : "No", inline: true }
+                { name: "Usuario", value: `${user.tag} (${userId})`, inline: true },
+                { name: "Staff", value: `${interaction.user.tag}`, inline: true },
+                { name: "Razón", value: reason, inline: false },
+                { name: "Duración", value: formatDuration(ms), inline: true }
               )
               .setTimestamp();
             logCh.send({ embeds: [logEmbed] }).catch(() => {});
           }
-        } catch (e) {
-          console.error("Error en log:", e);
+
+          return interaction.reply({ content: `✅ Mute aplicado a ${user.tag} por ${formatDuration(ms)}`, ephemeral: true });
         }
 
-        return interaction.reply({ content: `✅ Advertencia personalizada aplicada a ${user.tag}.`, ephemeral: true });
+        if (actionType === "ban") {
+          if (!canBan(interaction.member)) {
+            return interaction.reply({ content: "❌ No tienes permisos para banear.", ephemeral: true });
+          }
+
+          const embed = new EmbedBuilder()
+            .setTitle("🔨 Has sido baneado")
+            .setDescription(`Has sido baneado del servidor por: **${reason}**`)
+            .setColor(0x000000)
+            .setFooter({ text: "SirgioBOT - Moderación" })
+            .setTimestamp();
+
+          const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId("appeal_sanction").setLabel("Apelar sanción").setStyle(ButtonStyle.Primary)
+          );
+
+          await user.send({ embeds: [embed], components: [row] }).catch(() => {});
+
+          if (member) {
+            await member.ban({ reason: `${reason} - Por: ${interaction.user.tag}` }).catch(() => {});
+          } else {
+            await guild.members.ban(userId, { reason: `${reason} - Por: ${interaction.user.tag}` }).catch(() => {});
+          }
+
+          const logCh = guild.channels.cache.get(LOG_CHANNEL_ID);
+          if (logCh) {
+            const logEmbed = new EmbedBuilder()
+              .setColor(0x000000)
+              .setTitle("🔨 Ban aplicado")
+              .addFields(
+                { name: "Usuario", value: `${user.tag} (${userId})`, inline: true },
+                { name: "Staff", value: `${interaction.user.tag}`, inline: true },
+                { name: "Razón", value: reason, inline: false }
+              )
+              .setTimestamp();
+            logCh.send({ embeds: [logEmbed] }).catch(() => {});
+          }
+
+          return interaction.reply({ content: `✅ Ban aplicado a ${user.tag}`, ephemeral: true });
+        }
+      }
+
+      if (interaction.isModalSubmit() && interaction.customId.startsWith("panel_message_")) {
+        const channelId = interaction.fields.getTextInputValue("channel_id").trim();
+        const message = interaction.fields.getTextInputValue("message");
+        const asEmbed = interaction.fields.getTextInputValue("as_embed")?.toLowerCase() === "si";
+
+        const channel = interaction.guild.channels.cache.get(channelId) || await interaction.guild.channels.fetch(channelId).catch(() => null);
+        if (!channel) return interaction.reply({ content: "❌ Canal no encontrado.", ephemeral: true });
+
+        if (asEmbed) {
+          const embed = new EmbedBuilder()
+            .setDescription(message)
+            .setColor(0x00ff80)
+            .setTimestamp();
+          await channel.send({ embeds: [embed] });
+        } else {
+          await channel.send(message);
+        }
+
+        return interaction.reply({ content: `✅ Mensaje enviado a ${channel}`, ephemeral: true });
       }
 
       if (!interaction.isChatInputCommand()) return;
 
-      const isStaffOrOwner =
-        interaction.user.id === BOT_OWNER_ID ||
-        (interaction.member && STAFF_ROLE_IDS.some((r) => interaction.member.roles.cache.has(r)));
+      const { commandName, options, member, guild } = interaction;
 
-      if (interaction.commandName !== "automod" && !isStaffOrOwner) {
-        return interaction.reply({ content: "❌ No tienes permisos.", ephemeral: true });
+      if (!isStaff(member) && !["viewwarns"].includes(commandName)) {
+        return interaction.reply({ content: "❌ Solo el staff puede usar estos comandos.", ephemeral: true });
       }
 
-      if (interaction.commandName === "automod") {
-        const sub = interaction.options.getSubcommand();
-        if (sub === "on") automodEnabled = true;
-        if (sub === "off") automodEnabled = false;
-        if (sub === "status")
-          return interaction.reply({ content: `🔧 AutoMod está **${automodEnabled ? "activado" : "desactivado"}**.`, ephemeral: true });
-        return interaction.reply({ content: `✅ AutoMod ${sub} ejecutado.`, ephemeral: true });
-      }
+      if (commandName === "panelautomod") {
+        const embed = new EmbedBuilder()
+          .setTitle("🛡️ Panel de Moderación")
+          .setDescription("Usa los botones de abajo para moderar el servidor.\n\n" +
+            "**Advertencias:** Solo advertencia sin mute\n" +
+            "**Mute:** Silencia al usuario por un tiempo\n" +
+            "**Ban:** Banea al usuario del servidor")
+          .setColor(0x5865F2)
+          .setFooter({ text: "SirgioBOT - Panel Staff" })
+          .setTimestamp();
 
-      if (interaction.commandName === "addwarn") {
-        const user = interaction.options.getUser("usuario");
-        const modal = new ModalBuilder()
-          .setCustomId(`addwarn_modal_${user.id}`)
-          .setTitle("Agregar Advertencia Personalizada");
-
-        const razonInput = new TextInputBuilder()
-          .setCustomId("razon_input")
-          .setLabel("Razón de la advertencia")
-          .setStyle(TextInputStyle.Short)
-          .setRequired(true)
-          .setPlaceholder("Ej: Spam, comportamiento tóxico");
-
-        const muteInput = new TextInputBuilder()
-          .setCustomId("mute_input")
-          .setLabel("Tiempo de mute (opcional)")
-          .setStyle(TextInputStyle.Short)
-          .setRequired(false)
-          .setPlaceholder("Ej: 10m, 1h, 2d o dejar vacío para solo advertencia");
-
-        const buttonInput = new TextInputBuilder()
-          .setCustomId("button_input")
-          .setLabel("¿Mostrar botón 'ver palabras prohibidas'?")
-          .setStyle(TextInputStyle.Short)
-          .setRequired(false)
-          .setPlaceholder("si/no (por defecto: si)");
-
-        const appealInput = new TextInputBuilder()
-          .setCustomId("appeal_input")
-          .setLabel("¿Mostrar botón 'Apelar sanción'?")
-          .setStyle(TextInputStyle.Short)
-          .setRequired(false)
-          .setPlaceholder("si/no (por defecto: no)");
-
-        modal.addComponents(
-          new ActionRowBuilder().addComponents(razonInput),
-          new ActionRowBuilder().addComponents(muteInput),
-          new ActionRowBuilder().addComponents(buttonInput),
-          new ActionRowBuilder().addComponents(appealInput)
+        const row1 = new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId("panel_warn").setLabel("⚠️ Warn").setStyle(ButtonStyle.Secondary),
+          new ButtonBuilder().setCustomId("panel_mute").setLabel("🔇 Mute").setStyle(ButtonStyle.Primary),
+          new ButtonBuilder().setCustomId("panel_ban").setLabel("🔨 Ban").setStyle(ButtonStyle.Danger)
         );
 
-        return interaction.showModal(modal);
+        const row2 = new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId("panel_send_message").setLabel("📝 Enviar Mensaje").setStyle(ButtonStyle.Secondary)
+        );
+
+        return interaction.reply({ embeds: [embed], components: [row1, row2], ephemeral: true });
       }
 
-      if (interaction.commandName === "removewarn") {
-        const user = interaction.options.getUser("usuario");
-        if (!warnings[user.id]?.length) return interaction.reply({ content: "✅ Sin warns.", ephemeral: true });
-        warnings[user.id].pop();
-        if (warnings[user.id].length === 0) delete warnings[user.id];
-        saveWarnings();
-        return interaction.reply({ content: `🟢 Última advertencia eliminada.`, ephemeral: true });
+      if (commandName === "sancion") {
+        const user = options.getUser("usuario");
+        const tipo = options.getString("tipo");
+        const categoria = options.getString("categoria");
+        const razon = options.getString("razon") || SANCTION_CATEGORIES.find(c => c.value === categoria)?.label || "Sin razón";
+        const tiempo = options.getString("tiempo");
+        const veces = options.getInteger("veces") || 1;
+        const infraccionesAdicionales = options.getString("infracciones_adicionales");
+        const prueba = options.getAttachment("prueba");
+
+        if (tipo === "ban" && !canBan(member)) {
+          return interaction.reply({ content: "❌ Solo los moderadores o superiores pueden banear usuarios.", ephemeral: true });
+        }
+
+        if (categoria === "romper_norma" && (!razon || razon === "Romper Norma")) {
+          return interaction.reply({ content: "❌ Debes especificar la norma rota en el campo 'razon'.", ephemeral: true });
+        }
+
+        const targetMember = await guild.members.fetch(user.id).catch(() => null);
+        const ms = tiempo ? parseDuration(tiempo) : null;
+
+        const categoryInfo = SANCTION_CATEGORIES.find(c => c.value === categoria);
+        const fullReason = `${categoryInfo?.emoji || "📋"} ${categoryInfo?.label || categoria}: ${razon}${veces > 1 ? ` (x${veces})` : ""}`;
+
+        const userEmbed = new EmbedBuilder()
+          .setTitle(tipo === "warn" ? "⚠️ Advertencia recibida" : tipo === "mute" ? "🔇 Has sido silenciado" : "🔨 Has sido baneado")
+          .setDescription(`**Razón:** ${fullReason}`)
+          .setColor(tipo === "warn" ? 0xffff00 : tipo === "mute" ? 0xff0000 : 0x000000)
+          .addFields(
+            { name: "Categoría", value: categoryInfo?.label || categoria, inline: true },
+            { name: "Veces", value: `${veces}`, inline: true }
+          )
+          .setFooter({ text: "SirgioBOT - Moderación" })
+          .setTimestamp();
+
+        if (ms && tipo !== "warn") {
+          userEmbed.addFields({ name: "Duración", value: formatDuration(ms), inline: true });
+        }
+
+        if (infraccionesAdicionales) {
+          userEmbed.addFields({ name: "Infracciones adicionales", value: infraccionesAdicionales, inline: false });
+        }
+
+        const components = [];
+        if (tipo !== "warn") {
+          const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId("appeal_sanction").setLabel("Apelar sanción").setStyle(ButtonStyle.Primary)
+          );
+          components.push(row);
+        }
+
+        await user.send({ embeds: [userEmbed], components }).catch(() => {});
+
+        if (tipo === "warn") {
+          if (!warnings[user.id]) warnings[user.id] = [];
+          warnings[user.id].push({ reason: fullReason, date: new Date().toISOString(), detectedWord: null });
+          saveWarnings();
+        } else if (tipo === "mute" && targetMember) {
+          await targetMember.roles.add(MUTED_ROLE_ID).catch(() => {});
+          if (ms) {
+            if (activeMutes.has(user.id)) clearTimeout(activeMutes.get(user.id));
+            const timeoutId = setTimeout(async () => {
+              try {
+                const refreshed = await guild.members.fetch(user.id).catch(() => null);
+                if (refreshed) await refreshed.roles.remove(MUTED_ROLE_ID).catch(() => {});
+              } catch {}
+              activeMutes.delete(user.id);
+            }, ms);
+            activeMutes.set(user.id, timeoutId);
+          }
+        } else if (tipo === "ban") {
+          if (targetMember) {
+            await targetMember.ban({ reason: `${fullReason} - Por: ${interaction.user.tag}` }).catch(() => {});
+          } else {
+            await guild.members.ban(user.id, { reason: `${fullReason} - Por: ${interaction.user.tag}` }).catch(() => {});
+          }
+        }
+
+        const logCh = guild.channels.cache.get(LOG_CHANNEL_ID);
+        if (logCh) {
+          const logEmbed = new EmbedBuilder()
+            .setColor(tipo === "warn" ? 0xffff00 : tipo === "mute" ? 0xff0000 : 0x000000)
+            .setTitle(`${tipo === "warn" ? "⚠️ Advertencia" : tipo === "mute" ? "🔇 Mute" : "🔨 Ban"} aplicado`)
+            .addFields(
+              { name: "Usuario", value: `${user.tag} (${user.id})`, inline: true },
+              { name: "Staff", value: `${interaction.user.tag}`, inline: true },
+              { name: "Categoría", value: categoryInfo?.label || categoria, inline: true },
+              { name: "Razón", value: fullReason, inline: false }
+            )
+            .setTimestamp();
+
+          if (ms && tipo !== "warn") {
+            logEmbed.addFields({ name: "Duración", value: formatDuration(ms), inline: true });
+          }
+
+          if (prueba) {
+            logEmbed.setImage(prueba.url);
+          }
+
+          logCh.send({ embeds: [logEmbed] }).catch(() => {});
+        }
+
+        return interaction.reply({ 
+          content: `✅ ${tipo === "warn" ? "Advertencia" : tipo === "mute" ? "Mute" : "Ban"} aplicado a ${user.tag}${ms ? ` por ${formatDuration(ms)}` : ""}`, 
+          ephemeral: true 
+        });
       }
 
-      if (interaction.commandName === "resetwarns") {
-        const user = interaction.options.getUser("usuario");
-        delete warnings[user.id];
-        saveWarnings();
-        return interaction.reply({ content: `🔄 Warns reseteados de ${user.tag}.`, ephemeral: true });
+      if (commandName === "automod") {
+        const sub = options.getSubcommand();
+        if (sub === "on") {
+          automodEnabled = true;
+          return interaction.reply({ content: "✅ AutoMod activado.", ephemeral: true });
+        }
+        if (sub === "off") {
+          automodEnabled = false;
+          return interaction.reply({ content: "⚠️ AutoMod desactivado.", ephemeral: true });
+        }
+        if (sub === "status") {
+          const embed = new EmbedBuilder()
+            .setTitle("📊 Estado del AutoMod")
+            .setDescription(`Estado: **${automodEnabled ? "Activado ✅" : "Desactivado ❌"}**`)
+            .addFields(
+              { name: "Palabras prohibidas", value: `${bannedWords.length}`, inline: true },
+              { name: "Palabras sensibles", value: `${sensitiveWords.length}`, inline: true },
+              { name: "Palabras ocultas", value: `${HIDDEN_WORDS.length}`, inline: true }
+            )
+            .setColor(automodEnabled ? 0x00ff00 : 0xff0000)
+            .setTimestamp();
+          return interaction.reply({ embeds: [embed], ephemeral: true });
+        }
       }
 
-      if (interaction.commandName === "viewwarns") {
-        const user = interaction.options.getUser("usuario");
-        const arr = warnings[user.id] || [];
-        if (!arr.length) return interaction.reply({ content: `✅ ${user.tag} sin advertencias.`, ephemeral: true });
-        const desc = arr.map((w, i) => `**${i + 1}.** ${w.reason}`).join("\n");
-        const embed = new EmbedBuilder().setColor(0xffff00).setTitle(`Warns: ${user.tag}`).setDescription(desc);
+      if (commandName === "viewwarns") {
+        const user = options.getUser("usuario");
+        const userWarns = warnings[user.id] || [];
+        if (userWarns.length === 0) {
+          return interaction.reply({ content: `✅ ${user.tag} no tiene advertencias.`, ephemeral: true });
+        }
+        const embed = new EmbedBuilder()
+          .setTitle(`📋 Advertencias de ${user.tag}`)
+          .setDescription(userWarns.map((w, i) => `**${i + 1}.** ${w.reason}\n   📅 ${new Date(w.date).toLocaleString()}`).join("\n\n"))
+          .setColor(0xffff00)
+          .setFooter({ text: `Total: ${userWarns.length} warns` })
+          .setTimestamp();
         return interaction.reply({ embeds: [embed], ephemeral: true });
       }
 
-      if (interaction.commandName === "reloadlists") {
+      if (commandName === "resetwarns") {
+        const user = options.getUser("usuario");
+        delete warnings[user.id];
+        saveWarnings();
+        return interaction.reply({ content: `✅ Warns de ${user.tag} reseteados.`, ephemeral: true });
+      }
+
+      if (commandName === "removewarn") {
+        const user = options.getUser("usuario");
+        if (!warnings[user.id] || warnings[user.id].length === 0) {
+          return interaction.reply({ content: `❌ ${user.tag} no tiene warns.`, ephemeral: true });
+        }
+        warnings[user.id].pop();
+        if (warnings[user.id].length === 0) delete warnings[user.id];
+        saveWarnings();
+        return interaction.reply({ content: `✅ Última advertencia de ${user.tag} eliminada.`, ephemeral: true });
+      }
+
+      if (commandName === "reloadlists") {
         reloadWordLists();
-        return interaction.reply({ content: `🔁 Listas recargadas: ${bannedWords.length} prohibidas, ${sensitiveWords.length} sensibles.`, ephemeral: true });
+        return interaction.reply({ content: `✅ Listas recargadas. Prohibidas: ${bannedWords.length}, Sensibles: ${sensitiveWords.length}`, ephemeral: true });
       }
 
-      if (interaction.commandName === "addword") {
-        const palabra = interaction.options.getString("palabra").toLowerCase().trim();
-        if (!palabra) return interaction.reply({ content: "❌ La palabra no puede estar vacía.", ephemeral: true });
-
-        try {
-          const currentList = loadWords(BANNED_PATH);
-          if (currentList.includes(palabra)) {
-            return interaction.reply({ content: `⚠️ La palabra "${palabra}" ya está en la lista.`, ephemeral: true });
-          }
-
-          currentList.push(palabra);
-          fs.writeFileSync(BANNED_PATH, JSON.stringify({ words: currentList }, null, 2));
-          reloadWordLists();
-
-          const logCh = interaction.guild.channels.cache.get(LOG_CHANNEL_ID);
-          if (logCh) {
-            const logEmbed = new EmbedBuilder()
-              .setTitle("➕ Palabra añadida")
-              .setDescription(`Se agregó la palabra: **${palabra}**`)
-              .addFields({ name: "Moderador", value: `<@${interaction.user.id}>`, inline: true })
-              .setColor(0x00ff00)
-              .setTimestamp();
-            logCh.send({ embeds: [logEmbed] }).catch(() => {});
-          }
-
-          return interaction.reply({ content: `✅ Palabra "${palabra}" agregada a la lista prohibida.`, ephemeral: true });
-        } catch (e) {
-          console.error("Error agregando palabra:", e);
-          return interaction.reply({ content: "❌ Error al agregar la palabra.", ephemeral: true });
+      if (commandName === "addword") {
+        const word = options.getString("palabra").toLowerCase().trim();
+        if (bannedWords.includes(word)) {
+          return interaction.reply({ content: "❌ Esa palabra ya está en la lista.", ephemeral: true });
         }
+        bannedWords.push(word);
+        saveWords(BANNED_PATH, bannedWords);
+        return interaction.reply({ content: `✅ Palabra "${word}" agregada a la lista prohibida.`, ephemeral: true });
       }
 
-      if (interaction.commandName === "removeword") {
-        const palabra = interaction.options.getString("palabra").toLowerCase().trim();
-        if (!palabra) return interaction.reply({ content: "❌ La palabra no puede estar vacía.", ephemeral: true });
-
-        try {
-          const currentList = loadWords(BANNED_PATH);
-          const index = currentList.indexOf(palabra);
-          if (index === -1) {
-            return interaction.reply({ content: `⚠️ La palabra "${palabra}" no está en la lista.`, ephemeral: true });
-          }
-
-          currentList.splice(index, 1);
-          fs.writeFileSync(BANNED_PATH, JSON.stringify({ words: currentList }, null, 2));
-          reloadWordLists();
-
-          const logCh = interaction.guild.channels.cache.get(LOG_CHANNEL_ID);
-          if (logCh) {
-            const logEmbed = new EmbedBuilder()
-              .setTitle("➖ Palabra removida")
-              .setDescription(`Se eliminó la palabra: **${palabra}**`)
-              .addFields({ name: "Moderador", value: `<@${interaction.user.id}>`, inline: true })
-              .setColor(0xff6600)
-              .setTimestamp();
-            logCh.send({ embeds: [logEmbed] }).catch(() => {});
-          }
-
-          return interaction.reply({ content: `✅ Palabra "${palabra}" removida de la lista prohibida.`, ephemeral: true });
-        } catch (e) {
-          console.error("Error removiendo palabra:", e);
-          return interaction.reply({ content: "❌ Error al remover la palabra.", ephemeral: true });
+      if (commandName === "removeword") {
+        const word = options.getString("palabra").toLowerCase().trim();
+        const index = bannedWords.indexOf(word);
+        if (index === -1) {
+          return interaction.reply({ content: "❌ Esa palabra no está en la lista.", ephemeral: true });
         }
+        bannedWords.splice(index, 1);
+        saveWords(BANNED_PATH, bannedWords);
+        return interaction.reply({ content: `✅ Palabra "${word}" eliminada de la lista.`, ephemeral: true });
       }
 
-      if (interaction.commandName === "mute") {
-        const user = interaction.options.getUser("usuario");
-        const tiempo = interaction.options.getString("tiempo");
-        const motivo = interaction.options.getString("motivo") || "No especificado";
-        const ms = parseDuration(tiempo);
-        if (!ms) return interaction.reply({ content: "❌ Tiempo inválido.", ephemeral: true });
-
-        const guild = interaction.guild;
-        const member = await guild.members.fetch(user.id).catch(() => null);
-        if (!member) return interaction.reply({ content: "❌ Miembro no encontrado.", ephemeral: true });
-
-        try {
-          await member.roles.add(MUTED_ROLE_ID);
-          if (activeMutes.has(member.id)) {
-            clearTimeout(activeMutes.get(member.id));
-            activeMutes.delete(member.id);
-          }
-          
-          // Calcular tiempos
-          const now = new Date();
-          const endTime = new Date(now.getTime() + ms);
-          const muteMinutes = Math.ceil(ms / 60000);
-          
-          const timeoutId = setTimeout(async () => {
-            try {
-              const refreshed = await guild.members.fetch(member.id).catch(() => null);
-              if (refreshed) await refreshed.roles.remove(MUTED_ROLE_ID).catch(() => {});
-            } catch {}
-            activeMutes.delete(member.id);
-          }, ms);
-          activeMutes.set(member.id, timeoutId);
-
-          // Enviar embed al usuario muteado con botón de apelación
-          const userEmbed = new EmbedBuilder()
-            .setTitle("🔇 Has sido muteado")
-            .setColor(0xff0000)
-            .setThumbnail(interaction.guild.iconURL({ dynamic: true }))
-            .addFields(
-              { name: "📌 Servidor", value: guild.name, inline: false },
-              { name: "⏱️ Duración", value: `${muteMinutes} minutos`, inline: true },
-              { name: "🕐 Inicio", value: `<t:${Math.floor(now.getTime() / 1000)}:f>`, inline: true },
-              { name: "🕑 Fin del mute", value: `<t:${Math.floor(endTime.getTime() / 1000)}:f>`, inline: true },
-              { name: "👮 Moderador", value: `${interaction.user.tag}`, inline: true },
-              { name: "📝 Motivo", value: motivo, inline: false }
-            )
-            .setFooter({ text: "Si crees que esto fue un error, contacta al staff del servidor." })
-            .setTimestamp();
-
-          const appealRow = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId("appeal_sanction").setLabel("Apelar sanción").setStyle(ButtonStyle.Primary)
-          );
-
-          try {
-            await user.send({ embeds: [userEmbed], components: [appealRow] }).catch(() => {});
-          } catch (e) {
-            console.log("No se pudo enviar DM al usuario muteado");
-          }
-
-          // Log en canal
-          const logCh = guild.channels.cache.get(LOG_CHANNEL_ID);
-          if (logCh) {
-            const logEmbed = new EmbedBuilder()
-              .setTitle("🔇 Mute manual")
-              .setDescription(`${user.tag} muteado por ${tiempo}`)
-              .addFields(
-                { name: "Motivo", value: motivo, inline: true },
-                { name: "Moderador", value: `<@${interaction.user.id}>`, inline: true },
-                { name: "Fin del mute", value: `<t:${Math.floor(endTime.getTime() / 1000)}:f>`, inline: false }
-              )
-              .setColor(0xffa500)
-              .setTimestamp();
-            logCh.send({ embeds: [logEmbed] }).catch(() => {});
-          }
-          return interaction.reply({ content: `✅ ${user.tag} muteado por ${tiempo}.\n📝 Motivo: ${motivo}`, ephemeral: true });
-        } catch (e) {
-          console.error("Error:", e);
-          return interaction.reply({ content: "❌ Error aplicando mute.", ephemeral: true });
+      if (commandName === "remove_mute") {
+        const user = options.getUser("usuario");
+        const targetMember = await guild.members.fetch(user.id).catch(() => null);
+        if (!targetMember) {
+          return interaction.reply({ content: "❌ Usuario no encontrado en el servidor.", ephemeral: true });
         }
-      }
-
-      if (interaction.commandName === "remove_mute") {
-        const user = interaction.options.getUser("usuario");
-        const guild = interaction.guild;
-        const member = await guild.members.fetch(user.id).catch(() => null);
-        if (!member) return interaction.reply({ content: "❌ Miembro no encontrado.", ephemeral: true });
-        try {
-          await member.roles.remove(MUTED_ROLE_ID).catch(() => {});
-          if (activeMutes.has(member.id)) {
-            clearTimeout(activeMutes.get(member.id));
-            activeMutes.delete(member.id);
-          }
-          const logCh = guild.channels.cache.get(LOG_CHANNEL_ID);
-          if (logCh) logCh.send({ embeds: [new EmbedBuilder().setTitle("🔊 Unmute").setDescription(`${user.tag} desmuteado`).setColor(0x00ff00).setTimestamp()] }).catch(() => {});
-          return interaction.reply({ content: `✅ Mute removido de ${user.tag}.`, ephemeral: true });
-        } catch (e) {
-          return interaction.reply({ content: "❌ Error.", ephemeral: true });
+        await targetMember.roles.remove(MUTED_ROLE_ID).catch(() => {});
+        if (activeMutes.has(user.id)) {
+          clearTimeout(activeMutes.get(user.id));
+          activeMutes.delete(user.id);
         }
+        return interaction.reply({ content: `✅ Mute removido de ${user.tag}.`, ephemeral: true });
       }
 
-      if (interaction.commandName === "vigilar") {
-        const user = interaction.options.getUser("usuario");
-        const tiempoStr = interaction.options.getString("tiempo");
-        const guild = interaction.guild;
-        const member = await guild.members.fetch(user.id).catch(() => null);
-        if (!member) return interaction.reply({ content: "❌ Miembro no encontrado.", ephemeral: true });
+      if (commandName === "vigilar") {
+        const user = options.getUser("usuario");
+        const tiempoStr = options.getString("tiempo");
+        const ms = parseDuration(tiempoStr);
 
+        const chanName = sanitizeChannelName(`vigilancia-${user.username}`);
+        
+        const overwrites = [
+          { id: guild.id, deny: ["ViewChannel"] },
+          { id: client.user.id, allow: ["ViewChannel", "SendMessages", "ManageChannels"] },
+          ...STAFF_ROLE_IDS.map(roleId => ({
+            id: roleId,
+            allow: ["ViewChannel", "SendMessages", "ReadMessageHistory"]
+          }))
+        ];
+
+        let channel;
         try {
-          const ms = tiempoStr === "0" ? 0 : parseDuration(tiempoStr);
-          if (ms === null) return interaction.reply({ content: "❌ Tiempo inválido.", ephemeral: true });
-
-          // Crear canal de vigilancia
-          const chanName = sanitizeChannelName(`vigilancia-${user.username}`);
-          
-          // Solo staff puede ver el canal
-          const overwrites = [
-            { id: guild.id, deny: ["ViewChannel"] },
-            { id: client.user.id, allow: ["ViewChannel", "SendMessages", "ManageChannels", "ReadMessageHistory"] },
-            ...STAFF_ROLE_IDS.map(roleId => ({ id: roleId, allow: ["ViewChannel", "SendMessages", "ReadMessageHistory"] }))
-          ];
-
-          const vigilanceChannel = await guild.channels.create({
+          channel = await guild.channels.create({
             name: chanName,
             type: ChannelType.GuildText,
             parent: VIGIL_CATEGORY_ID,
             permissionOverwrites: overwrites,
-            reason: `Vigilancia iniciada por ${interaction.user.tag}`
-          }).catch(() => null);
+            reason: `Vigilancia de ${user.tag} por ${interaction.user.tag}`
+          });
+        } catch (err) {
+          return interaction.reply({ content: "❌ Error creando canal de vigilancia.", ephemeral: true });
+        }
 
-          if (!vigilanceChannel) return interaction.reply({ content: "❌ Error creando canal de vigilancia.", ephemeral: true });
+        activeVigilances.set(user.id, channel.id);
 
-          const vigilanceEmbed = new EmbedBuilder()
-            .setTitle("👁️ Vigilancia Iniciada")
-            .setDescription(`Se ha iniciado vigilancia para ${user.tag}`)
-            .addFields(
-              { name: "Usuario", value: `${user.tag} (${user.id})`, inline: true },
-              { name: "Iniciado por", value: `<@${interaction.user.id}>`, inline: true },
-              { name: "Duración", value: ms === 0 ? "Indefinida" : `${Math.ceil(ms / 60000)} minutos`, inline: true }
-            )
-            .setColor(0xffa500)
-            .setTimestamp();
+        const embed = new EmbedBuilder()
+          .setTitle("👁️ Vigilancia iniciada")
+          .setDescription(`Se está vigilando a ${user.tag}.\n\nTodos sus mensajes se registrarán aquí.`)
+          .setColor(0x5865F2)
+          .addFields(
+            { name: "Usuario", value: `${user.tag} (${user.id})`, inline: true },
+            { name: "Duración", value: ms ? formatDuration(ms) : "Indefinida", inline: true }
+          )
+          .setTimestamp();
 
-          await vigilanceChannel.send({ embeds: [vigilanceEmbed] }).catch(() => {});
+        await channel.send({ embeds: [embed] });
 
-          activeVigilances.set(user.id, { channelId: vigilanceChannel.id, endTime: ms > 0 ? Date.now() + ms : null });
-
-          if (ms > 0) {
-            setTimeout(async () => {
-              try {
-                await vigilanceChannel.delete().catch(() => {});
-              } catch {}
+        if (ms && ms > 0) {
+          setTimeout(async () => {
+            try {
+              const ch = guild.channels.cache.get(channel.id);
+              if (ch) await ch.delete("Vigilancia expirada");
               activeVigilances.delete(user.id);
-            }, ms);
-          }
-
-          const logCh = guild.channels.cache.get(LOG_CHANNEL_ID);
-          if (logCh) {
-            logCh.send({
-              embeds: [new EmbedBuilder()
-                .setTitle("👁️ Vigilancia iniciada")
-                .setDescription(`Vigilancia iniciada para ${user.tag}`)
-                .addFields(
-                  { name: "Duración", value: ms === 0 ? "Indefinida" : `${Math.ceil(ms / 60000)} minutos`, inline: true },
-                  { name: "Moderador", value: `<@${interaction.user.id}>`, inline: true }
-                )
-                .setColor(0xffa500)
-                .setTimestamp()]
-            }).catch(() => {});
-          }
-
-          return interaction.reply({ content: `✅ Vigilancia iniciada para ${user.tag} en ${vigilanceChannel}`, ephemeral: true });
-        } catch (e) {
-          console.error("Error en vigilancia:", e);
-          return interaction.reply({ content: "❌ Error iniciando vigilancia.", ephemeral: true });
+            } catch {}
+          }, ms);
         }
+
+        return interaction.reply({ content: `✅ Vigilancia de ${user.tag} iniciada en ${channel}`, ephemeral: true });
       }
 
-      if (interaction.commandName === "cerrar_vigilancia") {
-        const user = interaction.options.getUser("usuario");
-        const guild = interaction.guild;
-
-        try {
-          const vigilance = activeVigilances.get(user.id);
-          if (!vigilance) return interaction.reply({ content: `❌ No hay vigilancia activa para ${user.tag}.`, ephemeral: true });
-
-          const channel = await guild.channels.fetch(vigilance.channelId).catch(() => null);
-          if (channel) await channel.delete().catch(() => {});
-
-          activeVigilances.delete(user.id);
-
-          const logCh = guild.channels.cache.get(LOG_CHANNEL_ID);
-          if (logCh) {
-            logCh.send({
-              embeds: [new EmbedBuilder()
-                .setTitle("👁️ Vigilancia cerrada")
-                .setDescription(`Vigilancia cerrada para ${user.tag}`)
-                .addFields({ name: "Moderador", value: `<@${interaction.user.id}>`, inline: true })
-                .setColor(0xff0000)
-                .setTimestamp()]
-            }).catch(() => {});
-          }
-
-          return interaction.reply({ content: `✅ Vigilancia cerrada para ${user.tag}.`, ephemeral: true });
-        } catch (e) {
-          console.error("Error cerrando vigilancia:", e);
-          return interaction.reply({ content: "❌ Error cerrando vigilancia.", ephemeral: true });
+      if (commandName === "cerrar_vigilancia") {
+        const user = options.getUser("usuario");
+        const channelId = activeVigilances.get(user.id);
+        if (!channelId) {
+          return interaction.reply({ content: "❌ No hay vigilancia activa para ese usuario.", ephemeral: true });
         }
+        const channel = guild.channels.cache.get(channelId);
+        if (channel) {
+          await channel.delete("Vigilancia cerrada manualmente").catch(() => {});
+        }
+        activeVigilances.delete(user.id);
+        return interaction.reply({ content: `✅ Vigilancia de ${user.tag} cerrada.`, ephemeral: true });
       }
+
+      if (commandName === "mantenimiento") {
+        const accion = options.getString("accion");
+        
+        const confirmEmbed = new EmbedBuilder()
+          .setTitle(`⚠️ Confirmar ${accion === "on" ? "activación" : "desactivación"} de mantenimiento`)
+          .setDescription(accion === "on" 
+            ? "Esto pondrá todos los canales en privado y creará un canal visible para avisar del mantenimiento.\n\n¿Estás seguro?"
+            : "Esto restaurará el acceso a todos los canales.\n\n¿Estás seguro?")
+          .setColor(0xff9900)
+          .setTimestamp();
+
+        const row = new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId(`maint_confirm_${accion}`).setLabel("✅ Confirmar").setStyle(ButtonStyle.Success),
+          new ButtonBuilder().setCustomId(`maint_cancel`).setLabel("❌ Cancelar").setStyle(ButtonStyle.Danger)
+        );
+
+        return interaction.reply({ embeds: [confirmEmbed], components: [row], ephemeral: true });
+      }
+
+      if (commandName === "ping_role") {
+        const role = options.getRole("rol");
+        const mensaje = options.getString("mensaje") || "";
+
+        const content = `${role.toString()}${mensaje ? `\n\n${mensaje}` : ""}`;
+        
+        await interaction.channel.send({ content, allowedMentions: { roles: [role.id], parse: ["everyone"] } });
+        return interaction.reply({ content: "✅ Ping enviado.", ephemeral: true });
+      }
+
     } catch (err) {
-      console.error("Error en interaction:", err);
+      console.error("Error en interactionCreate:", err);
+      try {
+        if (!interaction.replied && !interaction.deferred) {
+          await interaction.reply({ content: "❌ Ocurrió un error.", ephemeral: true });
+        }
+      } catch {}
     }
   });
 
-  // Registrar mensajes de usuarios vigilados
+  client.on("interactionCreate", async (interaction) => {
+    if (!interaction.isButton()) return;
+
+    if (interaction.customId.startsWith("maint_confirm_")) {
+      const accion = interaction.customId.replace("maint_confirm_", "");
+      const guild = interaction.guild;
+
+      await interaction.update({ content: "⏳ Procesando...", embeds: [], components: [] });
+
+      if (accion === "on") {
+        try {
+          const maintenanceChannel = await guild.channels.create({
+            name: "servidor-en-mantenimiento",
+            type: ChannelType.GuildText,
+            permissionOverwrites: [
+              { id: guild.id, allow: ["ViewChannel"], deny: ["SendMessages"] }
+            ],
+            reason: "Modo mantenimiento activado"
+          });
+
+          const embed = new EmbedBuilder()
+            .setTitle("🔧 Servidor en Mantenimiento")
+            .setDescription("El servidor se encuentra temporalmente en mantenimiento.\n\nVolveremos pronto. ¡Gracias por tu paciencia!")
+            .setColor(0xff9900)
+            .setTimestamp();
+
+          await maintenanceChannel.send({ embeds: [embed] });
+
+          const textChannels = guild.channels.cache.filter(c => 
+            c.type === ChannelType.GuildText && 
+            c.id !== maintenanceChannel.id &&
+            !c.name.includes("mantenimiento")
+          );
+
+          for (const [, channel] of textChannels) {
+            try {
+              await channel.permissionOverwrites.edit(guild.id, { ViewChannel: false });
+            } catch {}
+          }
+
+          await interaction.editReply({ content: `✅ Modo mantenimiento activado. Canal creado: ${maintenanceChannel}` });
+        } catch (err) {
+          console.error("Error activando mantenimiento:", err);
+          await interaction.editReply({ content: "❌ Error activando el modo mantenimiento." });
+        }
+      } else {
+        try {
+          const maintenanceChannel = guild.channels.cache.find(c => c.name === "servidor-en-mantenimiento");
+          if (maintenanceChannel) {
+            await maintenanceChannel.delete("Modo mantenimiento desactivado");
+          }
+
+          const textChannels = guild.channels.cache.filter(c => c.type === ChannelType.GuildText);
+          for (const [, channel] of textChannels) {
+            try {
+              await channel.permissionOverwrites.edit(guild.id, { ViewChannel: null });
+            } catch {}
+          }
+
+          await interaction.editReply({ content: "✅ Modo mantenimiento desactivado. Canales restaurados." });
+        } catch (err) {
+          console.error("Error desactivando mantenimiento:", err);
+          await interaction.editReply({ content: "❌ Error desactivando el modo mantenimiento." });
+        }
+      }
+    }
+
+    if (interaction.customId === "maint_cancel") {
+      return interaction.update({ content: "❌ Operación cancelada.", embeds: [], components: [] });
+    }
+  });
+
   client.on("messageCreate", async (message) => {
     if (message.author.bot) return;
 
-    try {
-      const userId = message.author.id;
-      const vigilance = activeVigilances.get(userId);
-      
-      if (vigilance) {
-        const guild = message.guild;
-        if (!guild) return;
-        
-        const vigilanceChannel = await guild.channels.fetch(vigilance.channelId).catch(() => null);
-        if (!vigilanceChannel) {
-          activeVigilances.delete(userId);
-          return;
+    const vigilanceChannelId = activeVigilances.get(message.author.id);
+    if (vigilanceChannelId) {
+      try {
+        const vigilanceChannel = message.guild?.channels.cache.get(vigilanceChannelId);
+        if (vigilanceChannel) {
+          const recordEmbed = new EmbedBuilder()
+            .setAuthor({ name: message.author.tag, iconURL: message.author.displayAvatarURL() })
+            .setDescription(message.content || "*Sin contenido de texto*")
+            .addFields(
+              { name: "#️⃣ Canal", value: `<#${message.channelId}>`, inline: true }
+            )
+            .setColor(0x3498db)
+            .setFooter({ text: `ID: ${message.id}` })
+            .setTimestamp();
+
+          if (message.attachments && message.attachments.size > 0) {
+            const attachmentList = message.attachments.map(att => `[${att.name}](${att.url})`).join("\n");
+            recordEmbed.addFields({ name: "📎 Adjuntos", value: attachmentList, inline: false });
+          }
+
+          await vigilanceChannel.send({ embeds: [recordEmbed] }).catch(() => {});
         }
-
-        const now = new Date();
-        const timeString = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
-        const dateString = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
-        
-        const recordEmbed = new EmbedBuilder()
-          .setTitle("📝 Nuevo Mensaje")
-          .setAuthor({
-            name: message.author.tag,
-            iconURL: message.author.displayAvatarURL({ dynamic: true })
-          })
-          .setDescription(message.content || "*[Sin contenido]*")
-          .addFields(
-            { name: "📅 Fecha", value: dateString, inline: true },
-            { name: "🕐 Hora", value: timeString, inline: true },
-            { name: "#️⃣ Canal", value: `<#${message.channelId}>`, inline: true }
-          )
-          .setColor(0x3498db)
-          .setFooter({ text: `ID: ${message.id}` })
-          .setTimestamp();
-
-        // Agregar adjuntos si los hay
-        if (message.attachments && message.attachments.size > 0) {
-          const attachmentList = message.attachments.map(att => `[${att.name}](${att.url})`).join("\n");
-          recordEmbed.addFields({ name: "📎 Adjuntos", value: attachmentList, inline: false });
-        }
-
-        await vigilanceChannel.send({ embeds: [recordEmbed] }).catch(() => {});
+      } catch (error) {
+        console.error("Error registrando mensaje vigilado:", error);
       }
-    } catch (error) {
-      console.error("Error registrando mensaje vigilado:", error);
     }
   });
 
@@ -1001,22 +1267,19 @@ module.exports = (client) => {
 
       if (!member) return;
 
-      // Ignorar staff
       if (STAFF_ROLE_IDS.some((r) => member.roles.cache.has(r))) return;
 
       const content = message.content;
 
-      // 1. Detectar palabras prohibidas
       const bannedWord = findBannedWordInText(content);
       if (bannedWord) {
-        await applyWarn(client, guild, user, member, `Palabra prohibida: "${bannedWord}"`, bannedWord);
+        await applyWarn(client, guild, user, member, `Palabra prohibida detectada`, bannedWord);
         try {
           await message.delete();
         } catch {}
         return;
       }
 
-      // 2. Detectar invites
       if (INVITE_REGEX.test(content)) {
         await applyWarn(client, guild, user, member, "Invitación a otro servidor", null);
         try {
@@ -1025,40 +1288,28 @@ module.exports = (client) => {
         return;
       }
 
-      // 2.5. Detectar links (excluyendo GIFs embebidos de Discord)
       if (LINK_REGEX.test(content)) {
         const links = content.match(LINK_REGEX);
         if (links && links.length > 0) {
-          // Filtrar GIFs, servicios de música y video
           const nonAllowedLinks = links.filter(link => {
             const lowerLink = link.toLowerCase();
-            
-            // Excluir si termina en .gif
             if (lowerLink.endsWith('.gif')) return false;
-            
-            // Excluir dominios de servicios de GIFs
             if (lowerLink.includes('tenor.com')) return false;
             if (lowerLink.includes('giphy.com')) return false;
             if (lowerLink.includes('gfycat.com')) return false;
-            
-            // Excluir servicios de video
             if (lowerLink.includes('youtube.com')) return false;
             if (lowerLink.includes('youtu.be')) return false;
-            
-            // Excluir servicios de música
             if (lowerLink.includes('spotify.com')) return false;
             if (lowerLink.includes('soundcloud.com')) return false;
             if (lowerLink.includes('music.apple.com')) return false;
             if (lowerLink.includes('deezer.com')) return false;
             if (lowerLink.includes('tidal.com')) return false;
             if (lowerLink.includes('music.youtube.com')) return false;
-            
             return true;
           });
           
           if (nonAllowedLinks.length > 0) {
-            // El sistema de warns ya es progresivo: primera vez advertencia, repetir = mute gradual
-            await applyWarn(client, guild, user, member, `Compartir links no permitido (${nonAllowedLinks[0]})`, null);
+            await applyWarn(client, guild, user, member, `Compartir links no permitido`, null);
             try {
               await message.delete();
             } catch {}
@@ -1067,25 +1318,17 @@ module.exports = (client) => {
         }
       }
 
-      // 3. Detectar emojis excesivos (excluyendo emojis personalizados, menciones, URLs y GIFs)
-      // No penalizar si el mensaje contiene GIFs
       const hasGifAttachment = message.attachments && message.attachments.some(att => att.name && att.name.toLowerCase().endsWith('.gif'));
       const hasGifLink = content.toLowerCase().includes('.gif');
       
       if (!hasGifAttachment && !hasGifLink) {
-        // Remover todas las etiquetas de Discord y URLs antes de contar emojis:
-        // - Emojis personalizados: <:nombre:id> y <a:nombre:id>
-        // - Menciones de usuarios: <@userid> y <@!userid>
-        // - Menciones de roles: <@&roleid>
-        // - Menciones de canales: <#channelid>
-        // - URLs (http, https, www)
         const contentWithoutDiscordTags = content
-          .replace(/<a?:\w+:\d+>/g, "")           // Emojis personalizados
-          .replace(/<@!?\d+>/g, "")                // Menciones de usuarios
-          .replace(/<@&\d+>/g, "")                 // Menciones de roles
-          .replace(/<#\d+>/g, "")                  // Menciones de canales
-          .replace(/https?:\/\/[^\s]+/g, "")      // URLs http/https
-          .replace(/www\.[^\s]+/g, "");            // URLs www
+          .replace(/<a?:\w+:\d+>/g, "")
+          .replace(/<@!?\d+>/g, "")
+          .replace(/<@&\d+>/g, "")
+          .replace(/<#\d+>/g, "")
+          .replace(/https?:\/\/[^\s]+/g, "")
+          .replace(/www\.[^\s]+/g, "");
         
         const emojiCount = (contentWithoutDiscordTags.match(/\p{Emoji}/gu) || []).length;
         if (emojiCount > EMOJI_THRESHOLD) {
@@ -1097,7 +1340,6 @@ module.exports = (client) => {
         }
       }
 
-      // 4. Detectar spam de líneas
       const lineCount = content.split("\n").length;
       if (lineCount > LINES_THRESHOLD) {
         await applyWarn(client, guild, user, member, "Flood de líneas", null);
@@ -1107,9 +1349,7 @@ module.exports = (client) => {
         return;
       }
 
-      // 5. Detectar abuso de mayúsculas (excluyendo emojis del servidor)
       if (content.length > CAPS_LENGTH_THRESHOLD) {
-        // Remover emojis personalizados del servidor: <:nombre:id> y <a:nombre:id>
         const contentWithoutEmojis = content.replace(/<a?:\w+:\d+>/g, "");
         
         if (contentWithoutEmojis.length > CAPS_LENGTH_THRESHOLD) {
@@ -1125,7 +1365,6 @@ module.exports = (client) => {
         }
       }
 
-      // 6. Detectar spam rápido
       if (!userMessageHistory.has(user.id)) {
         userMessageHistory.set(user.id, []);
       }
