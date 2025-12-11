@@ -15,7 +15,7 @@ const CANALES = [
   {
     nombre: 'Sirgiotv',
     channelId: process.env.YOUTUBE_CHANNEL_2,
-    mensaje: '¡Sirgio subio nuevo video en Sirgiotv vayan a verlo'
+    mensaje: '¡Sirgio subio nuevo video en Sirgiotv! vayan a verlo'
   }
 ];
 
