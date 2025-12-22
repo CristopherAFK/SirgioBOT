@@ -650,6 +650,10 @@ module.exports = (client) => {
         }
 
         if (action === "send_dm") {
+          if (!interaction.member.roles.cache.has(MOD_ROLE_ID) && !interaction.member.roles.cache.has(HEAD_ADMIN_ROLE_ID)) {
+            return interaction.reply({ content: "❌ Esta acción solo está disponible para Moderadores y Head Admins.", ephemeral: true });
+          }
+          
           const modal = new ModalBuilder()
             .setCustomId(`panel_dm_${Date.now()}`)
             .setTitle("Enviar DM a usuario");
@@ -675,6 +679,10 @@ module.exports = (client) => {
         }
 
         if (action === "send_embed_channel") {
+          if (!interaction.member.roles.cache.has(MOD_ROLE_ID) && !interaction.member.roles.cache.has(HEAD_ADMIN_ROLE_ID)) {
+            return interaction.reply({ content: "❌ Esta acción solo está disponible para Moderadores y Head Admins.", ephemeral: true });
+          }
+          
           const modal = new ModalBuilder()
             .setCustomId(`panel_embed_${Date.now()}`)
             .setTitle("Enviar embed a canal");
@@ -722,6 +730,10 @@ module.exports = (client) => {
         }
 
         if (action === "watch_user") {
+          if (!interaction.member.roles.cache.has(MOD_ROLE_ID) && !interaction.member.roles.cache.has(HEAD_ADMIN_ROLE_ID)) {
+            return interaction.reply({ content: "❌ Esta acción solo está disponible para Moderadores y Head Admins.", ephemeral: true });
+          }
+          
           const modal = new ModalBuilder()
             .setCustomId(`panel_watch_${Date.now()}`)
             .setTitle("Vigilar Usuario");
@@ -747,6 +759,10 @@ module.exports = (client) => {
         }
 
         if (action === "increase_mute") {
+          if (!interaction.member.roles.cache.has(MOD_ROLE_ID) && !interaction.member.roles.cache.has(HEAD_ADMIN_ROLE_ID)) {
+            return interaction.reply({ content: "❌ Esta acción solo está disponible para Moderadores y Head Admins.", ephemeral: true });
+          }
+          
           const modal = new ModalBuilder()
             .setCustomId(`panel_increase_mute_${Date.now()}`)
             .setTitle("Aumentar tiempo de Mute");
@@ -1108,15 +1124,15 @@ module.exports = (client) => {
       }
 
       if (commandName === "stafftools") {
-        const isHeadAdmin = member.roles.cache.has(HEAD_ADMIN_ROLE_ID);
+        const canUsePremiumActions = member.roles.cache.has(HEAD_ADMIN_ROLE_ID) || member.roles.cache.has(MOD_ROLE_ID);
+        const isHelper = member.roles.cache.has(HELPER_ROLE_ID);
         
         const embed = new EmbedBuilder()
           .setTitle("🛡️ Panel de Herramientas Staff")
           .setDescription("Panel de moderación y herramientas para el equipo de staff.\n\n" +
-            "**Advertencias:** Solo advertencia sin mute\n" +
-            "**Mute:** Silencia al usuario por un tiempo\n" +
-            "**Ban:** Banea al usuario del servidor\n" +
-            "**Botones especiales:** Solo disponibles para Head Admin")
+            "**Botones Básicos:** Warn, Mute, Ban, Mensaje\n" +
+            "**Botones Avanzados:** DM, Embed, Vigilancia, Aumentar Mute\n" +
+            "**Permisos:** Moderadores y Head Admin pueden usar todo. Helpers solo lo básico.")
           .setColor(0x5865F2)
           .setFooter({ text: "SirgioBOT - Panel Staff" })
           .setTimestamp();
@@ -1133,13 +1149,13 @@ module.exports = (client) => {
         );
 
         const row3 = new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setCustomId("panel_send_dm").setLabel("💬 Enviar DM").setStyle(ButtonStyle.Primary).setDisabled(!isHeadAdmin),
-          new ButtonBuilder().setCustomId("panel_send_embed_channel").setLabel("📊 Enviar Embed").setStyle(ButtonStyle.Secondary).setDisabled(!isHeadAdmin)
+          new ButtonBuilder().setCustomId("panel_send_dm").setLabel("💬 Enviar DM").setStyle(ButtonStyle.Primary).setDisabled(!canUsePremiumActions),
+          new ButtonBuilder().setCustomId("panel_send_embed_channel").setLabel("📊 Enviar Embed").setStyle(ButtonStyle.Secondary).setDisabled(!canUsePremiumActions)
         );
 
         const row4 = new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setCustomId("panel_watch_user").setLabel("👁️ Vigilar Usuario").setStyle(ButtonStyle.Secondary).setDisabled(!isHeadAdmin),
-          new ButtonBuilder().setCustomId("panel_increase_mute").setLabel("⏱️ Aumentar Mute").setStyle(ButtonStyle.Primary).setDisabled(!isHeadAdmin)
+          new ButtonBuilder().setCustomId("panel_watch_user").setLabel("👁️ Vigilar Usuario").setStyle(ButtonStyle.Secondary).setDisabled(!canUsePremiumActions),
+          new ButtonBuilder().setCustomId("panel_increase_mute").setLabel("⏱️ Aumentar Mute").setStyle(ButtonStyle.Primary).setDisabled(!canUsePremiumActions)
         );
 
         return interaction.reply({ embeds: [embed], components: [row1, row2, row3, row4], ephemeral: false });
