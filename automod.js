@@ -17,7 +17,7 @@ const {
 } = require("discord.js");
 
 const GUILD_ID = "1212886282645147768";
-const LOG_CHANNEL_ID = "1434002802551783516";
+const LOG_CHANNEL_ID = "1434002832016801842";
 const MUTED_ROLE_ID = "1430271610358726717";
 const HELPER_ROLE_ID = "1230949752733175888";
 const MOD_ROLE_ID = "1229140504310972599";
@@ -279,9 +279,9 @@ function canBan(member) {
   return member.roles.cache.some(r => CAN_BAN_ROLE_IDS.includes(r.id));
 }
 
-async function applyWarn(client, guild, user, member, reason, detectedWord = null) {
+async function applyWarn(client, guild, user, member, reason, detectedWord = null, staffUser = null) {
   if (!warnings[user.id]) warnings[user.id] = [];
-  warnings[user.id].push({ reason, date: new Date().toISOString(), detectedWord });
+  warnings[user.id].push({ reason, date: new Date().toISOString(), detectedWord, appliedBy: staffUser ? staffUser.id : "automod" });
   saveWarnings();
 
   const warnCount = warnings[user.id].length;
@@ -290,15 +290,15 @@ async function applyWarn(client, guild, user, member, reason, detectedWord = nul
   const isHiddenWord = detectedWord && HIDDEN_WORDS.includes(detectedWord.toLowerCase());
 
   const embed = new EmbedBuilder()
-    .setTitle(warnCount === 1 ? "⚠️ Advertencia detectada" : "⛔ Infracción detectada")
+    .setTitle(warnCount === 1 ? "⚠️ Advertencia personalizada" : "⛔ Infracción detectada")
     .setDescription(
       warnCount === 1
         ? `Has recibido una advertencia por: **${reason}**.\n\nPor favor evita este comportamiento.`
         : `Has cometido una infracción por: **${reason}**.\n\nHas sido muteado por **${muteMinutes} minutos**.`
     )
-    .setFooter({ text: "SirgioBOT - Moderación automática" })
+    .setFooter({ text: "SirgioBOT - Moderación" })
     .setTimestamp()
-    .setColor(warnCount === 1 ? 0x1e90ff : 0xff0000);
+    .setColor(warnCount === 1 ? 0xffff00 : 0xff0000);
 
   const row = new ActionRowBuilder();
   
@@ -346,7 +346,8 @@ async function applyWarn(client, guild, user, member, reason, detectedWord = nul
           { name: "Usuario", value: `${user.tag} (${user.id})`, inline: true },
           { name: "Razón", value: reason, inline: true },
           { name: "Warns totales", value: `${warnCount}`, inline: true },
-          { name: "Duración mute", value: muteMinutes > 0 ? `${muteMinutes}m` : "Advertencia", inline: true }
+          { name: "Duración mute", value: muteMinutes > 0 ? `${muteMinutes}m` : "Advertencia", inline: true },
+          { name: "Tipo", value: staffUser ? "Manual (Staff)" : "Automático (AutoMod)", inline: true }
         )
         .setTimestamp();
       logCh.send({ embeds: [logEmbed] }).catch(() => {});
@@ -394,7 +395,7 @@ module.exports = (client) => {
             ))
           .addStringOption(o => o.setName("categoria").setDescription("Categoría de la infracción").setRequired(true)
             .addChoices(...categoryChoices))
-          .addStringOption(o => o.setName("razon").setDescription("Razón detallada (obligatoria para 'Romper Norma')").setRequired(false))
+          .addStringOption(o => o.setName("razon").setDescription("Razón detallada").setRequired(true))
           .addStringOption(o => o.setName("tiempo").setDescription("Duración (ej: 10m, 1h, 2d) - Para mute/ban").setRequired(false))
           .addIntegerOption(o => o.setName("veces").setDescription("Veces que cometió la infracción").setRequired(false))
           .addStringOption(o => o.setName("infracciones_adicionales").setDescription("Otras infracciones cometidas (separadas por coma)").setRequired(false))
@@ -840,111 +841,88 @@ module.exports = (client) => {
       }
 
       if (commandName === "sancion") {
-        const user = options.getUser("usuario");
+        if (!isStaff(interaction.member)) {
+          return interaction.reply({ content: "❌ Solo el staff puede usar este comando.", ephemeral: true });
+        }
+        
+        const targetUser = options.getUser("usuario");
         const tipo = options.getString("tipo");
         const categoria = options.getString("categoria");
-        const razon = options.getString("razon") || SANCTION_CATEGORIES.find(c => c.value === categoria)?.label || "Sin razón";
+        const razon = options.getString("razon");
         const tiempo = options.getString("tiempo");
         const veces = options.getInteger("veces") || 1;
-        const infraccionesAdicionales = options.getString("infracciones_adicionales");
+        const infracciones = options.getString("infracciones_adicionales");
         const prueba = options.getAttachment("prueba");
-
-        if (tipo === "ban" && !canBan(member)) {
-          return interaction.reply({ content: "❌ Solo los moderadores o superiores pueden banear usuarios.", ephemeral: true });
-        }
-
-        if (categoria === "romper_norma" && (!razon || razon === "Romper Norma")) {
-          return interaction.reply({ content: "❌ Debes especificar la norma rota en el campo 'razon'.", ephemeral: true });
-        }
-
-        const targetMember = await guild.members.fetch(user.id).catch(() => null);
-        const ms = tiempo ? parseDuration(tiempo) : null;
-
-        const categoryInfo = SANCTION_CATEGORIES.find(c => c.value === categoria);
-        const fullReason = `${categoryInfo?.emoji || "📋"} ${categoryInfo?.label || categoria}: ${razon}${veces > 1 ? ` (x${veces})` : ""}`;
-
-        const userEmbed = new EmbedBuilder()
-          .setTitle(tipo === "warn" ? "⚠️ Advertencia recibida" : tipo === "mute" ? "🔇 Has sido silenciado" : "🔨 Has sido baneado")
-          .setDescription(`**Razón:** ${fullReason}`)
-          .setColor(tipo === "warn" ? 0xffff00 : tipo === "mute" ? 0xff0000 : 0x000000)
-          .addFields(
-            { name: "Categoría", value: categoryInfo?.label || categoria, inline: true },
-            { name: "Veces", value: `${veces}`, inline: true }
-          )
-          .setFooter({ text: "SirgioBOT - Moderación" })
-          .setTimestamp();
-
-        if (ms && tipo !== "warn") {
-          userEmbed.addFields({ name: "Duración", value: formatDuration(ms), inline: true });
-        }
-
-        if (infraccionesAdicionales) {
-          userEmbed.addFields({ name: "Infracciones adicionales", value: infraccionesAdicionales, inline: false });
-        }
-
-        const components = [];
-        if (tipo !== "warn") {
-          const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId("appeal_sanction").setLabel("Apelar sanción").setStyle(ButtonStyle.Primary)
-          );
-          components.push(row);
-        }
-
-        await user.send({ embeds: [userEmbed], components }).catch(() => {});
-
+        
+        const targetMember = await guild.members.fetch(targetUser.id).catch(() => null);
+        
         if (tipo === "warn") {
-          if (!warnings[user.id]) warnings[user.id] = [];
-          warnings[user.id].push({ reason: fullReason, date: new Date().toISOString(), detectedWord: null });
-          saveWarnings();
-        } else if (tipo === "mute" && targetMember) {
-          await targetMember.roles.add(MUTED_ROLE_ID).catch(() => {});
-          if (ms) {
-            if (activeMutes.has(user.id)) clearTimeout(activeMutes.get(user.id));
+          await applyWarn(client, guild, targetUser, targetMember, `${categoria}: ${razon}`, null, interaction.user);
+        } else if (tipo === "mute") {
+          const ms = parseDuration(tiempo) || 10 * 60 * 1000;
+          const muteMinutes = Math.floor(ms / 60 / 1000);
+          
+          if (targetMember) {
+            await targetMember.roles.add(MUTED_ROLE_ID).catch(() => {});
             const timeoutId = setTimeout(async () => {
               try {
-                const refreshed = await guild.members.fetch(user.id).catch(() => null);
+                const refreshed = await guild.members.fetch(targetMember.id).catch(() => null);
                 if (refreshed) await refreshed.roles.remove(MUTED_ROLE_ID).catch(() => {});
               } catch {}
-              activeMutes.delete(user.id);
+              activeMutes.delete(targetMember.id);
             }, ms);
-            activeMutes.set(user.id, timeoutId);
+            activeMutes.set(targetMember.id, timeoutId);
           }
+          
+          try {
+            const logCh = guild?.channels.cache.get(LOG_CHANNEL_ID);
+            if (logCh) {
+              const logEmbed = new EmbedBuilder()
+                .setColor(0xff0000)
+                .setTitle("⛔ Sanción aplicada")
+                .addFields(
+                  { name: "Usuario", value: `${targetUser.tag} (${targetUser.id})`, inline: true },
+                  { name: "Razón", value: `${categoria}: ${razon}`, inline: true },
+                  { name: "Duración mute", value: `${muteMinutes}m`, inline: true },
+                  { name: "Aplicado por", value: `${interaction.user.tag}`, inline: true },
+                  { name: "Veces", value: `${veces}`, inline: true }
+                );
+              if (infracciones) logEmbed.addFields({ name: "Infracciones adicionales", value: infracciones, inline: false });
+              if (prueba) logEmbed.addFields({ name: "Prueba", value: `[${prueba.name}](${prueba.url})`, inline: false });
+              logEmbed.setTimestamp();
+              logCh.send({ embeds: [logEmbed] }).catch(() => {});
+            }
+          } catch (e) {}
         } else if (tipo === "ban") {
-          if (targetMember) {
-            await targetMember.ban({ reason: `${fullReason} - Por: ${interaction.user.tag}` }).catch(() => {});
-          } else {
-            await guild.members.ban(user.id, { reason: `${fullReason} - Por: ${interaction.user.tag}` }).catch(() => {});
-          }
+          const ms = parseDuration(tiempo);
+          
+          try {
+            if (targetMember) {
+              await guild.bans.create(targetUser.id, { reason: `${categoria}: ${razon}` }).catch(() => {});
+            }
+          } catch (e) {}
+          
+          try {
+            const logCh = guild?.channels.cache.get(LOG_CHANNEL_ID);
+            if (logCh) {
+              const logEmbed = new EmbedBuilder()
+                .setColor(0x000000)
+                .setTitle("🔨 Ban aplicado")
+                .addFields(
+                  { name: "Usuario", value: `${targetUser.tag} (${targetUser.id})`, inline: true },
+                  { name: "Razón", value: `${categoria}: ${razon}`, inline: true },
+                  { name: "Aplicado por", value: `${interaction.user.tag}`, inline: true },
+                  { name: "Veces", value: `${veces}`, inline: true }
+                );
+              if (infracciones) logEmbed.addFields({ name: "Infracciones adicionales", value: infracciones, inline: false });
+              if (prueba) logEmbed.addFields({ name: "Prueba", value: `[${prueba.name}](${prueba.url})`, inline: false });
+              logEmbed.setTimestamp();
+              logCh.send({ embeds: [logEmbed] }).catch(() => {});
+            }
+          } catch (e) {}
         }
-
-        const logCh = guild.channels.cache.get(LOG_CHANNEL_ID);
-        if (logCh) {
-          const logEmbed = new EmbedBuilder()
-            .setColor(tipo === "warn" ? 0xffff00 : tipo === "mute" ? 0xff0000 : 0x000000)
-            .setTitle(`${tipo === "warn" ? "⚠️ Advertencia" : tipo === "mute" ? "🔇 Mute" : "🔨 Ban"} aplicado`)
-            .addFields(
-              { name: "Usuario", value: `${user.tag} (${user.id})`, inline: true },
-              { name: "Staff", value: `${interaction.user.tag}`, inline: true },
-              { name: "Categoría", value: categoryInfo?.label || categoria, inline: true },
-              { name: "Razón", value: fullReason, inline: false }
-            )
-            .setTimestamp();
-
-          if (ms && tipo !== "warn") {
-            logEmbed.addFields({ name: "Duración", value: formatDuration(ms), inline: true });
-          }
-
-          if (prueba) {
-            logEmbed.setImage(prueba.url);
-          }
-
-          logCh.send({ embeds: [logEmbed] }).catch(() => {});
-        }
-
-        return interaction.reply({ 
-          content: `✅ ${tipo === "warn" ? "Advertencia" : tipo === "mute" ? "Mute" : "Ban"} aplicado a ${user.tag}${ms ? ` por ${formatDuration(ms)}` : ""}`, 
-          ephemeral: true 
-        });
+        
+        return interaction.reply({ content: `✅ Sanción aplicada a ${targetUser.tag}.`, ephemeral: true });
       }
 
       if (commandName === "automod") {
@@ -1017,6 +995,22 @@ module.exports = (client) => {
         }
         bannedWords.push(word);
         saveWords(BANNED_PATH, bannedWords);
+        
+        try {
+          const logCh = guild?.channels.cache.get(LOG_CHANNEL_ID);
+          if (logCh) {
+            const logEmbed = new EmbedBuilder()
+              .setColor(0xff0000)
+              .setTitle("📝 Palabra prohibida agregada")
+              .addFields(
+                { name: "Palabra", value: `**${word}**`, inline: true },
+                { name: "Agregado por", value: `${interaction.user.tag}`, inline: true }
+              )
+              .setTimestamp();
+            logCh.send({ embeds: [logEmbed] }).catch(() => {});
+          }
+        } catch (e) {}
+        
         return interaction.reply({ content: `✅ Palabra "${word}" agregada a la lista prohibida.`, ephemeral: true });
       }
 
@@ -1028,6 +1022,22 @@ module.exports = (client) => {
         }
         bannedWords.splice(index, 1);
         saveWords(BANNED_PATH, bannedWords);
+        
+        try {
+          const logCh = guild?.channels.cache.get(LOG_CHANNEL_ID);
+          if (logCh) {
+            const logEmbed = new EmbedBuilder()
+              .setColor(0x00ff00)
+              .setTitle("📝 Palabra prohibida removida")
+              .addFields(
+                { name: "Palabra", value: `**${word}**`, inline: true },
+                { name: "Removido por", value: `${interaction.user.tag}`, inline: true }
+              )
+              .setTimestamp();
+            logCh.send({ embeds: [logEmbed] }).catch(() => {});
+          }
+        } catch (e) {}
+        
         return interaction.reply({ content: `✅ Palabra "${word}" eliminada de la lista.`, ephemeral: true });
       }
 
@@ -1042,6 +1052,22 @@ module.exports = (client) => {
           clearTimeout(activeMutes.get(user.id));
           activeMutes.delete(user.id);
         }
+        
+        try {
+          const logCh = guild?.channels.cache.get(LOG_CHANNEL_ID);
+          if (logCh) {
+            const logEmbed = new EmbedBuilder()
+              .setColor(0x00ff00)
+              .setTitle("🔊 Unmute")
+              .addFields(
+                { name: "Usuario", value: `${user.tag} (${user.id})`, inline: true },
+                { name: "Demuteado por", value: `${interaction.user.tag}`, inline: true }
+              )
+              .setTimestamp();
+            logCh.send({ embeds: [logEmbed] }).catch(() => {});
+          }
+        } catch (e) {}
+        
         return interaction.reply({ content: `✅ Mute removido de ${user.tag}.`, ephemeral: true });
       }
 
@@ -1379,6 +1405,7 @@ module.exports = (client) => {
         try {
           await message.delete();
         } catch {}
+        return;
       }
 
     } catch (err) {
