@@ -1299,7 +1299,7 @@ module.exports = (client) => {
 
       const bannedWord = findBannedWordInText(content);
       if (bannedWord) {
-        await applyWarn(client, guild, user, member, `Palabra prohibida detectada`, bannedWord);
+        await applyWarn(client, guild, user, member, `Palabra prohibida: ${bannedWord}`, bannedWord);
         try {
           await message.delete();
         } catch {}

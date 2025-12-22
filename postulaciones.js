@@ -110,14 +110,6 @@ module.exports = (client) => {
             )
         ),
       new SlashCommandBuilder()
-        .setName('abrir_postulaciones')
-        .setDescription('Abrir el sistema de postulaciones (Staff)')
-        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
-      new SlashCommandBuilder()
-        .setName('cerrar_postulaciones')
-        .setDescription('Cerrar el sistema de postulaciones (Staff)')
-        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
-      new SlashCommandBuilder()
         .setName('estado_postulaciones')
         .setDescription('Ver el estado actual de las postulaciones')
     ];
@@ -135,46 +127,6 @@ module.exports = (client) => {
   client.on('interactionCreate', async interaction => {
     if (interaction.isChatInputCommand()) {
       const { commandName } = interaction;
-
-      if (commandName === 'abrir_postulaciones') {
-        const member = interaction.member;
-        const hasStaffRole = member.roles.cache.has(STAFF_ROLE_ID) || member.permissions.has(PermissionFlagsBits.Administrator);
-        
-        if (!hasStaffRole) {
-          return interaction.reply({ content: '❌ No tienes permisos para usar este comando.', ephemeral: true });
-        }
-
-        postulacionesAbiertas = true;
-        saveStatus();
-
-        const embed = new EmbedBuilder()
-          .setTitle('📋 Postulaciones Abiertas')
-          .setDescription('Las postulaciones han sido **abiertas**.\n\nLos usuarios ahora pueden postularse usando el comando `/postular`.')
-          .setColor(0x00ff00)
-          .setTimestamp();
-
-        await interaction.reply({ embeds: [embed] });
-      }
-
-      if (commandName === 'cerrar_postulaciones') {
-        const member = interaction.member;
-        const hasStaffRole = member.roles.cache.has(STAFF_ROLE_ID) || member.permissions.has(PermissionFlagsBits.Administrator);
-        
-        if (!hasStaffRole) {
-          return interaction.reply({ content: '❌ No tienes permisos para usar este comando.', ephemeral: true });
-        }
-
-        postulacionesAbiertas = false;
-        saveStatus();
-
-        const embed = new EmbedBuilder()
-          .setTitle('🔒 Postulaciones Cerradas')
-          .setDescription('Las postulaciones han sido **cerradas**.\n\nLos usuarios ya no pueden postularse hasta que se vuelvan a abrir.')
-          .setColor(0xff0000)
-          .setTimestamp();
-
-        await interaction.reply({ embeds: [embed] });
-      }
 
       if (commandName === 'estado_postulaciones') {
         const embed = new EmbedBuilder()

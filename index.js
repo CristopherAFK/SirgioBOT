@@ -326,7 +326,7 @@ client.on("interactionCreate", async (interaction) => {
           .setFooter({ text: `Ticket #${number}` })
           .setTimestamp();
 
-        await channel.send({ content: `<@${interaction.user.id}>`, embeds: [embedTicket], components: isMod(interaction.member) ? [] : [row] });
+        await channel.send({ content: `<@${interaction.user.id}>`, embeds: [embedTicket], components: [row] });
 
         try {
           await interaction.update({ content: `✅ Ticket creado: ${channel}`, embeds: [], components: [] });
@@ -342,8 +342,11 @@ client.on("interactionCreate", async (interaction) => {
         const ticket = data.channels[channelId];
         if (!ticket) return interaction.reply({ content: "❗ Ticket no encontrado en registros.", ephemeral: true });
 
-        if (!isMod(interaction.member)) {
-          return interaction.reply({ content: "❌ Solo moderadores o administradores pueden atender tickets.", ephemeral: true });
+        const MOD_ROLE_ID = "1229140504310972599";
+        const hasMod = interaction.member.roles.cache.has(MOD_ROLE_ID);
+        
+        if (!hasMod) {
+          return interaction.reply({ content: "❌ Solo moderadores pueden atender tickets.", ephemeral: true });
         }
 
         try {
@@ -401,11 +404,15 @@ client.on("interactionCreate", async (interaction) => {
       try {
         const logsChannel = await interaction.guild?.channels.fetch(LOGS_CHANNEL_ID).catch(() => null);
         if (logsChannel) {
+          const ticketData = data.channels[Object.keys(data.channels).find(k => data.channels[k].number === ticketNumber)];
+          const staffMemberTag = ticketData?.claimedBy ? `<@${ticketData.claimedBy}>` : "No asignado";
+          
           const ratingEmbed = new EmbedBuilder()
             .setTitle("📊 Calificación de Ticket")
             .setDescription(`El usuario ha calificado su experiencia con el ticket #${ticketNumber}`)
             .addFields(
               { name: "Usuario", value: `${interaction.user.tag}`, inline: true },
+              { name: "Staff que atendió", value: staffMemberTag, inline: true },
               { name: "Calificación", value: `${stars} (${rating}/5)`, inline: true },
               { name: "Comentario", value: comment, inline: false }
             )
