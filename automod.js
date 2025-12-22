@@ -579,8 +579,10 @@ module.exports = (client) => {
         }
 
         if (action === "warn" || action === "mute" || action === "ban") {
-          if (action === "ban" && !canBan(interaction.member)) {
-            return interaction.reply({ content: "❌ Solo los moderadores o superiores pueden banear usuarios.", ephemeral: true });
+          if (action === "ban") {
+            if (!canBan(interaction.member)) {
+              return interaction.reply({ content: "❌ Los Helpers no pueden banear. Solo Moderadores y superiores.", ephemeral: true });
+            }
           }
 
           const modal = new ModalBuilder()
@@ -1130,9 +1132,9 @@ module.exports = (client) => {
         const embed = new EmbedBuilder()
           .setTitle("🛡️ Panel de Herramientas Staff")
           .setDescription("Panel de moderación y herramientas para el equipo de staff.\n\n" +
-            "**Botones Básicos:** Warn, Mute, Ban, Mensaje\n" +
-            "**Botones Avanzados:** DM, Embed, Vigilancia, Aumentar Mute\n" +
-            "**Permisos:** Moderadores y Head Admin pueden usar todo. Helpers solo lo básico.")
+            "**Helpers:** Warn, Mute, Mensaje, Remover Mute\n" +
+            "**Moderadores:** Todos los botones (incluyendo Ban, DM, Embed, Vigilancia)\n" +
+            "**Head Admin:** Todos los botones")
           .setColor(0x5865F2)
           .setFooter({ text: "SirgioBOT - Panel Staff" })
           .setTimestamp();
@@ -1140,7 +1142,7 @@ module.exports = (client) => {
         const row1 = new ActionRowBuilder().addComponents(
           new ButtonBuilder().setCustomId("panel_warn").setLabel("⚠️ Warn").setStyle(ButtonStyle.Secondary),
           new ButtonBuilder().setCustomId("panel_mute").setLabel("🔇 Mute").setStyle(ButtonStyle.Primary),
-          new ButtonBuilder().setCustomId("panel_ban").setLabel("🔨 Ban").setStyle(ButtonStyle.Danger)
+          new ButtonBuilder().setCustomId("panel_ban").setLabel("🔨 Ban").setStyle(ButtonStyle.Danger).setDisabled(isHelper)
         );
 
         const row2 = new ActionRowBuilder().addComponents(
