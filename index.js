@@ -402,16 +402,16 @@ client.on("interactionCreate", async (interaction) => {
       const stars = "⭐".repeat(rating) + "☆".repeat(5 - rating);
 
       try {
-        const logsChannel = await interaction.guild?.channels.fetch(LOGS_CHANNEL_ID).catch(() => null);
+        const logsChannel = await interaction.guild.channels.fetch(LOGS_CHANNEL_ID).catch(() => null);
         if (logsChannel) {
           const ticketData = data.channels[Object.keys(data.channels).find(k => data.channels[k].number === ticketNumber)];
           const staffMemberTag = ticketData?.claimedBy ? `<@${ticketData.claimedBy}>` : "No asignado";
           
           const ratingEmbed = new EmbedBuilder()
-            .setTitle("📊 Calificación de Ticket")
-            .setDescription(`El usuario ha calificado su experiencia con el ticket #${ticketNumber}`)
+            .setTitle("⭐ Calificación de Ticket #" + ticketNumber)
+            .setDescription(`El usuario ha calificado su experiencia con el soporte`)
             .addFields(
-              { name: "Usuario", value: `${interaction.user.tag}`, inline: true },
+              { name: "Usuario", value: `<@${interaction.user.id}>`, inline: true },
               { name: "Staff que atendió", value: staffMemberTag, inline: true },
               { name: "Calificación", value: `${stars} (${rating}/5)`, inline: true },
               { name: "Comentario", value: comment, inline: false }
@@ -420,6 +420,9 @@ client.on("interactionCreate", async (interaction) => {
             .setTimestamp();
 
           await logsChannel.send({ embeds: [ratingEmbed] });
+          console.log(`📊 Calificación de ticket #${ticketNumber} enviada al canal de logs`);
+        } else {
+          console.warn("Canal de logs no encontrado para enviar calificación");
         }
       } catch (err) {
         console.error("Error enviando calificación:", err);
