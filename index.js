@@ -402,9 +402,19 @@ client.on("interactionCreate", async (interaction) => {
       const stars = "⭐".repeat(rating) + "☆".repeat(5 - rating);
 
       try {
-        const logsChannel = await interaction.guild.channels.fetch(LOGS_CHANNEL_ID).catch(() => null);
+        const logsChannel = await interaction.guild.channels.fetch(LOGS_CHANNEL_ID).catch((err) => {
+          console.warn("No se pudo obtener el canal de logs:", err);
+          return null;
+        });
+        
         if (logsChannel) {
-          const ticketData = data.channels[Object.keys(data.channels).find(k => data.channels[k].number === ticketNumber)];
+          const channelIds = Object.keys(data.channels || {});
+          const ticketChannelId = channelIds.find(k => {
+            const ticketData = data.channels[k];
+            return ticketData && ticketData.number === ticketNumber;
+          });
+          
+          const ticketData = ticketChannelId ? data.channels[ticketChannelId] : null;
           const staffMemberTag = ticketData?.claimedBy ? `<@${ticketData.claimedBy}>` : "No asignado";
           
           const ratingEmbed = new EmbedBuilder()
@@ -414,18 +424,22 @@ client.on("interactionCreate", async (interaction) => {
               { name: "Usuario", value: `<@${interaction.user.id}>`, inline: true },
               { name: "Staff que atendió", value: staffMemberTag, inline: true },
               { name: "Calificación", value: `${stars} (${rating}/5)`, inline: true },
-              { name: "Comentario", value: comment, inline: false }
+              { name: "Comentario", value: comment || "Sin comentario", inline: false }
             )
             .setColor(rating >= 4 ? 0x00ff00 : rating >= 3 ? 0xffff00 : 0xff0000)
             .setTimestamp();
 
-          await logsChannel.send({ embeds: [ratingEmbed] });
-          console.log(`📊 Calificación de ticket #${ticketNumber} enviada al canal de logs`);
+          try {
+            await logsChannel.send({ embeds: [ratingEmbed] });
+            console.log(`📊 Calificación de ticket #${ticketNumber} enviada al canal de logs`);
+          } catch (sendErr) {
+            console.error("Error al enviar embed de calificación:", sendErr);
+          }
         } else {
-          console.warn("Canal de logs no encontrado para enviar calificación");
+          console.warn("Canal de logs no encontrado para enviar calificación (ID: " + LOGS_CHANNEL_ID + ")");
         }
       } catch (err) {
-        console.error("Error enviando calificación:", err);
+        console.error("Error en bloque try-catch de calificaciones:", err);
       }
 
       return interaction.reply({ content: `¡Gracias por tu calificación! ${stars}`, ephemeral: true });
