@@ -1155,22 +1155,33 @@ module.exports = (client) => {
         const row1 = new ActionRowBuilder().addComponents(
           new ButtonBuilder().setCustomId("panel_warn").setLabel("⚠️ Warn").setStyle(ButtonStyle.Secondary),
           new ButtonBuilder().setCustomId("panel_mute").setLabel("🔇 Mute").setStyle(ButtonStyle.Primary),
-          new ButtonBuilder().setCustomId("panel_ban").setLabel("🔨 Ban").setStyle(ButtonStyle.Danger)
+          new ButtonBuilder().setCustomId("panel_ban").setLabel("🔨 Ban").setStyle(ButtonStyle.Danger),
+          new ButtonBuilder().setCustomId("panel_timeout").setLabel("⌛ Timeout").setStyle(ButtonStyle.Secondary),
+          new ButtonBuilder().setCustomId("panel_nuke").setLabel("🧹 Nuke").setStyle(ButtonStyle.Danger)
         );
 
         const row2 = new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setCustomId("panel_send_message").setLabel("📝 Enviar Mensaje").setStyle(ButtonStyle.Secondary),
-          new ButtonBuilder().setCustomId("panel_remove_mute").setLabel("🔊 Remover Mute").setStyle(ButtonStyle.Success)
+          new ButtonBuilder().setCustomId("panel_clear").setLabel("🧼 Limpiar Chat").setStyle(ButtonStyle.Primary),
+          new ButtonBuilder().setCustomId("panel_edit_msg").setLabel("✏️ Editar Msg").setStyle(ButtonStyle.Secondary),
+          new ButtonBuilder().setCustomId("panel_reduce_perms").setLabel("🔒 Restringir").setStyle(ButtonStyle.Danger),
+          new ButtonBuilder().setCustomId("panel_add_note").setLabel("📝 Nota").setStyle(ButtonStyle.Secondary),
+          new ButtonBuilder().setCustomId("panel_view_history").setLabel("📊 Historial").setStyle(ButtonStyle.Primary)
         );
 
         const row3 = new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setCustomId("panel_send_dm").setLabel("💬 Enviar DM").setStyle(ButtonStyle.Primary),
-          new ButtonBuilder().setCustomId("panel_send_embed_channel").setLabel("📊 Enviar Embed").setStyle(ButtonStyle.Secondary)
+          new ButtonBuilder().setCustomId("panel_role_manage").setLabel("🎭 Roles").setStyle(ButtonStyle.Primary),
+          new ButtonBuilder().setCustomId("panel_lock_channel").setLabel("🔇 Silenciar Canal").setStyle(ButtonStyle.Danger),
+          new ButtonBuilder().setCustomId("panel_warn_template").setLabel("⚠️ Plantillas").setStyle(ButtonStyle.Secondary),
+          new ButtonBuilder().setCustomId("panel_block_link").setLabel("🔗 Bloquear Link").setStyle(ButtonStyle.Danger),
+          new ButtonBuilder().setCustomId("panel_automod_toggle").setLabel("⚙️ AutoMod").setStyle(ButtonStyle.Success)
         );
 
         const row4 = new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setCustomId("panel_watch_user").setLabel("👁️ Vigilar Usuario").setStyle(ButtonStyle.Secondary),
-          new ButtonBuilder().setCustomId("panel_increase_mute").setLabel("⏱️ Aumentar Mute").setStyle(ButtonStyle.Primary)
+          new ButtonBuilder().setCustomId("panel_quarantine").setLabel("☣️ Quarantine").setStyle(ButtonStyle.Danger),
+          new ButtonBuilder().setCustomId("panel_watch_user").setLabel("👁️ Vigilar").setStyle(ButtonStyle.Secondary),
+          new ButtonBuilder().setCustomId("panel_remove_mute").setLabel("🔊 Unmute").setStyle(ButtonStyle.Success),
+          new ButtonBuilder().setCustomId("panel_send_dm").setLabel("💬 DM").setStyle(ButtonStyle.Primary),
+          new ButtonBuilder().setCustomId("panel_send_embed_channel").setLabel("📊 Embed").setStyle(ButtonStyle.Secondary)
         );
 
         return interaction.reply({ embeds: [embed], components: [row1, row2, row3, row4], ephemeral: false });
