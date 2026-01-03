@@ -1145,9 +1145,9 @@ module.exports = (client) => {
         const embed = new EmbedBuilder()
           .setTitle("🛡️ Panel de Herramientas Staff")
           .setDescription("Panel de moderación y herramientas para el equipo de staff.\n\n" +
-            "**Helpers:** Warn, Mute, Mensaje, Remover Mute\n" +
-            "**Moderadores:** Todos los botones (incluyendo Ban, DM, Embed, Vigilancia)\n" +
-            "**Head Admin:** Todos los botones")
+            "**Helpers:** Warn, Mute, DM, Limpiar Chat (50), Nota, Historial, Plantillas, Unmute\n" +
+            "**Moderadores:** Todo lo anterior + Ban, Timeout, Nuke, Restringir, Roles, Silenciar Canal, Bloquear Link, Vigilar\n" +
+            "**Head Admin / Admin:** Acceso total incluyendo AutoMod Toggle y Quarantine")
           .setColor(0x5865F2)
           .setFooter({ text: "SirgioBOT - Panel Staff" })
           .setTimestamp();
