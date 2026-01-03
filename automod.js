@@ -452,15 +452,15 @@ module.exports = (client) => {
           .setDescription("Hace ping a un rol específico")
           .addRoleOption(o => o.setName("rol").setDescription("Rol a mencionar").setRequired(true))
           .addStringOption(o => o.setName("mensaje").setDescription("Mensaje opcional").setRequired(false))
-      ].map((c) => c.toJSON());
+      ];
 
-      for (const command of commands) {
-        await client.application.commands.create(command, GUILD_ID);
-      }
+      // Registro global de comandos (para que sean visibles para todos)
+      await guild.commands.set(commands);
       console.log("🟢 Comandos de AutoMod registrados");
     } catch (err) {
       console.error("Error registrando comandos:", err);
     }
+  });
   });
 
   client.on("interactionCreate", async (interaction) => {
@@ -951,21 +951,25 @@ module.exports = (client) => {
 
       if (interaction.isModalSubmit() && interaction.customId.startsWith("panel_dm_")) {
         const userId = interaction.fields.getTextInputValue("user_id").trim();
-        const message = interaction.fields.getTextInputValue("message");
+        const messageText = interaction.fields.getTextInputValue("message");
 
         const user = await client.users.fetch(userId).catch(() => null);
         if (!user) return interaction.reply({ content: "❌ Usuario no encontrado.", ephemeral: true });
 
         const embed = new EmbedBuilder()
           .setTitle("📬 Mensaje del Staff")
-          .setDescription(message)
+          .setDescription(messageText)
           .setColor(0x5865F2)
-          .setFooter({ text: "Responde a este mensaje en el servidor" })
+          .setFooter({ text: "Responde a este mensaje para hablar con el staff" })
           .setTimestamp();
 
         try {
           await user.send({ embeds: [embed] });
-          return interaction.reply({ content: `✅ DM enviado a ${user.tag}`, ephemeral: true });
+          
+          // Registrar para relay de respuestas
+          activeStaffDMs.set(user.id, interaction.user.id);
+          
+          return interaction.reply({ content: `✅ DM enviado a ${user.tag}. Sus respuestas te llegarán a ti.`, ephemeral: true });
         } catch (err) {
           return interaction.reply({ content: "❌ No se pudo enviar el DM (DMs cerrados del usuario).", ephemeral: true });
         }
@@ -1126,9 +1130,10 @@ module.exports = (client) => {
       }
 
       if (commandName === "stafftools") {
-        const canUsePremiumActions = member.roles.cache.has(HEAD_ADMIN_ROLE_ID) || member.roles.cache.has(MOD_ROLE_ID);
-        const isHelper = member.roles.cache.has(HELPER_ROLE_ID);
-        
+        if (!member.roles.cache.has(HEAD_ADMIN_ROLE_ID)) {
+          return interaction.reply({ content: "❌ Solo los **Head Admin** pueden desplegar el panel de herramientas.", ephemeral: true });
+        }
+
         const embed = new EmbedBuilder()
           .setTitle("🛡️ Panel de Herramientas Staff")
           .setDescription("Panel de moderación y herramientas para el equipo de staff.\n\n" +
@@ -1142,7 +1147,7 @@ module.exports = (client) => {
         const row1 = new ActionRowBuilder().addComponents(
           new ButtonBuilder().setCustomId("panel_warn").setLabel("⚠️ Warn").setStyle(ButtonStyle.Secondary),
           new ButtonBuilder().setCustomId("panel_mute").setLabel("🔇 Mute").setStyle(ButtonStyle.Primary),
-          new ButtonBuilder().setCustomId("panel_ban").setLabel("🔨 Ban").setStyle(ButtonStyle.Danger).setDisabled(isHelper)
+          new ButtonBuilder().setCustomId("panel_ban").setLabel("🔨 Ban").setStyle(ButtonStyle.Danger)
         );
 
         const row2 = new ActionRowBuilder().addComponents(
@@ -1151,13 +1156,13 @@ module.exports = (client) => {
         );
 
         const row3 = new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setCustomId("panel_send_dm").setLabel("💬 Enviar DM").setStyle(ButtonStyle.Primary).setDisabled(!canUsePremiumActions),
-          new ButtonBuilder().setCustomId("panel_send_embed_channel").setLabel("📊 Enviar Embed").setStyle(ButtonStyle.Secondary).setDisabled(!canUsePremiumActions)
+          new ButtonBuilder().setCustomId("panel_send_dm").setLabel("💬 Enviar DM").setStyle(ButtonStyle.Primary),
+          new ButtonBuilder().setCustomId("panel_send_embed_channel").setLabel("📊 Enviar Embed").setStyle(ButtonStyle.Secondary)
         );
 
         const row4 = new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setCustomId("panel_watch_user").setLabel("👁️ Vigilar Usuario").setStyle(ButtonStyle.Secondary).setDisabled(!canUsePremiumActions),
-          new ButtonBuilder().setCustomId("panel_increase_mute").setLabel("⏱️ Aumentar Mute").setStyle(ButtonStyle.Primary).setDisabled(!canUsePremiumActions)
+          new ButtonBuilder().setCustomId("panel_watch_user").setLabel("👁️ Vigilar Usuario").setStyle(ButtonStyle.Secondary),
+          new ButtonBuilder().setCustomId("panel_increase_mute").setLabel("⏱️ Aumentar Mute").setStyle(ButtonStyle.Primary)
         );
 
         return interaction.reply({ embeds: [embed], components: [row1, row2, row3, row4], ephemeral: false });

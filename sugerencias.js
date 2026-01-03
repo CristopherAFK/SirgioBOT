@@ -86,8 +86,12 @@ module.exports = (client) => {
       
       // Verificar si el mensaje está en el canal de sugerencias
       if (message.channelId === SUGGESTIONS_CHANNEL_ID) {
-        // Borrar el mensaje
-        await message.delete().catch(() => {});
+        // Borrar el mensaje de inmediato
+        try {
+          await message.delete();
+        } catch (e) {
+          console.error("Error al borrar mensaje en sugerencias:", e);
+        }
         
         // Enviar mensaje privado al usuario
         try {
@@ -96,13 +100,11 @@ module.exports = (client) => {
                      'Para hacer una sugerencia, usa el comando:\n' +
                      '`/sugerir`\n\n' +
                      '¡Gracias por tu comprensión! 😊'
-          });
-        } catch (dmError) {
-          console.log(`No se pudo enviar DM a ${message.author.tag}`);
-        }
+          }).catch(() => {});
+        } catch (dmError) {}
       }
     } catch (error) {
-      console.error('Error en messageCreate:', error);
+      console.error('Error en messageCreate sugerencias:', error);
     }
   });
 

@@ -402,19 +402,17 @@ client.on("interactionCreate", async (interaction) => {
       const stars = "⭐".repeat(rating) + "☆".repeat(5 - rating);
 
       try {
-        const logsChannel = await interaction.guild.channels.fetch(LOGS_CHANNEL_ID).catch((err) => {
+        const guild = interaction.guild || await client.guilds.fetch(interaction.guildId).catch(() => null);
+        if (!guild) return console.error("No se pudo obtener la guild para la calificación");
+
+        const logsChannel = await guild.channels.fetch(LOGS_CHANNEL_ID).catch((err) => {
           console.warn("No se pudo obtener el canal de logs:", err);
           return null;
         });
         
         if (logsChannel) {
-          const channelIds = Object.keys(data.channels || {});
-          const ticketChannelId = channelIds.find(k => {
-            const ticketData = data.channels[k];
-            return ticketData && ticketData.number === ticketNumber;
-          });
-          
-          const ticketData = ticketChannelId ? data.channels[ticketChannelId] : null;
+          const ticketDataEntry = Object.entries(data.channels || {}).find(([id, t]) => t && t.number === ticketNumber);
+          const ticketData = ticketDataEntry ? ticketDataEntry[1] : null;
           const staffMemberTag = ticketData?.claimedBy ? `<@${ticketData.claimedBy}>` : "No asignado";
           
           const ratingEmbed = new EmbedBuilder()
@@ -429,12 +427,8 @@ client.on("interactionCreate", async (interaction) => {
             .setColor(rating >= 4 ? 0x00ff00 : rating >= 3 ? 0xffff00 : 0xff0000)
             .setTimestamp();
 
-          try {
-            await logsChannel.send({ embeds: [ratingEmbed] });
-            console.log(`📊 Calificación de ticket #${ticketNumber} enviada al canal de logs`);
-          } catch (sendErr) {
-            console.error("Error al enviar embed de calificación:", sendErr);
-          }
+          await logsChannel.send({ embeds: [ratingEmbed] });
+          console.log(`📊 Calificación de ticket #${ticketNumber} enviada al canal de logs`);
         } else {
           console.warn("Canal de logs no encontrado para enviar calificación (ID: " + LOGS_CHANNEL_ID + ")");
         }
