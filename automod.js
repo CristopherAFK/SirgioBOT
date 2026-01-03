@@ -376,6 +376,12 @@ module.exports = (client) => {
     cleanupExpiredWarns(client);
     setInterval(() => cleanupExpiredWarns(client), 24 * 60 * 60 * 1000);
 
+    const guild = client.guilds.cache.get(GUILD_ID);
+    if (!guild) {
+      console.error("❌ No se pudo encontrar el servidor con ID:", GUILD_ID);
+      return;
+    }
+
     try {
       const categoryChoices = SANCTION_CATEGORIES.slice(0, 25).map(c => ({ name: c.label, value: c.value }));
       
