@@ -590,9 +590,20 @@ module.exports = (client) => {
         }
 
         // --- Lógica de permisos por botón ---
-        const modActions = ["ban", "timeout", "nuke", "reduce_perms", "role_manage", "lock_channel", "block_link", "watch_user", "quarantine"];
-        const adminActions = ["automod_toggle"];
+        const isHelper = member.roles.cache.has(HELPER_ROLE_ID);
+        const isModPlus = member.roles.cache.has(MOD_ROLE_ID) || member.roles.cache.has(ADMIN_ROLE_ID) || member.roles.cache.has(HEAD_ADMIN_ROLE_ID);
+        const isAdminPlus = member.roles.cache.has(ADMIN_ROLE_ID) || member.roles.cache.has(HEAD_ADMIN_ROLE_ID);
 
+        // Helper actions: Mute and Remove Mute
+        const helperActions = ["mute", "unmute"];
+        // Moderator actions: Mute, Remove Mute, Ban + all communication tools
+        const modActions = ["mute", "unmute", "ban", "timeout", "clear", "nuke", "send_embed_channel", "announce"];
+        // Admin+ actions: Advanced tools
+        const adminActions = ["automod_toggle", "role_manage", "lock_channel", "block_link", "watch_user", "quarantine", "reduce_perms"];
+
+        if (helperActions.includes(action) && !isHelper && !isModPlus) {
+          return interaction.reply({ content: "❌ Esta acción requiere rango **Helper** o superior.", ephemeral: true });
+        }
         if (modActions.includes(action) && !isModPlus) {
           return interaction.reply({ content: "❌ Esta acción requiere rango **Moderador** o superior.", ephemeral: true });
         }
@@ -679,9 +690,460 @@ module.exports = (client) => {
           return interaction.reply({ content: `⚙️ AutoMod ha sido ${automodEnabled ? "**activado** ✅" : "**desactivado** ❌"}.`, ephemeral: true });
         }
 
-        // Respuesta genérica para botones sin modal implementado aún para no romper el flujo
-        if (["nuke", "edit_msg", "reduce_perms", "view_history", "role_manage", "lock_channel", "warn_template", "block_link", "quarantine", "watch_user", "remove_mute", "send_dm", "send_embed_channel"].includes(action)) {
-          return interaction.reply({ content: `🛠️ La herramienta **${action}** está siendo configurada para este panel.`, ephemeral: true });
+
+        if (action === "remove_mute") {
+          const modal = new ModalBuilder()
+            .setCustomId(`panel_remove_mute_modal_${targetUserId}`)
+            .setTitle("🔊 Quitar Silencio");
+
+          const userInput = new TextInputBuilder()
+            .setCustomId("user_id")
+            .setLabel("ID del Usuario")
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder("ID del usuario a des-silenciar")
+            .setValue(targetUserId || "")
+            .setRequired(true);
+
+          const reasonInput = new TextInputBuilder()
+            .setCustomId("reason")
+            .setLabel("Razón")
+            .setStyle(TextInputStyle.Paragraph)
+            .setPlaceholder("Razón para quitar el silencio...")
+            .setRequired(false);
+
+          const firstActionRow = new ActionRowBuilder().addComponents(userInput);
+          const secondActionRow = new ActionRowBuilder().addComponents(reasonInput);
+          modal.addComponents(firstActionRow, secondActionRow);
+
+          return interaction.showModal(modal);
+        }
+
+        if (action === "send_dm") {
+          const modal = new ModalBuilder()
+            .setCustomId(`panel_dm_${targetUserId}`)
+            .setTitle("📩 Enviar Mensaje Directo");
+
+          const userInput = new TextInputBuilder()
+            .setCustomId("user_id")
+            .setLabel("ID del Usuario")
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder("ID del usuario destinatario")
+            .setValue(targetUserId || "")
+            .setRequired(true);
+
+          const messageInput = new TextInputBuilder()
+            .setCustomId("message")
+            .setLabel("Mensaje")
+            .setStyle(TextInputStyle.Paragraph)
+            .setPlaceholder("Escribe el mensaje a enviar...")
+            .setRequired(true);
+
+          const firstActionRow = new ActionRowBuilder().addComponents(userInput);
+          const secondActionRow = new ActionRowBuilder().addComponents(messageInput);
+          
+          modal.addComponents(firstActionRow, secondActionRow);
+          return interaction.showModal(modal);
+        }
+
+        // Implementación de warn_template
+        if (action === "warn_template") {
+          const modal = new ModalBuilder()
+            .setCustomId("panel_warn_template_modal")
+            .setTitle("⚠️ Gestionar Plantillas de Advertencia");
+
+          const templateNameInput = new TextInputBuilder()
+            .setCustomId("template_name")
+            .setLabel("Nombre de la Plantilla")
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder("Ej: spam, toxicidad, flood...")
+            .setRequired(true);
+
+          const templateContentInput = new TextInputBuilder()
+            .setCustomId("template_content")
+            .setLabel("Contenido de la Plantilla")
+            .setStyle(TextInputStyle.Paragraph)
+            .setPlaceholder("Escribe el mensaje de advertencia...")
+            .setRequired(true);
+
+          const actionTypeInput = new TextInputBuilder()
+            .setCustomId("action_type")
+            .setLabel("Acción (crear/editar/eliminar/listar)")
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder("crear")
+            .setRequired(true);
+
+          const firstActionRow = new ActionRowBuilder().addComponents(templateNameInput);
+          const secondActionRow = new ActionRowBuilder().addComponents(templateContentInput);
+          const thirdActionRow = new ActionRowBuilder().addComponents(actionTypeInput);
+
+          modal.addComponents(firstActionRow, secondActionRow, thirdActionRow);
+          return interaction.showModal(modal);
+        }
+
+        if (action === "edit_msg") {
+          const modal = new ModalBuilder()
+            .setCustomId(`panel_edit_msg_${Date.now()}`)
+            .setTitle("✏️ Editar Mensaje");
+
+          const messageIdInput = new TextInputBuilder()
+            .setCustomId("message_id")
+            .setLabel("ID del Mensaje")
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder("ID del mensaje a editar")
+            .setRequired(true);
+
+          const newContentInput = new TextInputBuilder()
+            .setCustomId("new_content")
+            .setLabel("Nuevo Contenido")
+            .setStyle(TextInputStyle.Paragraph)
+            .setPlaceholder("Escribe el nuevo contenido del mensaje...")
+            .setRequired(true);
+
+          const channelIdInput = new TextInputBuilder()
+            .setCustomId("channel_id")
+            .setLabel("ID del Canal (opcional)")
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder("Deja vacío para canal actual")
+            .setRequired(false);
+
+          const firstActionRow = new ActionRowBuilder().addComponents(messageIdInput);
+          const secondActionRow = new ActionRowBuilder().addComponents(newContentInput);
+          const thirdActionRow = new ActionRowBuilder().addComponents(channelIdInput);
+
+          modal.addComponents(firstActionRow, secondActionRow, thirdActionRow);
+          return interaction.showModal(modal);
+        }
+
+
+        if (action === "nuke") {
+          const modal = new ModalBuilder()
+            .setCustomId(`panel_nuke_${Date.now()}`)
+            .setTitle("🧹 Nuke Canal");
+
+          const confirmInput = new TextInputBuilder()
+            .setCustomId("confirm_nuke")
+            .setLabel("Confirmación")
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder("Escribe 'CONFIRMAR' para proceder")
+            .setRequired(true);
+
+          const reasonInput = new TextInputBuilder()
+            .setCustomId("nuke_reason")
+            .setLabel("Razón del Nuke")
+            .setStyle(TextInputStyle.Paragraph)
+            .setPlaceholder("Explica por qué necesitas nukear este canal...")
+            .setRequired(true);
+
+          const firstActionRow = new ActionRowBuilder().addComponents(confirmInput);
+          const secondActionRow = new ActionRowBuilder().addComponents(reasonInput);
+
+          modal.addComponents(firstActionRow, secondActionRow);
+          return interaction.showModal(modal);
+        }
+
+        if (action === "reduce_perms") {
+          const modal = new ModalBuilder()
+            .setCustomId(`panel_reduce_perms_${Date.now()}`)
+            .setTitle("⬇️ Reducir Permisos");
+
+          const userIdInput = new TextInputBuilder()
+            .setCustomId("user_id")
+            .setLabel("ID del Usuario")
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder("ID del usuario a reducir permisos")
+            .setRequired(true);
+
+          const reasonInput = new TextInputBuilder()
+            .setCustomId("reduce_reason")
+            .setLabel("Razón de la Reducción")
+            .setStyle(TextInputStyle.Paragraph)
+            .setPlaceholder("Explica por qué se reducen los permisos...")
+            .setRequired(true);
+
+          const durationInput = new TextInputBuilder()
+            .setCustomId("reduce_duration")
+            .setLabel("Duración (opcional)")
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder("Ej: 1h, 30m, 1d (vacío = permanente)")
+            .setRequired(false);
+
+          const firstActionRow = new ActionRowBuilder().addComponents(userIdInput);
+          const secondActionRow = new ActionRowBuilder().addComponents(reasonInput);
+          const thirdActionRow = new ActionRowBuilder().addComponents(durationInput);
+
+          modal.addComponents(firstActionRow, secondActionRow, thirdActionRow);
+          return interaction.showModal(modal);
+        }
+
+        if (action === "view_history") {
+          const modal = new ModalBuilder()
+            .setCustomId(`panel_view_history_${Date.now()}`)
+            .setTitle("📋 Ver Historial");
+
+          const userIdInput = new TextInputBuilder()
+            .setCustomId("user_id")
+            .setLabel("ID del Usuario")
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder("ID del usuario para ver historial")
+            .setRequired(true);
+
+          const historyTypeInput = new TextInputBuilder()
+            .setCustomId("history_type")
+            .setLabel("Tipo de Historial")
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder("warns, mutes, bans, all (por defecto: all)")
+            .setRequired(false);
+
+          const limitInput = new TextInputBuilder()
+            .setCustomId("history_limit")
+            .setLabel("Límite de Registros")
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder("Número máximo de registros (por defecto: 10)")
+            .setRequired(false);
+
+          const firstActionRow = new ActionRowBuilder().addComponents(userIdInput);
+          const secondActionRow = new ActionRowBuilder().addComponents(historyTypeInput);
+          const thirdActionRow = new ActionRowBuilder().addComponents(limitInput);
+
+          modal.addComponents(firstActionRow, secondActionRow, thirdActionRow);
+          return interaction.showModal(modal);
+        }
+
+        if (action === "role_manage") {
+          const modal = new ModalBuilder()
+            .setCustomId(`panel_role_manage_${Date.now()}`)
+            .setTitle("👤 Gestionar Roles");
+
+          const userIdInput = new TextInputBuilder()
+            .setCustomId("user_id")
+            .setLabel("ID del Usuario")
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder("ID del usuario para gestionar roles")
+            .setRequired(true);
+
+          const actionTypeInput = new TextInputBuilder()
+            .setCustomId("action_type")
+            .setLabel("Acción")
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder("add o remove")
+            .setRequired(true);
+
+          const roleIdInput = new TextInputBuilder()
+            .setCustomId("role_id")
+            .setLabel("ID del Rol")
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder("ID del rol a agregar/remover")
+            .setRequired(true);
+
+          const reasonInput = new TextInputBuilder()
+            .setCustomId("role_reason")
+            .setLabel("Razón")
+            .setStyle(TextInputStyle.Paragraph)
+            .setPlaceholder("Razón para la gestión de roles...")
+            .setRequired(true);
+
+          const firstActionRow = new ActionRowBuilder().addComponents(userIdInput);
+          const secondActionRow = new ActionRowBuilder().addComponents(actionTypeInput);
+          const thirdActionRow = new ActionRowBuilder().addComponents(roleIdInput);
+          const fourthActionRow = new ActionRowBuilder().addComponents(reasonInput);
+
+          modal.addComponents(firstActionRow, secondActionRow, thirdActionRow, fourthActionRow);
+          return interaction.showModal(modal);
+        }
+
+        if (action === "lock_channel") {
+          const modal = new ModalBuilder()
+            .setCustomId(`panel_lock_channel_${Date.now()}`)
+            .setTitle("🔒 Bloquear Canal");
+
+          const channelIdInput = new TextInputBuilder()
+            .setCustomId("channel_id")
+            .setLabel("ID del Canal (opcional)")
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder("Deja vacío para canal actual")
+            .setRequired(false);
+
+          const reasonInput = new TextInputBuilder()
+            .setCustomId("lock_reason")
+            .setLabel("Razón del Bloqueo")
+            .setStyle(TextInputStyle.Paragraph)
+            .setPlaceholder("Razón para bloquear el canal...")
+            .setRequired(true);
+
+          const durationInput = new TextInputBuilder()
+            .setCustomId("lock_duration")
+            .setLabel("Duración (opcional)")
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder("Ej: 30m, 2h, 1d (vacío = permanente)")
+            .setRequired(false);
+
+          const firstActionRow = new ActionRowBuilder().addComponents(channelIdInput);
+          const secondActionRow = new ActionRowBuilder().addComponents(reasonInput);
+          const thirdActionRow = new ActionRowBuilder().addComponents(durationInput);
+
+          modal.addComponents(firstActionRow, secondActionRow, thirdActionRow);
+          return interaction.showModal(modal);
+        }
+
+        if (action === "block_link") {
+          const modal = new ModalBuilder()
+            .setCustomId(`panel_block_link_${Date.now()}`)
+            .setTitle("🚫 Bloquear Enlaces");
+
+          const userIdInput = new TextInputBuilder()
+            .setCustomId("user_id")
+            .setLabel("ID del Usuario")
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder("ID del usuario a restringir enlaces")
+            .setRequired(true);
+
+          const reasonInput = new TextInputBuilder()
+            .setCustomId("block_reason")
+            .setLabel("Razón del Bloqueo")
+            .setStyle(TextInputStyle.Paragraph)
+            .setPlaceholder("Razón para bloquear enlaces...")
+            .setRequired(true);
+
+          const durationInput = new TextInputBuilder()
+            .setCustomId("block_duration")
+            .setLabel("Duración")
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder("Ej: 30m, 2h, 1d")
+            .setRequired(true);
+
+          const firstActionRow = new ActionRowBuilder().addComponents(userIdInput);
+          const secondActionRow = new ActionRowBuilder().addComponents(reasonInput);
+          const thirdActionRow = new ActionRowBuilder().addComponents(durationInput);
+
+          modal.addComponents(firstActionRow, secondActionRow, thirdActionRow);
+          return interaction.showModal(modal);
+        }
+
+        if (action === "quarantine") {
+          const modal = new ModalBuilder()
+            .setCustomId(`panel_quarantine_${Date.now()}`)
+            .setTitle("☣️ Cuarentena Usuario");
+
+          const userIdInput = new TextInputBuilder()
+            .setCustomId("user_id")
+            .setLabel("ID del Usuario")
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder("ID del usuario a poner en cuarentena")
+            .setRequired(true);
+
+          const reasonInput = new TextInputBuilder()
+            .setCustomId("quarantine_reason")
+            .setLabel("Razón de la Cuarentena")
+            .setStyle(TextInputStyle.Paragraph)
+            .setPlaceholder("Razón para poner en cuarentena...")
+            .setRequired(true);
+
+          const durationInput = new TextInputBuilder()
+            .setCustomId("quarantine_duration")
+            .setLabel("Duración")
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder("Ej: 1h, 6h, 1d, 3d")
+            .setRequired(true);
+
+          const firstActionRow = new ActionRowBuilder().addComponents(userIdInput);
+          const secondActionRow = new ActionRowBuilder().addComponents(reasonInput);
+          const thirdActionRow = new ActionRowBuilder().addComponents(durationInput);
+
+          modal.addComponents(firstActionRow, secondActionRow, thirdActionRow);
+          return interaction.showModal(modal);
+        }
+
+        if (action === "watch_user") {
+          const modal = new ModalBuilder()
+            .setCustomId(`panel_watch_user_${Date.now()}`)
+            .setTitle("👁️ Vigilar Usuario");
+
+          const userIdInput = new TextInputBuilder()
+            .setCustomId("user_id")
+            .setLabel("ID del Usuario")
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder("ID del usuario a vigilar")
+            .setRequired(true);
+
+          const reasonInput = new TextInputBuilder()
+            .setCustomId("watch_reason")
+            .setLabel("Razón de Vigilancia")
+            .setStyle(TextInputStyle.Paragraph)
+            .setPlaceholder("Razón para vigilar al usuario...")
+            .setRequired(true);
+
+          const durationInput = new TextInputBuilder()
+            .setCustomId("watch_duration")
+            .setLabel("Duración")
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder("Ej: 1d, 3d, 1w (vacío = indefinido)")
+            .setRequired(false);
+
+          const alertLevelInput = new TextInputBuilder()
+            .setCustomId("alert_level")
+            .setLabel("Nivel de Alerta")
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder("low, medium, high")
+            .setRequired(true);
+
+          const firstActionRow = new ActionRowBuilder().addComponents(userIdInput);
+          const secondActionRow = new ActionRowBuilder().addComponents(reasonInput);
+          const thirdActionRow = new ActionRowBuilder().addComponents(durationInput);
+          const fourthActionRow = new ActionRowBuilder().addComponents(alertLevelInput);
+
+          modal.addComponents(firstActionRow, secondActionRow, thirdActionRow, fourthActionRow);
+          return interaction.showModal(modal);
+        }
+
+        // Handler para send_embed_channel
+        if (action === "send_embed_channel") {
+          const modal = new ModalBuilder()
+            .setCustomId(`panel_send_embed_${interaction.user.id}`)
+            .setTitle('📢 Enviar Embed a Canal');
+
+          const channelInput = new TextInputBuilder()
+            .setCustomId('channel_id')
+            .setLabel('ID del Canal')
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder('Ingresa el ID del canal donde enviar el embed')
+            .setRequired(true);
+
+          const titleInput = new TextInputBuilder()
+            .setCustomId('embed_title')
+            .setLabel('Título del Embed')
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder('Título del mensaje embed')
+            .setRequired(true);
+
+          const descriptionInput = new TextInputBuilder()
+            .setCustomId('embed_description')
+            .setLabel('Descripción del Embed')
+            .setStyle(TextInputStyle.Paragraph)
+            .setPlaceholder('Contenido del mensaje embed')
+            .setRequired(true);
+
+          const colorInput = new TextInputBuilder()
+            .setCustomId('embed_color')
+            .setLabel('Color del Embed (hex)')
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder('#FF0000 (opcional)')
+            .setRequired(false);
+
+          const footerInput = new TextInputBuilder()
+            .setCustomId('embed_footer')
+            .setLabel('Pie del Embed')
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder('Texto del pie (opcional)')
+            .setRequired(false);
+
+          const firstActionRow = new ActionRowBuilder().addComponents(channelInput);
+          const secondActionRow = new ActionRowBuilder().addComponents(titleInput);
+          const thirdActionRow = new ActionRowBuilder().addComponents(descriptionInput);
+          const fourthActionRow = new ActionRowBuilder().addComponents(colorInput);
+          const fifthActionRow = new ActionRowBuilder().addComponents(footerInput);
+
+          modal.addComponents(firstActionRow, secondActionRow, thirdActionRow, fourthActionRow, fifthActionRow);
+          return interaction.showModal(modal);
         }
       }
 
@@ -910,6 +1372,46 @@ module.exports = (client) => {
         return interaction.reply({ content: `✅ Mute removido a ${member.user.tag}`, ephemeral: true });
       }
 
+      if (interaction.isModalSubmit() && interaction.customId.startsWith("panel_remove_mute_modal_")) {
+        const userId = interaction.fields.getTextInputValue("user_id").trim();
+        const reason = interaction.fields.getTextInputValue("reason") || "No especificada";
+        const guild = interaction.guild;
+        const member = await guild.members.fetch(userId).catch(() => null);
+
+        if (!member) return interaction.reply({ content: "❌ Usuario no encontrado en el servidor.", ephemeral: true });
+
+        // Verificar si el usuario está muteado
+        const muteRole = guild.roles.cache.find(role => role.name === "Muted" || role.name === "Silenciado");
+        if (!muteRole || !member.roles.cache.has(muteRole.id)) {
+          return interaction.reply({ content: "❌ El usuario no está silenciado.", ephemeral: true });
+        }
+
+        try {
+          await member.roles.remove(muteRole, `Mute removido por ${interaction.user.tag} - Razón: ${reason}`);
+          
+          // Log del unmute
+          const logChannel = guild.channels.cache.find(ch => ch.name === "logs" || ch.name === "mod-logs");
+          if (logChannel) {
+            const logEmbed = new EmbedBuilder()
+              .setTitle("🔊 Silencio Removido")
+              .addFields(
+                { name: "Usuario", value: `${member.user.tag} (${member.id})`, inline: true },
+                { name: "Moderador", value: `${interaction.user.tag}`, inline: true },
+                { name: "Razón", value: reason, inline: false }
+              )
+              .setColor(0x00ff00)
+              .setTimestamp();
+            
+            logChannel.send({ embeds: [logEmbed] });
+          }
+
+          return interaction.reply({ content: `✅ Silencio removido a ${member.user.tag}. Razón: ${reason}`, ephemeral: true });
+        } catch (error) {
+          console.error("Error al remover mute:", error);
+          return interaction.reply({ content: "❌ Error al remover el silencio.", ephemeral: true });
+        }
+      }
+
       if (interaction.isModalSubmit() && interaction.customId.startsWith("panel_watch_")) {
         const userId = interaction.fields.getTextInputValue("user_id").trim();
         const durationStr = interaction.fields.getTextInputValue("duration");
@@ -1011,6 +1513,204 @@ module.exports = (client) => {
         return interaction.reply({ content: `✅ Mute de ${member.user.tag} aumentado por ${formatDuration(extraMs)}`, ephemeral: true });
       }
 
+
+      if (interaction.isModalSubmit() && interaction.customId.startsWith("panel_send_embed_")) {
+        const channelId = interaction.fields.getTextInputValue("channel_id").trim();
+        const title = interaction.fields.getTextInputValue("embed_title");
+        const description = interaction.fields.getTextInputValue("embed_description");
+        const colorHex = interaction.fields.getTextInputValue("embed_color");
+        const footer = interaction.fields.getTextInputValue("embed_footer");
+
+        const channel = interaction.guild.channels.cache.get(channelId);
+        if (!channel || !channel.isTextBased()) {
+          return interaction.reply({ content: "❌ Canal no encontrado o no es un canal de texto.", ephemeral: true });
+        }
+
+        const embed = new EmbedBuilder()
+          .setTitle(title)
+          .setDescription(description)
+          .setTimestamp();
+
+        // Configurar color si se proporcionó
+        if (colorHex && colorHex.match(/^#[0-9A-Fa-f]{6}$/)) {
+          embed.setColor(colorHex);
+        } else {
+          embed.setColor(0x00ff00); // Verde por defecto
+        }
+
+        // Configurar footer si se proporcionó
+        if (footer) {
+          embed.setFooter({ text: footer });
+        }
+
+        try {
+          await channel.send({ embeds: [embed] });
+          return interaction.reply({ content: `✅ Embed enviado exitosamente a ${channel}`, ephemeral: true });
+        } catch (error) {
+          console.error("Error enviando embed:", error);
+          return interaction.reply({ content: "❌ Error al enviar el embed. Verifica los permisos del bot.", ephemeral: true });
+        }
+      }
+
+      if (interaction.isModalSubmit() && interaction.customId.startsWith("panel_role_manage_")) {
+        const userId = interaction.fields.getTextInputValue("user_id").trim();
+        const actionType = interaction.fields.getTextInputValue("action_type").trim().toLowerCase();
+        const roleId = interaction.fields.getTextInputValue("role_id").trim();
+
+        if (!["add", "remove"].includes(actionType)) {
+          return interaction.reply({ content: "❌ La acción debe ser 'add' o 'remove'.", ephemeral: true });
+        }
+
+        const targetMember = interaction.guild.members.cache.get(userId);
+        if (!targetMember) {
+          return interaction.reply({ content: "❌ Usuario no encontrado en el servidor.", ephemeral: true });
+        }
+
+        const role = interaction.guild.roles.cache.get(roleId);
+        if (!role) {
+          return interaction.reply({ content: "❌ Rol no encontrado.", ephemeral: true });
+        }
+
+        try {
+          if (actionType === "add") {
+            await targetMember.roles.add(role);
+            return interaction.reply({ content: `✅ Rol ${role.name} añadido a ${targetMember.user.tag}`, ephemeral: true });
+          } else {
+            await targetMember.roles.remove(role);
+            return interaction.reply({ content: `✅ Rol ${role.name} removido de ${targetMember.user.tag}`, ephemeral: true });
+          }
+        } catch (error) {
+          console.error("Error gestionando rol:", error);
+          return interaction.reply({ content: "❌ Error al gestionar el rol. Verifica los permisos del bot.", ephemeral: true });
+        }
+      }
+
+      if (interaction.isModalSubmit() && interaction.customId.startsWith("panel_lock_channel_")) {
+        const channelId = interaction.fields.getTextInputValue("channel_id").trim();
+        const reason = interaction.fields.getTextInputValue("lock_reason");
+
+        let targetChannel;
+        if (channelId) {
+          targetChannel = interaction.guild.channels.cache.get(channelId);
+          if (!targetChannel) {
+            return interaction.reply({ content: "❌ Canal no encontrado.", ephemeral: true });
+          }
+        } else {
+          targetChannel = interaction.channel;
+        }
+
+        if (!targetChannel.isTextBased()) {
+          return interaction.reply({ content: "❌ Solo se pueden bloquear canales de texto.", ephemeral: true });
+        }
+
+        try {
+          await targetChannel.permissionOverwrites.edit(interaction.guild.roles.everyone, {
+            SendMessages: false,
+            AddReactions: false,
+            CreatePublicThreads: false,
+            CreatePrivateThreads: false
+          });
+
+          const embed = new EmbedBuilder()
+            .setTitle("🔒 Canal Bloqueado")
+            .setDescription(`**Razón:** ${reason}`)
+            .setColor(0xff0000)
+            .setTimestamp()
+            .setFooter({ text: `Bloqueado por ${interaction.user.tag}` });
+
+          await targetChannel.send({ embeds: [embed] });
+          return interaction.reply({ content: `✅ Canal ${targetChannel} bloqueado exitosamente.`, ephemeral: true });
+        } catch (error) {
+          console.error("Error bloqueando canal:", error);
+          return interaction.reply({ content: "❌ Error al bloquear el canal. Verifica los permisos del bot.", ephemeral: true });
+        }
+      }
+
+      if (interaction.isModalSubmit() && interaction.customId.startsWith("panel_block_link_")) {
+        const userId = interaction.fields.getTextInputValue("user_id").trim();
+        const reason = interaction.fields.getTextInputValue("block_reason");
+
+        const targetMember = interaction.guild.members.cache.get(userId);
+        if (!targetMember) {
+          return interaction.reply({ content: "❌ Usuario no encontrado en el servidor.", ephemeral: true });
+        }
+
+        // Crear o encontrar el rol de "Sin Enlaces"
+        let noLinksRole = interaction.guild.roles.cache.find(role => role.name === "Sin Enlaces");
+        if (!noLinksRole) {
+          try {
+            noLinksRole = await interaction.guild.roles.create({
+              name: "Sin Enlaces",
+              color: 0x8B0000,
+              reason: "Rol automático para bloquear enlaces"
+            });
+          } catch (error) {
+            console.error("Error creando rol Sin Enlaces:", error);
+            return interaction.reply({ content: "❌ Error al crear el rol necesario.", ephemeral: true });
+          }
+        }
+
+        try {
+          await targetMember.roles.add(noLinksRole);
+          
+          const embed = new EmbedBuilder()
+            .setTitle("🚫 Enlaces Bloqueados")
+            .setDescription(`**Usuario:** ${targetMember.user.tag}\n**Razón:** ${reason}`)
+            .setColor(0xff0000)
+            .setTimestamp()
+            .setFooter({ text: `Bloqueado por ${interaction.user.tag}` });
+
+          await interaction.channel.send({ embeds: [embed] });
+          return interaction.reply({ content: `✅ Enlaces bloqueados para ${targetMember.user.tag}`, ephemeral: true });
+        } catch (error) {
+          console.error("Error bloqueando enlaces:", error);
+          return interaction.reply({ content: "❌ Error al bloquear enlaces. Verifica los permisos del bot.", ephemeral: true });
+        }
+      }
+
+      // Handler para panel_quarantine_
+      if (interaction.isModalSubmit() && interaction.customId.startsWith("panel_quarantine_")) {
+        const userId = interaction.fields.getTextInputValue("user_id").trim();
+        const reason = interaction.fields.getTextInputValue("quarantine_reason");
+
+        const targetMember = interaction.guild.members.cache.get(userId);
+        if (!targetMember) {
+          return interaction.reply({ content: "❌ Usuario no encontrado en el servidor.", ephemeral: true });
+        }
+
+        // Crear o encontrar el rol de "Cuarentena"
+        let quarantineRole = interaction.guild.roles.cache.find(role => role.name === "Cuarentena");
+        if (!quarantineRole) {
+          try {
+            quarantineRole = await interaction.guild.roles.create({
+              name: "Cuarentena",
+              color: 0x800080,
+              permissions: [],
+              reason: "Rol automático para cuarentena de usuarios"
+            });
+          } catch (error) {
+            console.error("Error creando rol Cuarentena:", error);
+            return interaction.reply({ content: "❌ Error al crear el rol necesario.", ephemeral: true });
+          }
+        }
+
+        try {
+          await targetMember.roles.add(quarantineRole);
+          
+          const embed = new EmbedBuilder()
+            .setTitle("🔒 Usuario en Cuarentena")
+            .setDescription(`**Usuario:** ${targetMember.user.tag}\n**Razón:** ${reason}`)
+            .setColor(0x800080)
+            .setTimestamp()
+            .setFooter({ text: `Puesto en cuarentena por ${interaction.user.tag}` });
+
+          await interaction.channel.send({ embeds: [embed] });
+          return interaction.reply({ content: `✅ ${targetMember.user.tag} ha sido puesto en cuarentena`, ephemeral: true });
+        } catch (error) {
+          console.error("Error aplicando cuarentena:", error);
+          return interaction.reply({ content: "❌ Error al aplicar cuarentena. Verifica los permisos del bot.", ephemeral: true });
+        }
+      }
       if (!interaction.isChatInputCommand()) return;
 
       const { commandName, options, member, guild } = interaction;
@@ -1028,49 +1728,138 @@ module.exports = (client) => {
           return interaction.reply({ content: "❌ Solo los **Head Admin** pueden desplegar el panel de herramientas.", ephemeral: true });
         }
 
-        const embed = new EmbedBuilder()
-          .setTitle("🛡️ Panel de Herramientas Staff")
-          .setDescription("Panel de moderación y herramientas para el equipo de staff.\n\n" +
-            "**Helpers:** Warn, Mute, DM, Limpiar Chat (50), Nota, Historial, Plantillas, Unmute\n" +
-            "**Moderadores:** Todo lo anterior + Ban, Timeout, Nuke, Restringir, Roles, Silenciar Canal, Bloquear Link, Vigilar\n" +
-            "**Head Admin / Admin:** Acceso total incluyendo AutoMod Toggle y Quarantine")
-          .setColor(0x5865F2)
+        // Enviar imagen como mensaje separado primero
+        // Confirmación ephemeral para el usuario que ejecutó el comando
+        await interaction.reply({
+          content: "✅ **Panel de Staff Tools desplegado correctamente**\nEl panel es visible para todos los miembros del servidor.",
+          ephemeral: true
+        });
+
+        // Enviar imagen como mensaje separado después
+        await interaction.followUp({
+          content: "https://cdn.discordapp.com/attachments/1231000158234476658/1457133379731456063/58_sin_titulo_20260103160731.png?ex=695ae4b5&is=69599335&hm=e5b5be166dd283ab8312b4922e48540bf53e461cefd2c60e0bcd248688429b75",
+          ephemeral: false
+        });
+
+        // CATEGORÍA 1: MODERACIÓN BÁSICA
+        const moderationEmbed = new EmbedBuilder()
+          .setTitle("🛡️ Moderación Básica")
+          .setDescription("**Acciones disciplinarias y gestión de usuarios**\n\n" +
+            "• **Helpers+:** Warn, Mute, Unmute\n" +
+            "• **Moderadores+:** Ban, Timeout")
+          .setColor(0xFF6B6B)
+          .setThumbnail("https://cdn.discordapp.com/attachments/1231000158234476658/1457133379731456063/58_sin_titulo_20260103160731.png?ex=695ae4b5&is=69599335&hm=e5b5be166dd283ab8312b4922e48540bf53e461cefd2c60e0bcd248688429b75")
           .setFooter({ text: "SirgioBOT - Panel Staff" })
           .setTimestamp();
 
-        const row1 = new ActionRowBuilder().addComponents(
+        const moderationRow = new ActionRowBuilder().addComponents(
           new ButtonBuilder().setCustomId("panel_warn").setLabel("⚠️ Warn").setStyle(ButtonStyle.Secondary),
           new ButtonBuilder().setCustomId("panel_mute").setLabel("🔇 Mute").setStyle(ButtonStyle.Primary),
+          new ButtonBuilder().setCustomId("panel_remove_mute").setLabel("🔊 Unmute").setStyle(ButtonStyle.Success),
           new ButtonBuilder().setCustomId("panel_ban").setLabel("🔨 Ban").setStyle(ButtonStyle.Danger),
-          new ButtonBuilder().setCustomId("panel_timeout").setLabel("⌛ Timeout").setStyle(ButtonStyle.Secondary),
-          new ButtonBuilder().setCustomId("panel_nuke").setLabel("🧹 Nuke").setStyle(ButtonStyle.Danger)
+          new ButtonBuilder().setCustomId("panel_timeout").setLabel("⌛ Timeout").setStyle(ButtonStyle.Secondary)
         );
 
-        const row2 = new ActionRowBuilder().addComponents(
+        // CATEGORÍA 2: GESTIÓN DE CANALES
+        const channelEmbed = new EmbedBuilder()
+          .setTitle("📢 Gestión de Canales")
+          .setDescription("**Herramientas para administrar canales y mensajes**\n\n" +
+            "• **Helpers+:** Limpiar Chat (50 msgs), Editar Mensajes\n" +
+            "• **Moderadores+:** Nuke, Silenciar Canal, Bloquear Links")
+          .setColor(0x4ECDC4)
+          .setThumbnail("https://cdn.discordapp.com/attachments/1231000158234476658/1457133379731456063/58_sin_titulo_20260103160731.png?ex=695ae4b5&is=69599335&hm=e5b5be166dd283ab8312b4922e48540bf53e461cefd2c60e0bcd248688429b75")
+          .setFooter({ text: "SirgioBOT - Panel Staff" })
+          .setTimestamp();
+
+        const channelRow = new ActionRowBuilder().addComponents(
           new ButtonBuilder().setCustomId("panel_clear").setLabel("🧼 Limpiar Chat").setStyle(ButtonStyle.Primary),
           new ButtonBuilder().setCustomId("panel_edit_msg").setLabel("✏️ Editar Msg").setStyle(ButtonStyle.Secondary),
+          new ButtonBuilder().setCustomId("panel_nuke").setLabel("🧹 Nuke").setStyle(ButtonStyle.Danger),
+          new ButtonBuilder().setCustomId("panel_lock_channel").setLabel("🔇 Silenciar Canal").setStyle(ButtonStyle.Danger),
+          new ButtonBuilder().setCustomId("panel_block_link").setLabel("🔗 Bloquear Link").setStyle(ButtonStyle.Danger)
+        );
+
+        // CATEGORÍA 3: COMUNICACIÓN
+        const communicationEmbed = new EmbedBuilder()
+          .setTitle("💬 Comunicación")
+          .setDescription("**Herramientas de comunicación y plantillas**\n\n" +
+            "• **Helpers+:** DM, Plantillas de Warn\n" +
+            "• **Moderadores+:** Enviar Embeds personalizados")
+          .setColor(0x45B7D1)
+          .setThumbnail("https://cdn.discordapp.com/attachments/1231000158234476658/1457133379731456063/58_sin_titulo_20260103160731.png?ex=695ae4b5&is=69599335&hm=e5b5be166dd283ab8312b4922e48540bf53e461cefd2c60e0bcd248688429b75")
+          .setFooter({ text: "SirgioBOT - Panel Staff" })
+          .setTimestamp();
+
+        const communicationRow = new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId("panel_send_dm").setLabel("💬 DM").setStyle(ButtonStyle.Primary),
+          new ButtonBuilder().setCustomId("panel_warn_template").setLabel("⚠️ Plantillas").setStyle(ButtonStyle.Secondary),
+          new ButtonBuilder().setCustomId("panel_send_embed_channel").setLabel("📊 Embed").setStyle(ButtonStyle.Secondary)
+        );
+
+        // CATEGORÍA 4: ADMINISTRACIÓN AVANZADA
+        const adminEmbed = new EmbedBuilder()
+          .setTitle("⚙️ Administración Avanzada")
+          .setDescription("**Herramientas administrativas y de monitoreo**\n\n" +
+            "• **Moderadores+:** Gestión de Roles, Vigilar Usuarios, Restringir Permisos\n" +
+            "• **Head Admin:** AutoMod Toggle, Quarantine")
+          .setColor(0x9B59B6)
+          .setThumbnail("https://cdn.discordapp.com/attachments/1231000158234476658/1457133379731456063/58_sin_titulo_20260103160731.png?ex=695ae4b5&is=69599335&hm=e5b5be166dd283ab8312b4922e48540bf53e461cefd2c60e0bcd248688429b75")
+          .setFooter({ text: "SirgioBOT - Panel Staff" })
+          .setTimestamp();
+
+        const adminRow1 = new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId("panel_role_manage").setLabel("🎭 Roles").setStyle(ButtonStyle.Primary),
+          new ButtonBuilder().setCustomId("panel_watch_user").setLabel("👁️ Vigilar").setStyle(ButtonStyle.Secondary),
           new ButtonBuilder().setCustomId("panel_reduce_perms").setLabel("🔒 Restringir").setStyle(ButtonStyle.Danger),
+          new ButtonBuilder().setCustomId("panel_automod_toggle").setLabel("⚙️ AutoMod").setStyle(ButtonStyle.Success),
+          new ButtonBuilder().setCustomId("panel_quarantine").setLabel("☣️ Quarantine").setStyle(ButtonStyle.Danger)
+        );
+
+        // CATEGORÍA 5: INFORMACIÓN Y NOTAS
+        const infoEmbed = new EmbedBuilder()
+          .setTitle("📊 Información y Registros")
+          .setDescription("**Herramientas de seguimiento y documentación**\n\n" +
+            "• **Helpers+:** Añadir Notas, Ver Historial de usuarios")
+          .setColor(0xF39C12)
+          .setThumbnail("https://cdn.discordapp.com/attachments/1231000158234476658/1457133379731456063/58_sin_titulo_20260103160731.png?ex=695ae4b5&is=69599335&hm=e5b5be166dd283ab8312b4922e48540bf53e461cefd2c60e0bcd248688429b75")
+          .setFooter({ text: "SirgioBOT - Panel Staff" })
+          .setTimestamp();
+
+        const infoRow = new ActionRowBuilder().addComponents(
           new ButtonBuilder().setCustomId("panel_add_note").setLabel("📝 Nota").setStyle(ButtonStyle.Secondary),
           new ButtonBuilder().setCustomId("panel_view_history").setLabel("📊 Historial").setStyle(ButtonStyle.Primary)
         );
 
-        const row3 = new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setCustomId("panel_role_manage").setLabel("🎭 Roles").setStyle(ButtonStyle.Primary),
-          new ButtonBuilder().setCustomId("panel_lock_channel").setLabel("🔇 Silenciar Canal").setStyle(ButtonStyle.Danger),
-          new ButtonBuilder().setCustomId("panel_warn_template").setLabel("⚠️ Plantillas").setStyle(ButtonStyle.Secondary),
-          new ButtonBuilder().setCustomId("panel_block_link").setLabel("🔗 Bloquear Link").setStyle(ButtonStyle.Danger),
-          new ButtonBuilder().setCustomId("panel_automod_toggle").setLabel("⚙️ AutoMod").setStyle(ButtonStyle.Success)
-        );
-
-        const row4 = new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setCustomId("panel_quarantine").setLabel("☣️ Quarantine").setStyle(ButtonStyle.Danger),
-          new ButtonBuilder().setCustomId("panel_watch_user").setLabel("👁️ Vigilar").setStyle(ButtonStyle.Secondary),
-          new ButtonBuilder().setCustomId("panel_remove_mute").setLabel("🔊 Unmute").setStyle(ButtonStyle.Success),
-          new ButtonBuilder().setCustomId("panel_send_dm").setLabel("💬 DM").setStyle(ButtonStyle.Primary),
-          new ButtonBuilder().setCustomId("panel_send_embed_channel").setLabel("📊 Embed").setStyle(ButtonStyle.Secondary)
-        );
-
-        return interaction.reply({ embeds: [embed], components: [row1, row2, row3, row4], ephemeral: false });
+        // Enviar todos los embeds categorizados
+        await interaction.followUp({ 
+          embeds: [moderationEmbed], 
+          components: [moderationRow], 
+          ephemeral: false 
+        });
+        
+        await interaction.followUp({ 
+          embeds: [channelEmbed], 
+          components: [channelRow], 
+          ephemeral: false 
+        });
+        
+        await interaction.followUp({ 
+          embeds: [communicationEmbed], 
+          components: [communicationRow], 
+          ephemeral: false 
+        });
+        
+        await interaction.followUp({ 
+          embeds: [adminEmbed], 
+          components: [adminRow1], 
+          ephemeral: false 
+        });
+        
+        return interaction.followUp({ 
+          embeds: [infoEmbed], 
+          components: [infoRow], 
+          ephemeral: false 
+        });
       }
 
       if (commandName === "sancion") {
