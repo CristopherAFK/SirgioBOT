@@ -6,6 +6,7 @@ require("dotenv").config();
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
+const { connectDB } = require('./database');
 const {
   Client,
   GatewayIntentBits,
@@ -33,6 +34,15 @@ const client = new Client({
     GatewayIntentBits.GuildMessageReactions
   ],
   partials: [Partials.Channel, Partials.Message, Partials.Reaction]
+});
+
+// Conectar a la base de datos
+connectDB().then(connected => {
+  if (connected) {
+    console.log("🗄️ Base de datos inicializada correctamente.");
+  } else {
+    console.warn("⚠️ Continuando con almacenamiento local.");
+  }
 });
 
 require('./automod')(client);
