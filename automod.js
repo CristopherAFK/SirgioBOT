@@ -581,18 +581,26 @@ module.exports = (client) => {
 
       if (interaction.isButton() && interaction.customId.startsWith("panel_")) {
         const action = interaction.customId.replace("panel_", "");
-        
-        if (!isStaff(interaction.member)) {
+        const member = interaction.member;
+        const isModPlus = member.roles.cache.has(MOD_ROLE_ID) || member.roles.cache.has(ADMIN_ROLE_ID) || member.roles.cache.has(HEAD_ADMIN_ROLE_ID);
+        const isAdminPlus = member.roles.cache.has(ADMIN_ROLE_ID) || member.roles.cache.has(HEAD_ADMIN_ROLE_ID);
+
+        if (!isStaff(member)) {
           return interaction.reply({ content: "❌ Solo el staff puede usar este panel.", ephemeral: true });
         }
 
-        if (action === "warn" || action === "mute" || action === "ban") {
-          if (action === "ban") {
-            if (!canBan(interaction.member)) {
-              return interaction.reply({ content: "❌ Los Helpers no pueden banear. Solo Moderadores y superiores.", ephemeral: true });
-            }
-          }
+        // --- Lógica de permisos por botón ---
+        const modActions = ["ban", "timeout", "nuke", "reduce_perms", "role_manage", "lock_channel", "block_link", "watch_user", "quarantine"];
+        const adminActions = ["automod_toggle"];
 
+        if (modActions.includes(action) && !isModPlus) {
+          return interaction.reply({ content: "❌ Esta acción requiere rango **Moderador** o superior.", ephemeral: true });
+        }
+        if (adminActions.includes(action) && !isAdminPlus) {
+          return interaction.reply({ content: "❌ Esta acción requiere rango **Administrador** o superior.", ephemeral: true });
+        }
+
+        if (action === "warn" || action === "mute" || action === "ban" || action === "timeout") {
           const modal = new ModalBuilder()
             .setCustomId(`panel_sancion_${action}_${Date.now()}`)
             .setTitle(`Aplicar ${action.toUpperCase()}`);
@@ -612,9 +620,9 @@ module.exports = (client) => {
 
           const durationInput = new TextInputBuilder()
             .setCustomId("duration")
-            .setLabel("Duración (solo mute/ban)")
+            .setLabel("Duración")
             .setStyle(TextInputStyle.Short)
-            .setRequired(false)
+            .setRequired(action !== "warn")
             .setPlaceholder("Ej: 10m, 1h, 2d");
 
           modal.addComponents(
@@ -626,47 +634,26 @@ module.exports = (client) => {
           return interaction.showModal(modal);
         }
 
-        if (action === "send_message") {
+        if (action === "clear") {
           const modal = new ModalBuilder()
-            .setCustomId(`panel_message_${Date.now()}`)
-            .setTitle("Enviar mensaje a canal");
+            .setCustomId(`panel_clear_${Date.now()}`)
+            .setTitle("Limpiar Chat");
 
-          const channelInput = new TextInputBuilder()
-            .setCustomId("channel_id")
-            .setLabel("ID del canal")
+          const amountInput = new TextInputBuilder()
+            .setCustomId("amount")
+            .setLabel("Cantidad de mensajes")
             .setStyle(TextInputStyle.Short)
-            .setRequired(true);
+            .setRequired(true)
+            .setPlaceholder("Máximo 100");
 
-          const messageInput = new TextInputBuilder()
-            .setCustomId("message")
-            .setLabel("Mensaje")
-            .setStyle(TextInputStyle.Paragraph)
-            .setRequired(true);
-
-          const embedInput = new TextInputBuilder()
-            .setCustomId("as_embed")
-            .setLabel("¿Como embed? (si/no)")
-            .setStyle(TextInputStyle.Short)
-            .setRequired(false)
-            .setPlaceholder("no");
-
-          modal.addComponents(
-            new ActionRowBuilder().addComponents(channelInput),
-            new ActionRowBuilder().addComponents(messageInput),
-            new ActionRowBuilder().addComponents(embedInput)
-          );
-
+          modal.addComponents(new ActionRowBuilder().addComponents(amountInput));
           return interaction.showModal(modal);
         }
 
-        if (action === "send_dm") {
-          if (!interaction.member.roles.cache.has(MOD_ROLE_ID) && !interaction.member.roles.cache.has(HEAD_ADMIN_ROLE_ID)) {
-            return interaction.reply({ content: "❌ Esta acción solo está disponible para Moderadores y Head Admins.", ephemeral: true });
-          }
-          
+        if (action === "add_note") {
           const modal = new ModalBuilder()
-            .setCustomId(`panel_dm_${Date.now()}`)
-            .setTitle("Enviar DM a usuario");
+            .setCustomId(`panel_note_${Date.now()}`)
+            .setTitle("Añadir Nota a Usuario");
 
           const userInput = new TextInputBuilder()
             .setCustomId("user_id")
@@ -674,128 +661,27 @@ module.exports = (client) => {
             .setStyle(TextInputStyle.Short)
             .setRequired(true);
 
-          const messageInput = new TextInputBuilder()
-            .setCustomId("message")
-            .setLabel("Mensaje")
+          const noteInput = new TextInputBuilder()
+            .setCustomId("note")
+            .setLabel("Comentario interno")
             .setStyle(TextInputStyle.Paragraph)
             .setRequired(true);
 
           modal.addComponents(
             new ActionRowBuilder().addComponents(userInput),
-            new ActionRowBuilder().addComponents(messageInput)
+            new ActionRowBuilder().addComponents(noteInput)
           );
-
           return interaction.showModal(modal);
         }
 
-        if (action === "send_embed_channel") {
-          if (!interaction.member.roles.cache.has(MOD_ROLE_ID) && !interaction.member.roles.cache.has(HEAD_ADMIN_ROLE_ID)) {
-            return interaction.reply({ content: "❌ Esta acción solo está disponible para Moderadores y Head Admins.", ephemeral: true });
-          }
-          
-          const modal = new ModalBuilder()
-            .setCustomId(`panel_embed_${Date.now()}`)
-            .setTitle("Enviar embed a canal");
-
-          const channelInput = new TextInputBuilder()
-            .setCustomId("channel_id")
-            .setLabel("ID del canal")
-            .setStyle(TextInputStyle.Short)
-            .setRequired(true);
-
-          const titleInput = new TextInputBuilder()
-            .setCustomId("title")
-            .setLabel("Título del embed")
-            .setStyle(TextInputStyle.Short)
-            .setRequired(true);
-
-          const descInput = new TextInputBuilder()
-            .setCustomId("description")
-            .setLabel("Descripción")
-            .setStyle(TextInputStyle.Paragraph)
-            .setRequired(true);
-
-          modal.addComponents(
-            new ActionRowBuilder().addComponents(channelInput),
-            new ActionRowBuilder().addComponents(titleInput),
-            new ActionRowBuilder().addComponents(descInput)
-          );
-
-          return interaction.showModal(modal);
+        if (action === "automod_toggle") {
+          automodEnabled = !automodEnabled;
+          return interaction.reply({ content: `⚙️ AutoMod ha sido ${automodEnabled ? "**activado** ✅" : "**desactivado** ❌"}.`, ephemeral: true });
         }
 
-        if (action === "remove_mute") {
-          const modal = new ModalBuilder()
-            .setCustomId(`panel_unmute_${Date.now()}`)
-            .setTitle("Remover Mute");
-
-          const userInput = new TextInputBuilder()
-            .setCustomId("user_id")
-            .setLabel("ID del usuario")
-            .setStyle(TextInputStyle.Short)
-            .setRequired(true);
-
-          modal.addComponents(new ActionRowBuilder().addComponents(userInput));
-          return interaction.showModal(modal);
-        }
-
-        if (action === "watch_user") {
-          if (!interaction.member.roles.cache.has(MOD_ROLE_ID) && !interaction.member.roles.cache.has(HEAD_ADMIN_ROLE_ID)) {
-            return interaction.reply({ content: "❌ Esta acción solo está disponible para Moderadores y Head Admins.", ephemeral: true });
-          }
-          
-          const modal = new ModalBuilder()
-            .setCustomId(`panel_watch_${Date.now()}`)
-            .setTitle("Vigilar Usuario");
-
-          const userInput = new TextInputBuilder()
-            .setCustomId("user_id")
-            .setLabel("ID del usuario")
-            .setStyle(TextInputStyle.Short)
-            .setRequired(true);
-
-          const durationInput = new TextInputBuilder()
-            .setCustomId("duration")
-            .setLabel("Duración (ej: 1h, 2d, o 0 para indefinida)")
-            .setStyle(TextInputStyle.Short)
-            .setRequired(true);
-
-          modal.addComponents(
-            new ActionRowBuilder().addComponents(userInput),
-            new ActionRowBuilder().addComponents(durationInput)
-          );
-
-          return interaction.showModal(modal);
-        }
-
-        if (action === "increase_mute") {
-          if (!interaction.member.roles.cache.has(MOD_ROLE_ID) && !interaction.member.roles.cache.has(HEAD_ADMIN_ROLE_ID)) {
-            return interaction.reply({ content: "❌ Esta acción solo está disponible para Moderadores y Head Admins.", ephemeral: true });
-          }
-          
-          const modal = new ModalBuilder()
-            .setCustomId(`panel_increase_mute_${Date.now()}`)
-            .setTitle("Aumentar tiempo de Mute");
-
-          const userInput = new TextInputBuilder()
-            .setCustomId("user_id")
-            .setLabel("ID del usuario")
-            .setLabel("ID del usuario")
-            .setStyle(TextInputStyle.Short)
-            .setRequired(true);
-
-          const timeInput = new TextInputBuilder()
-            .setCustomId("extra_time")
-            .setLabel("Tiempo adicional (ej: 10m, 1h, 2d)")
-            .setStyle(TextInputStyle.Short)
-            .setRequired(true);
-
-          modal.addComponents(
-            new ActionRowBuilder().addComponents(userInput),
-            new ActionRowBuilder().addComponents(timeInput)
-          );
-
-          return interaction.showModal(modal);
+        // Respuesta genérica para botones sin modal implementado aún para no romper el flujo
+        if (["nuke", "edit_msg", "reduce_perms", "view_history", "role_manage", "lock_channel", "warn_template", "block_link", "quarantine", "watch_user", "remove_mute", "send_dm", "send_embed_channel"].includes(action)) {
+          return interaction.reply({ content: `🛠️ La herramienta **${action}** está siendo configurada para este panel.`, ephemeral: true });
         }
       }
 
