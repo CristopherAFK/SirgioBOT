@@ -461,7 +461,6 @@ module.exports = (client) => {
       console.error("Error registrando comandos:", err);
     }
   });
-  });
 
   client.on("interactionCreate", async (interaction) => {
     try {
