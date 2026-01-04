@@ -1709,6 +1709,171 @@ module.exports = (client) => {
           return interaction.reply({ content: "❌ Error al aplicar cuarentena. Verifica los permisos del bot.", ephemeral: true });
         }
       }
+
+      // Handler para panel_warn_template_modal
+      if (interaction.isModalSubmit() && interaction.customId === "panel_warn_template_modal") {
+        const templateName = interaction.fields.getTextInputValue("template_name").trim();
+        const templateContent = interaction.fields.getTextInputValue("template_content").trim();
+        const actionType = interaction.fields.getTextInputValue("action_type").trim().toLowerCase();
+
+        const embed = new EmbedBuilder()
+          .setTitle("⚠️ Gestión de Plantillas de Advertencia")
+          .setColor(0xFFFF00)
+          .setTimestamp()
+          .setFooter({ text: `Acción realizada por ${interaction.user.tag}` });
+
+        if (actionType === "crear") {
+          embed.setDescription(`**Plantilla creada:**\n**Nombre:** ${templateName}\n**Contenido:** ${templateContent}\n\n*Nota: Esta funcionalidad se integrará con la base de datos en futuras actualizaciones.*`);
+        } else if (actionType === "listar") {
+          embed.setDescription("**Plantillas disponibles:**\n• spam\n• toxicidad\n• flood\n• lenguaje inapropiado\n\n*Nota: Lista de ejemplo. Se integrará con base de datos.*");
+        } else {
+          embed.setDescription(`**Acción:** ${actionType}\n**Plantilla:** ${templateName}\n\n*Funcionalidad en desarrollo.*`);
+        }
+
+        await interaction.channel.send({ embeds: [embed] });
+        return interaction.reply({ content: `✅ Plantilla "${templateName}" procesada correctamente`, ephemeral: true });
+      }
+
+      // Handler para panel_edit_msg
+      if (interaction.isModalSubmit() && interaction.customId.startsWith("panel_edit_msg_")) {
+        const messageId = interaction.fields.getTextInputValue("message_id").trim();
+        const newContent = interaction.fields.getTextInputValue("new_content").trim();
+        const channelId = interaction.fields.getTextInputValue("channel_id").trim();
+
+        const targetChannel = channelId ? interaction.guild.channels.cache.get(channelId) : interaction.channel;
+        if (!targetChannel) {
+          return interaction.reply({ content: "❌ Canal no encontrado.", ephemeral: true });
+        }
+
+        try {
+          const message = await targetChannel.messages.fetch(messageId);
+          await message.edit(newContent);
+
+          const embed = new EmbedBuilder()
+            .setTitle("✏️ Mensaje Editado")
+            .setDescription(`**Canal:** ${targetChannel}\n**Mensaje ID:** ${messageId}\n**Nuevo contenido:** ${newContent.substring(0, 100)}${newContent.length > 100 ? '...' : ''}`)
+            .setColor(0x00FF00)
+            .setTimestamp()
+            .setFooter({ text: `Editado por ${interaction.user.tag}` });
+
+          await interaction.channel.send({ embeds: [embed] });
+          return interaction.reply({ content: "✅ Mensaje editado correctamente", ephemeral: true });
+        } catch (error) {
+          console.error("Error editando mensaje:", error);
+          return interaction.reply({ content: "❌ Error al editar el mensaje. Verifica el ID y permisos.", ephemeral: true });
+        }
+      }
+
+      // Handler para panel_nuke
+      if (interaction.isModalSubmit() && interaction.customId.startsWith("panel_nuke_")) {
+        const channelId = interaction.fields.getTextInputValue("channel_id").trim();
+        const confirmText = interaction.fields.getTextInputValue("confirm_text").trim();
+
+        if (confirmText.toLowerCase() !== "confirmar") {
+          return interaction.reply({ content: "❌ Debes escribir 'confirmar' para proceder con el nuke.", ephemeral: true });
+        }
+
+        const targetChannel = channelId ? interaction.guild.channels.cache.get(channelId) : interaction.channel;
+        if (!targetChannel) {
+          return interaction.reply({ content: "❌ Canal no encontrado.", ephemeral: true });
+        }
+
+        try {
+          const channelName = targetChannel.name;
+          const channelPosition = targetChannel.position;
+          const channelParent = targetChannel.parent;
+          const channelPermissions = targetChannel.permissionOverwrites.cache;
+
+          await targetChannel.delete();
+          const newChannel = await interaction.guild.channels.create({
+            name: channelName,
+            type: targetChannel.type,
+            parent: channelParent,
+            position: channelPosition,
+            permissionOverwrites: channelPermissions
+          });
+
+          const embed = new EmbedBuilder()
+            .setTitle("🧹 Canal Nukeado")
+            .setDescription(`Canal recreado exitosamente por ${interaction.user.tag}`)
+            .setColor(0xFF0000)
+            .setTimestamp();
+
+          await newChannel.send({ embeds: [embed] });
+          return interaction.reply({ content: "✅ Canal nukeado correctamente", ephemeral: true });
+        } catch (error) {
+          console.error("Error nukeando canal:", error);
+          return interaction.reply({ content: "❌ Error al nukear el canal. Verifica los permisos del bot.", ephemeral: true });
+        }
+      }
+
+      // Handler para panel_reduce_perms
+      if (interaction.isModalSubmit() && interaction.customId.startsWith("panel_reduce_perms_")) {
+        const userId = interaction.fields.getTextInputValue("user_id").trim();
+        const reason = interaction.fields.getTextInputValue("reduce_reason").trim();
+        const duration = interaction.fields.getTextInputValue("reduce_duration").trim();
+
+        const targetMember = interaction.guild.members.cache.get(userId);
+        if (!targetMember) {
+          return interaction.reply({ content: "❌ Usuario no encontrado en el servidor.", ephemeral: true });
+        }
+
+        try {
+          // Crear o encontrar rol de permisos reducidos
+          let restrictedRole = interaction.guild.roles.cache.find(role => role.name === "Permisos Reducidos");
+          if (!restrictedRole) {
+            restrictedRole = await interaction.guild.roles.create({
+              name: "Permisos Reducidos",
+              color: 0x808080,
+              permissions: ["ViewChannel", "ReadMessageHistory"],
+              reason: "Rol automático para usuarios con permisos reducidos"
+            });
+          }
+
+          await targetMember.roles.add(restrictedRole);
+
+          const embed = new EmbedBuilder()
+            .setTitle("🔒 Permisos Reducidos")
+            .setDescription(`**Usuario:** ${targetMember.user.tag}\n**Razón:** ${reason}\n**Duración:** ${duration || 'Permanente'}`)
+            .setColor(0x808080)
+            .setTimestamp()
+            .setFooter({ text: `Aplicado por ${interaction.user.tag}` });
+
+          await interaction.channel.send({ embeds: [embed] });
+          return interaction.reply({ content: `✅ Permisos reducidos aplicados a ${targetMember.user.tag}`, ephemeral: true });
+        } catch (error) {
+          console.error("Error reduciendo permisos:", error);
+          return interaction.reply({ content: "❌ Error al reducir permisos. Verifica los permisos del bot.", ephemeral: true });
+        }
+      }
+
+      // Handler para panel_view_history
+      if (interaction.isModalSubmit() && interaction.customId.startsWith("panel_view_history_")) {
+        const userId = interaction.fields.getTextInputValue("user_id").trim();
+        const historyType = interaction.fields.getTextInputValue("history_type").trim().toLowerCase() || "all";
+        const limit = parseInt(interaction.fields.getTextInputValue("history_limit").trim()) || 10;
+
+        const targetUser = await interaction.client.users.fetch(userId).catch(() => null);
+        if (!targetUser) {
+          return interaction.reply({ content: "❌ Usuario no encontrado.", ephemeral: true });
+        }
+
+        const embed = new EmbedBuilder()
+          .setTitle("📊 Historial de Usuario")
+          .setDescription(`**Usuario:** ${targetUser.tag}\n**Tipo:** ${historyType}\n**Límite:** ${limit}`)
+          .addFields(
+            { name: "⚠️ Advertencias", value: "Sin registros disponibles", inline: true },
+            { name: "🔇 Muteos", value: "Sin registros disponibles", inline: true },
+            { name: "🔨 Baneos", value: "Sin registros disponibles", inline: true }
+          )
+          .setColor(0x0099FF)
+          .setTimestamp()
+          .setFooter({ text: `Consultado por ${interaction.user.tag} • Nota: Integración con base de datos pendiente` });
+
+        await interaction.channel.send({ embeds: [embed] });
+        return interaction.reply({ content: `✅ Historial de ${targetUser.tag} mostrado`, ephemeral: true });
+      }
+
       if (!interaction.isChatInputCommand()) return;
 
       const { commandName, options, member, guild } = interaction;
@@ -1717,9 +1882,6 @@ module.exports = (client) => {
         return interaction.reply({ content: "❌ Solo el staff puede usar estos comandos.", ephemeral: true });
       }
       
-      if (commandName === "stafftools" && !isStaff(member)) {
-        return interaction.reply({ content: "❌ Solo el staff puede acceder a estas herramientas.", ephemeral: true });
-      }
 
       if (commandName === "stafftools") {
         if (!member.roles.cache.has(HEAD_ADMIN_ROLE_ID)) {
