@@ -1896,9 +1896,9 @@ module.exports = (client) => {
         });
 
         // Enviar imagen como mensaje separado después
-        await interaction.followUp({
-          content: "https://cdn.discordapp.com/attachments/1231000158234476658/1457133379731456063/58_sin_titulo_20260103160731.png?ex=695ae4b5&is=69599335&hm=e5b5be166dd283ab8312b4922e48540bf53e461cefd2c60e0bcd248688429b75",
-          ephemeral: false
+        // Enviar imagen como mensaje separado después
+        await interaction.channel.send({
+          content: "https://cdn.discordapp.com/attachments/1231000158234476658/1457133379731456063/58_sin_titulo_20260103160731.png?ex=695ae4b5&is=69599335&hm=e5b5be166dd283ab8312b4922e48540bf53e461cefd2c60e0bcd248688429b75"
         });
 
         // CATEGORÍA 1: MODERACIÓN BÁSICA
@@ -1991,34 +1991,29 @@ module.exports = (client) => {
         );
 
         // Enviar todos los embeds categorizados
-        await interaction.followUp({ 
+        await interaction.channel.send({ 
           embeds: [moderationEmbed], 
-          components: [moderationRow], 
-          ephemeral: false 
+          components: [moderationRow]
         });
         
-        await interaction.followUp({ 
+        await interaction.channel.send({ 
           embeds: [channelEmbed], 
-          components: [channelRow], 
-          ephemeral: false 
+          components: [channelRow]
         });
         
-        await interaction.followUp({ 
+        await interaction.channel.send({ 
           embeds: [communicationEmbed], 
-          components: [communicationRow], 
-          ephemeral: false 
+          components: [communicationRow]
         });
         
-        await interaction.followUp({ 
+        await interaction.channel.send({ 
           embeds: [adminEmbed], 
-          components: [adminRow1], 
-          ephemeral: false 
+          components: [adminRow1]
         });
         
-        return interaction.followUp({ 
+        await interaction.channel.send({ 
           embeds: [infoEmbed], 
-          components: [infoRow], 
-          ephemeral: false 
+          components: [infoRow]
         });
       }
 
