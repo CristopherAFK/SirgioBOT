@@ -591,7 +591,6 @@ module.exports = (client) => {
 
         // --- Lógica de permisos por botón ---
         const isHelper = member.roles.cache.has(HELPER_ROLE_ID);
-        const isAdminPlus = member.roles.cache.has(ADMIN_ROLE_ID) || member.roles.cache.has(HEAD_ADMIN_ROLE_ID);
 
         // Helper actions: Mute and Remove Mute
         const helperActions = ["mute", "unmute"];
