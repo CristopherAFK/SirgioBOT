@@ -13,7 +13,8 @@ const {
   TextInputBuilder,
   TextInputStyle,
   StringSelectMenuBuilder,
-  AttachmentBuilder
+  AttachmentBuilder,
+  MessageFlags,
 } = require("discord.js");
 
 const GUILD_ID = "1212886282645147768";
@@ -1892,7 +1893,7 @@ module.exports = (client) => {
         // Confirmación ephemeral para el usuario que ejecutó el comando
         await interaction.reply({
           content: "✅ **Panel de Staff Tools desplegado correctamente**\nEl panel es visible para todos los miembros del servidor.",
-          ephemeral: true
+          flags: MessageFlags.Ephemeral
         });
 
         // Enviar imagen como mensaje separado después
