@@ -2015,6 +2015,26 @@ module.exports = (client) => {
           embeds: [infoEmbed], 
           components: [infoRow]
         });
+
+        // Embed de guía con botón
+        const guideEmbed = new EmbedBuilder()
+          .setTitle("❓ ¿Necesitas ayuda?")
+          .setDescription("Si no sabes para qué sirve algún botón o herramienta, haz click aquí")
+          .setColor(0x9B59B6)
+          .setThumbnail("https://cdn.discordapp.com/attachments/1231000158234476658/1457133379731456063/58_sin_titulo_20260103160731.png?ex=695ae4b5&is=69599335&hm=e5b5be166dd283ab8312b4922e48540bf53e461cefd2c60e0bcd248688429b75");
+
+        const guideButton = new ButtonBuilder()
+          .setCustomId('show_guide')
+          .setLabel('📖 Ver Guía Completa')
+          .setStyle(ButtonStyle.Primary);
+
+        const guideRow = new ActionRowBuilder()
+          .addComponents(guideButton);
+
+        await interaction.channel.send({ 
+          embeds: [guideEmbed], 
+          components: [guideRow]
+        });
       }
 
       if (commandName === "sancion") {
@@ -2426,6 +2446,34 @@ module.exports = (client) => {
 
     if (interaction.customId === "maint_cancel") {
       return interaction.update({ content: "❌ Operación cancelada.", embeds: [], components: [] });
+    }
+
+    if (interaction.customId === "show_guide") {
+      const guideEmbed = new EmbedBuilder()
+        .setTitle("📖 Guía Completa de Herramientas de Staff")
+        .setDescription("**🔨 MODERACIÓN**\n" +
+          "• **Mute:** Silencia a un usuario temporalmente\n" +
+          "• **Remove Mute:** Quita el silencio a un usuario\n" +
+          "• **Ban:** Banea permanentemente a un usuario del servidor\n" +
+          "• **Kick:** Expulsa a un usuario del servidor\n" +
+          "• **Timeout:** Aplica timeout temporal a un usuario\n\n" +
+          "**📢 COMUNICACIÓN**\n" +
+          "• **Enviar Embed:** Crea y envía mensajes embed personalizados\n" +
+          "• **Enviar DM:** Envía mensaje privado a un usuario\n" +
+          "• **Anuncio:** Publica anuncios oficiales en canales\n" +
+          "• **Encuesta:** Crea encuestas con reacciones\n\n" +
+          "**🔧 ADMINISTRACIÓN**\n" +
+          "• **Mantenimiento:** Activa/desactiva modo mantenimiento del servidor\n" +
+          "• **Backup:** Crea respaldos de configuración del servidor\n" +
+          "• **Logs:** Accede a registros de actividad del servidor\n\n" +
+          "**📊 INFORMACIÓN**\n" +
+          "• **Añadir Notas:** Agrega notas al perfil de un usuario\n" +
+          "• **Ver Historial:** Consulta el historial de sanciones de un usuario")
+        .setColor(0x9B59B6)
+        .setFooter({ text: "Usa estas herramientas responsablemente" })
+        .setTimestamp();
+
+      return interaction.reply({ embeds: [guideEmbed], ephemeral: true });
     }
   });
 
