@@ -481,7 +481,7 @@ module.exports = (client) => {
           .setTitle("🚫 Palabras prohibidas")
           .setDescription(list.length ? list.map((w) => `• ${w}`).join("\n") : "La lista está vacía.")
           .setFooter({ text: "Evita usar este tipo de lenguaje." });
-        return interaction.reply({ embeds: [embed], ephemeral: true });
+        return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
       }
 
       if (interaction.isButton() && interaction.customId === "appeal_sanction") {
@@ -499,19 +499,19 @@ module.exports = (client) => {
           .setFooter({ text: "Esta acción creará un ticket de apelación" })
           .setTimestamp();
 
-        return interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
+        return interaction.reply({ embeds: [embed], components: [row], flags: MessageFlags.Ephemeral });
       }
 
       if (interaction.isButton() && interaction.customId.startsWith("confirm_appeal_")) {
         try {
           const guild = interaction.guild || client.guilds.cache.get(GUILD_ID);
-          if (!guild) return interaction.reply({ content: "❌ No se pudo obtener el servidor.", ephemeral: true });
+          if (!guild) return interaction.reply({ content: "❌ No se pudo obtener el servidor.", flags: MessageFlags.Ephemeral });
 
           loadTicketData();
           if (ticketData.userHasTicket[interaction.user.id]) {
             const existingId = ticketData.userHasTicket[interaction.user.id];
             const existingCh = guild.channels.cache.get(existingId) || await guild.channels.fetch(existingId).catch(() => null);
-            return interaction.reply({ content: `❗️ Ya tienes un ticket abierto: ${existingCh ? existingCh.toString() : existingId}`, ephemeral: true });
+            return interaction.reply({ content: `❗️ Ya tienes un ticket abierto: ${existingCh ? existingCh.toString() : existingId}`, flags: MessageFlags.Ephemeral });
           }
 
           ticketData.lastTicket = (ticketData.lastTicket || 0) + 1;
@@ -569,15 +569,15 @@ module.exports = (client) => {
 
           await channel.send({ content: `<@${interaction.user.id}>`, embeds: [embedTicket], components: [ticketRow] });
 
-          return interaction.reply({ content: `✅ Ticket de apelación creado: ${channel}`, ephemeral: true });
+          return interaction.reply({ content: `✅ Ticket de apelación creado: ${channel}`, flags: MessageFlags.Ephemeral });
         } catch (e) {
           console.error("Error creando ticket de apelación:", e);
-          return interaction.reply({ content: "❌ Error creando el ticket.", ephemeral: true });
+          return interaction.reply({ content: "❌ Error creando el ticket.", flags: MessageFlags.Ephemeral });
         }
       }
 
       if (interaction.isButton() && interaction.customId.startsWith("cancel_appeal_")) {
-        return interaction.reply({ content: "❌ Apelación cancelada.", ephemeral: true });
+        return interaction.reply({ content: "❌ Apelación cancelada.", flags: MessageFlags.Ephemeral });
       }
 
       if (interaction.isButton() && interaction.customId.startsWith("panel_")) {
@@ -587,7 +587,7 @@ module.exports = (client) => {
         const isAdminPlus = member.roles.cache.has(ADMIN_ROLE_ID) || member.roles.cache.has(HEAD_ADMIN_ROLE_ID);
 
         if (!isStaff(member)) {
-          return interaction.reply({ content: "❌ Solo el staff puede usar este panel.", ephemeral: true });
+          return interaction.reply({ content: "❌ Solo el staff puede usar este panel.", flags: MessageFlags.Ephemeral });
         }
 
         // --- Lógica de permisos por botón ---
@@ -601,13 +601,13 @@ module.exports = (client) => {
         const adminActions = ["automod_toggle", "role_manage", "lock_channel", "block_link", "watch_user", "quarantine", "reduce_perms"];
 
         if (helperActions.includes(action) && !isHelper && !isModPlus) {
-          return interaction.reply({ content: "❌ Esta acción requiere rango **Helper** o superior.", ephemeral: true });
+          return interaction.reply({ content: "❌ Esta acción requiere rango **Helper** o superior.", flags: MessageFlags.Ephemeral });
         }
         if (modActions.includes(action) && !isModPlus) {
-          return interaction.reply({ content: "❌ Esta acción requiere rango **Moderador** o superior.", ephemeral: true });
+          return interaction.reply({ content: "❌ Esta acción requiere rango **Moderador** o superior.", flags: MessageFlags.Ephemeral });
         }
         if (adminActions.includes(action) && !isAdminPlus) {
-          return interaction.reply({ content: "❌ Esta acción requiere rango **Administrador** o superior.", ephemeral: true });
+          return interaction.reply({ content: "❌ Esta acción requiere rango **Administrador** o superior.", flags: MessageFlags.Ephemeral });
         }
 
         if (action === "warn" || action === "mute" || action === "ban" || action === "timeout") {
@@ -686,7 +686,7 @@ module.exports = (client) => {
 
         if (action === "automod_toggle") {
           automodEnabled = !automodEnabled;
-          return interaction.reply({ content: `⚙️ AutoMod ha sido ${automodEnabled ? "**activado** ✅" : "**desactivado** ❌"}.`, ephemeral: true });
+          return interaction.reply({ content: `⚙️ AutoMod ha sido ${automodEnabled ? "**activado** ✅" : "**desactivado** ❌"}.`, flags: MessageFlags.Ephemeral });
         }
 
 
@@ -1155,7 +1155,7 @@ module.exports = (client) => {
 
         const guild = interaction.guild;
         const user = await client.users.fetch(userId).catch(() => null);
-        if (!user) return interaction.reply({ content: "❌ Usuario no encontrado.", ephemeral: true });
+        if (!user) return interaction.reply({ content: "❌ Usuario no encontrado.", flags: MessageFlags.Ephemeral });
 
         const member = await guild.members.fetch(userId).catch(() => null);
 
@@ -1189,7 +1189,7 @@ module.exports = (client) => {
             logCh.send({ embeds: [logEmbed] }).catch(() => {});
           }
 
-          return interaction.reply({ content: `✅ Advertencia aplicada a ${user.tag}`, ephemeral: true });
+          return interaction.reply({ content: `✅ Advertencia aplicada a ${user.tag}`, flags: MessageFlags.Ephemeral });
         }
 
         if (actionType === "mute") {
@@ -1238,12 +1238,12 @@ module.exports = (client) => {
             logCh.send({ embeds: [logEmbed] }).catch(() => {});
           }
 
-          return interaction.reply({ content: `✅ Mute aplicado a ${user.tag} por ${formatDuration(ms)}`, ephemeral: true });
+          return interaction.reply({ content: `✅ Mute aplicado a ${user.tag} por ${formatDuration(ms)}`, flags: MessageFlags.Ephemeral });
         }
 
         if (actionType === "ban") {
           if (!canBan(interaction.member)) {
-            return interaction.reply({ content: "❌ No tienes permisos para banear.", ephemeral: true });
+            return interaction.reply({ content: "❌ No tienes permisos para banear.", flags: MessageFlags.Ephemeral });
           }
 
           const embed = new EmbedBuilder()
@@ -1279,7 +1279,7 @@ module.exports = (client) => {
             logCh.send({ embeds: [logEmbed] }).catch(() => {});
           }
 
-          return interaction.reply({ content: `✅ Ban aplicado a ${user.tag}`, ephemeral: true });
+          return interaction.reply({ content: `✅ Ban aplicado a ${user.tag}`, flags: MessageFlags.Ephemeral });
         }
       }
 
@@ -1289,7 +1289,7 @@ module.exports = (client) => {
         const asEmbed = interaction.fields.getTextInputValue("as_embed")?.toLowerCase() === "si";
 
         const channel = interaction.guild.channels.cache.get(channelId) || await interaction.guild.channels.fetch(channelId).catch(() => null);
-        if (!channel) return interaction.reply({ content: "❌ Canal no encontrado.", ephemeral: true });
+        if (!channel) return interaction.reply({ content: "❌ Canal no encontrado.", flags: MessageFlags.Ephemeral });
 
         if (asEmbed) {
           const embed = new EmbedBuilder()
@@ -1301,7 +1301,7 @@ module.exports = (client) => {
           await channel.send(message);
         }
 
-        return interaction.reply({ content: `✅ Mensaje enviado a ${channel}`, ephemeral: true });
+        return interaction.reply({ content: `✅ Mensaje enviado a ${channel}`, flags: MessageFlags.Ephemeral });
       }
 
       if (interaction.isModalSubmit() && interaction.customId.startsWith("panel_dm_")) {
@@ -1309,7 +1309,7 @@ module.exports = (client) => {
         const messageText = interaction.fields.getTextInputValue("message");
 
         const user = await client.users.fetch(userId).catch(() => null);
-        if (!user) return interaction.reply({ content: "❌ Usuario no encontrado.", ephemeral: true });
+        if (!user) return interaction.reply({ content: "❌ Usuario no encontrado.", flags: MessageFlags.Ephemeral });
 
         const embed = new EmbedBuilder()
           .setTitle("📬 Mensaje del Staff")
@@ -1324,9 +1324,9 @@ module.exports = (client) => {
           // Registrar para relay de respuestas
           activeStaffDMs.set(user.id, interaction.user.id);
           
-          return interaction.reply({ content: `✅ DM enviado a ${user.tag}. Sus respuestas te llegarán a ti.`, ephemeral: true });
+          return interaction.reply({ content: `✅ DM enviado a ${user.tag}. Sus respuestas te llegarán a ti.`, flags: MessageFlags.Ephemeral });
         } catch (err) {
-          return interaction.reply({ content: "❌ No se pudo enviar el DM (DMs cerrados del usuario).", ephemeral: true });
+          return interaction.reply({ content: "❌ No se pudo enviar el DM (DMs cerrados del usuario).", flags: MessageFlags.Ephemeral });
         }
       }
 
@@ -1336,7 +1336,7 @@ module.exports = (client) => {
         const description = interaction.fields.getTextInputValue("description");
 
         const channel = interaction.guild.channels.cache.get(channelId) || await interaction.guild.channels.fetch(channelId).catch(() => null);
-        if (!channel) return interaction.reply({ content: "❌ Canal no encontrado.", ephemeral: true });
+        if (!channel) return interaction.reply({ content: "❌ Canal no encontrado.", flags: MessageFlags.Ephemeral });
 
         const embed = new EmbedBuilder()
           .setTitle(title)
@@ -1345,7 +1345,7 @@ module.exports = (client) => {
           .setTimestamp();
 
         await channel.send({ embeds: [embed] });
-        return interaction.reply({ content: `✅ Embed enviado a ${channel}`, ephemeral: true });
+        return interaction.reply({ content: `✅ Embed enviado a ${channel}`, flags: MessageFlags.Ephemeral });
       }
 
       if (interaction.isModalSubmit() && interaction.customId.startsWith("panel_unmute_")) {
@@ -1353,7 +1353,7 @@ module.exports = (client) => {
         const guild = interaction.guild;
         const member = await guild.members.fetch(userId).catch(() => null);
 
-        if (!member) return interaction.reply({ content: "❌ Usuario no encontrado en el servidor.", ephemeral: true });
+        if (!member) return interaction.reply({ content: "❌ Usuario no encontrado en el servidor.", flags: MessageFlags.Ephemeral });
 
         await member.roles.remove(MUTED_ROLE_ID).catch(() => {});
         activeMutes.delete(userId);
@@ -1368,7 +1368,7 @@ module.exports = (client) => {
           user.send({ embeds: [embed] }).catch(() => {});
         }
 
-        return interaction.reply({ content: `✅ Mute removido a ${member.user.tag}`, ephemeral: true });
+        return interaction.reply({ content: `✅ Mute removido a ${member.user.tag}`, flags: MessageFlags.Ephemeral });
       }
 
       if (interaction.isModalSubmit() && interaction.customId.startsWith("panel_remove_mute_modal_")) {
@@ -1377,12 +1377,12 @@ module.exports = (client) => {
         const guild = interaction.guild;
         const member = await guild.members.fetch(userId).catch(() => null);
 
-        if (!member) return interaction.reply({ content: "❌ Usuario no encontrado en el servidor.", ephemeral: true });
+        if (!member) return interaction.reply({ content: "❌ Usuario no encontrado en el servidor.", flags: MessageFlags.Ephemeral });
 
         // Verificar si el usuario está muteado
         const muteRole = guild.roles.cache.find(role => role.name === "Muted" || role.name === "Silenciado");
         if (!muteRole || !member.roles.cache.has(muteRole.id)) {
-          return interaction.reply({ content: "❌ El usuario no está silenciado.", ephemeral: true });
+          return interaction.reply({ content: "❌ El usuario no está silenciado.", flags: MessageFlags.Ephemeral });
         }
 
         try {
@@ -1404,10 +1404,10 @@ module.exports = (client) => {
             logChannel.send({ embeds: [logEmbed] });
           }
 
-          return interaction.reply({ content: `✅ Silencio removido a ${member.user.tag}. Razón: ${reason}`, ephemeral: true });
+          return interaction.reply({ content: `✅ Silencio removido a ${member.user.tag}. Razón: ${reason}`, flags: MessageFlags.Ephemeral });
         } catch (error) {
           console.error("Error al remover mute:", error);
-          return interaction.reply({ content: "❌ Error al remover el silencio.", ephemeral: true });
+          return interaction.reply({ content: "❌ Error al remover el silencio.", flags: MessageFlags.Ephemeral });
         }
       }
 
@@ -1417,7 +1417,7 @@ module.exports = (client) => {
         const guild = interaction.guild;
         const user = await client.users.fetch(userId).catch(() => null);
 
-        if (!user) return interaction.reply({ content: "❌ Usuario no encontrado.", ephemeral: true });
+        if (!user) return interaction.reply({ content: "❌ Usuario no encontrado.", flags: MessageFlags.Ephemeral });
 
         const ms = parseDuration(durationStr);
         const chanName = sanitizeChannelName(`vigilancia-${user.username}`);
@@ -1441,7 +1441,7 @@ module.exports = (client) => {
             reason: `Vigilancia de ${user.tag} por ${interaction.user.tag}`
           });
         } catch (err) {
-          return interaction.reply({ content: "❌ Error creando canal de vigilancia.", ephemeral: true });
+          return interaction.reply({ content: "❌ Error creando canal de vigilancia.", flags: MessageFlags.Ephemeral });
         }
 
         activeVigilances.set(user.id, channel.id);
@@ -1468,7 +1468,7 @@ module.exports = (client) => {
           }, ms);
         }
 
-        return interaction.reply({ content: `✅ Vigilancia de ${user.tag} iniciada en ${channel}`, ephemeral: true });
+        return interaction.reply({ content: `✅ Vigilancia de ${user.tag} iniciada en ${channel}`, flags: MessageFlags.Ephemeral });
       }
 
       if (interaction.isModalSubmit() && interaction.customId.startsWith("panel_increase_mute_")) {
@@ -1477,13 +1477,13 @@ module.exports = (client) => {
         const guild = interaction.guild;
 
         const member = await guild.members.fetch(userId).catch(() => null);
-        if (!member) return interaction.reply({ content: "❌ Usuario no encontrado en el servidor.", ephemeral: true });
+        if (!member) return interaction.reply({ content: "❌ Usuario no encontrado en el servidor.", flags: MessageFlags.Ephemeral });
 
         const extraMs = parseDuration(extraTimeStr);
-        if (!extraMs) return interaction.reply({ content: "❌ Formato de duración inválido.", ephemeral: true });
+        if (!extraMs) return interaction.reply({ content: "❌ Formato de duración inválido.", flags: MessageFlags.Ephemeral });
 
         if (!activeMutes.has(userId)) {
-          return interaction.reply({ content: "❌ Este usuario no tiene mute activo.", ephemeral: true });
+          return interaction.reply({ content: "❌ Este usuario no tiene mute activo.", flags: MessageFlags.Ephemeral });
         }
 
         const oldTimeout = activeMutes.get(userId);
@@ -1509,7 +1509,7 @@ module.exports = (client) => {
           user.send({ embeds: [embed] }).catch(() => {});
         }
 
-        return interaction.reply({ content: `✅ Mute de ${member.user.tag} aumentado por ${formatDuration(extraMs)}`, ephemeral: true });
+        return interaction.reply({ content: `✅ Mute de ${member.user.tag} aumentado por ${formatDuration(extraMs)}`, flags: MessageFlags.Ephemeral });
       }
 
 
@@ -1522,7 +1522,7 @@ module.exports = (client) => {
 
         const channel = interaction.guild.channels.cache.get(channelId);
         if (!channel || !channel.isTextBased()) {
-          return interaction.reply({ content: "❌ Canal no encontrado o no es un canal de texto.", ephemeral: true });
+          return interaction.reply({ content: "❌ Canal no encontrado o no es un canal de texto.", flags: MessageFlags.Ephemeral });
         }
 
         const embed = new EmbedBuilder()
@@ -1544,10 +1544,10 @@ module.exports = (client) => {
 
         try {
           await channel.send({ embeds: [embed] });
-          return interaction.reply({ content: `✅ Embed enviado exitosamente a ${channel}`, ephemeral: true });
+          return interaction.reply({ content: `✅ Embed enviado exitosamente a ${channel}`, flags: MessageFlags.Ephemeral });
         } catch (error) {
           console.error("Error enviando embed:", error);
-          return interaction.reply({ content: "❌ Error al enviar el embed. Verifica los permisos del bot.", ephemeral: true });
+          return interaction.reply({ content: "❌ Error al enviar el embed. Verifica los permisos del bot.", flags: MessageFlags.Ephemeral });
         }
       }
 
@@ -1557,30 +1557,30 @@ module.exports = (client) => {
         const roleId = interaction.fields.getTextInputValue("role_id").trim();
 
         if (!["add", "remove"].includes(actionType)) {
-          return interaction.reply({ content: "❌ La acción debe ser 'add' o 'remove'.", ephemeral: true });
+          return interaction.reply({ content: "❌ La acción debe ser 'add' o 'remove'.", flags: MessageFlags.Ephemeral });
         }
 
         const targetMember = interaction.guild.members.cache.get(userId);
         if (!targetMember) {
-          return interaction.reply({ content: "❌ Usuario no encontrado en el servidor.", ephemeral: true });
+          return interaction.reply({ content: "❌ Usuario no encontrado en el servidor.", flags: MessageFlags.Ephemeral });
         }
 
         const role = interaction.guild.roles.cache.get(roleId);
         if (!role) {
-          return interaction.reply({ content: "❌ Rol no encontrado.", ephemeral: true });
+          return interaction.reply({ content: "❌ Rol no encontrado.", flags: MessageFlags.Ephemeral });
         }
 
         try {
           if (actionType === "add") {
             await targetMember.roles.add(role);
-            return interaction.reply({ content: `✅ Rol ${role.name} añadido a ${targetMember.user.tag}`, ephemeral: true });
+            return interaction.reply({ content: `✅ Rol ${role.name} añadido a ${targetMember.user.tag}`, flags: MessageFlags.Ephemeral });
           } else {
             await targetMember.roles.remove(role);
-            return interaction.reply({ content: `✅ Rol ${role.name} removido de ${targetMember.user.tag}`, ephemeral: true });
+            return interaction.reply({ content: `✅ Rol ${role.name} removido de ${targetMember.user.tag}`, flags: MessageFlags.Ephemeral });
           }
         } catch (error) {
           console.error("Error gestionando rol:", error);
-          return interaction.reply({ content: "❌ Error al gestionar el rol. Verifica los permisos del bot.", ephemeral: true });
+          return interaction.reply({ content: "❌ Error al gestionar el rol. Verifica los permisos del bot.", flags: MessageFlags.Ephemeral });
         }
       }
 
@@ -1592,14 +1592,14 @@ module.exports = (client) => {
         if (channelId) {
           targetChannel = interaction.guild.channels.cache.get(channelId);
           if (!targetChannel) {
-            return interaction.reply({ content: "❌ Canal no encontrado.", ephemeral: true });
+            return interaction.reply({ content: "❌ Canal no encontrado.", flags: MessageFlags.Ephemeral });
           }
         } else {
           targetChannel = interaction.channel;
         }
 
         if (!targetChannel.isTextBased()) {
-          return interaction.reply({ content: "❌ Solo se pueden bloquear canales de texto.", ephemeral: true });
+          return interaction.reply({ content: "❌ Solo se pueden bloquear canales de texto.", flags: MessageFlags.Ephemeral });
         }
 
         try {
@@ -1618,10 +1618,10 @@ module.exports = (client) => {
             .setFooter({ text: `Bloqueado por ${interaction.user.tag}` });
 
           await targetChannel.send({ embeds: [embed] });
-          return interaction.reply({ content: `✅ Canal ${targetChannel} bloqueado exitosamente.`, ephemeral: true });
+          return interaction.reply({ content: `✅ Canal ${targetChannel} bloqueado exitosamente.`, flags: MessageFlags.Ephemeral });
         } catch (error) {
           console.error("Error bloqueando canal:", error);
-          return interaction.reply({ content: "❌ Error al bloquear el canal. Verifica los permisos del bot.", ephemeral: true });
+          return interaction.reply({ content: "❌ Error al bloquear el canal. Verifica los permisos del bot.", flags: MessageFlags.Ephemeral });
         }
       }
 
@@ -1631,7 +1631,7 @@ module.exports = (client) => {
 
         const targetMember = interaction.guild.members.cache.get(userId);
         if (!targetMember) {
-          return interaction.reply({ content: "❌ Usuario no encontrado en el servidor.", ephemeral: true });
+          return interaction.reply({ content: "❌ Usuario no encontrado en el servidor.", flags: MessageFlags.Ephemeral });
         }
 
         // Crear o encontrar el rol de "Sin Enlaces"
@@ -1645,7 +1645,7 @@ module.exports = (client) => {
             });
           } catch (error) {
             console.error("Error creando rol Sin Enlaces:", error);
-            return interaction.reply({ content: "❌ Error al crear el rol necesario.", ephemeral: true });
+            return interaction.reply({ content: "❌ Error al crear el rol necesario.", flags: MessageFlags.Ephemeral });
           }
         }
 
@@ -1660,10 +1660,10 @@ module.exports = (client) => {
             .setFooter({ text: `Bloqueado por ${interaction.user.tag}` });
 
           await interaction.channel.send({ embeds: [embed] });
-          return interaction.reply({ content: `✅ Enlaces bloqueados para ${targetMember.user.tag}`, ephemeral: true });
+          return interaction.reply({ content: `✅ Enlaces bloqueados para ${targetMember.user.tag}`, flags: MessageFlags.Ephemeral });
         } catch (error) {
           console.error("Error bloqueando enlaces:", error);
-          return interaction.reply({ content: "❌ Error al bloquear enlaces. Verifica los permisos del bot.", ephemeral: true });
+          return interaction.reply({ content: "❌ Error al bloquear enlaces. Verifica los permisos del bot.", flags: MessageFlags.Ephemeral });
         }
       }
 
@@ -1674,7 +1674,7 @@ module.exports = (client) => {
 
         const targetMember = interaction.guild.members.cache.get(userId);
         if (!targetMember) {
-          return interaction.reply({ content: "❌ Usuario no encontrado en el servidor.", ephemeral: true });
+          return interaction.reply({ content: "❌ Usuario no encontrado en el servidor.", flags: MessageFlags.Ephemeral });
         }
 
         // Crear o encontrar el rol de "Cuarentena"
@@ -1689,7 +1689,7 @@ module.exports = (client) => {
             });
           } catch (error) {
             console.error("Error creando rol Cuarentena:", error);
-            return interaction.reply({ content: "❌ Error al crear el rol necesario.", ephemeral: true });
+            return interaction.reply({ content: "❌ Error al crear el rol necesario.", flags: MessageFlags.Ephemeral });
           }
         }
 
@@ -1704,10 +1704,10 @@ module.exports = (client) => {
             .setFooter({ text: `Puesto en cuarentena por ${interaction.user.tag}` });
 
           await interaction.channel.send({ embeds: [embed] });
-          return interaction.reply({ content: `✅ ${targetMember.user.tag} ha sido puesto en cuarentena`, ephemeral: true });
+          return interaction.reply({ content: `✅ ${targetMember.user.tag} ha sido puesto en cuarentena`, flags: MessageFlags.Ephemeral });
         } catch (error) {
           console.error("Error aplicando cuarentena:", error);
-          return interaction.reply({ content: "❌ Error al aplicar cuarentena. Verifica los permisos del bot.", ephemeral: true });
+          return interaction.reply({ content: "❌ Error al aplicar cuarentena. Verifica los permisos del bot.", flags: MessageFlags.Ephemeral });
         }
       }
 
@@ -1732,7 +1732,7 @@ module.exports = (client) => {
         }
 
         await interaction.channel.send({ embeds: [embed] });
-        return interaction.reply({ content: `✅ Plantilla "${templateName}" procesada correctamente`, ephemeral: true });
+        return interaction.reply({ content: `✅ Plantilla "${templateName}" procesada correctamente`, flags: MessageFlags.Ephemeral });
       }
 
       // Handler para panel_edit_msg
@@ -1743,7 +1743,7 @@ module.exports = (client) => {
 
         const targetChannel = channelId ? interaction.guild.channels.cache.get(channelId) : interaction.channel;
         if (!targetChannel) {
-          return interaction.reply({ content: "❌ Canal no encontrado.", ephemeral: true });
+          return interaction.reply({ content: "❌ Canal no encontrado.", flags: MessageFlags.Ephemeral });
         }
 
         try {
@@ -1758,10 +1758,10 @@ module.exports = (client) => {
             .setFooter({ text: `Editado por ${interaction.user.tag}` });
 
           await interaction.channel.send({ embeds: [embed] });
-          return interaction.reply({ content: "✅ Mensaje editado correctamente", ephemeral: true });
+          return interaction.reply({ content: "✅ Mensaje editado correctamente", flags: MessageFlags.Ephemeral });
         } catch (error) {
           console.error("Error editando mensaje:", error);
-          return interaction.reply({ content: "❌ Error al editar el mensaje. Verifica el ID y permisos.", ephemeral: true });
+          return interaction.reply({ content: "❌ Error al editar el mensaje. Verifica el ID y permisos.", flags: MessageFlags.Ephemeral });
         }
       }
 
@@ -1771,12 +1771,12 @@ module.exports = (client) => {
         const confirmText = interaction.fields.getTextInputValue("confirm_text").trim();
 
         if (confirmText.toLowerCase() !== "confirmar") {
-          return interaction.reply({ content: "❌ Debes escribir 'confirmar' para proceder con el nuke.", ephemeral: true });
+          return interaction.reply({ content: "❌ Debes escribir 'confirmar' para proceder con el nuke.", flags: MessageFlags.Ephemeral });
         }
 
         const targetChannel = channelId ? interaction.guild.channels.cache.get(channelId) : interaction.channel;
         if (!targetChannel) {
-          return interaction.reply({ content: "❌ Canal no encontrado.", ephemeral: true });
+          return interaction.reply({ content: "❌ Canal no encontrado.", flags: MessageFlags.Ephemeral });
         }
 
         try {
@@ -1801,10 +1801,10 @@ module.exports = (client) => {
             .setTimestamp();
 
           await newChannel.send({ embeds: [embed] });
-          return interaction.reply({ content: "✅ Canal nukeado correctamente", ephemeral: true });
+          return interaction.reply({ content: "✅ Canal nukeado correctamente", flags: MessageFlags.Ephemeral });
         } catch (error) {
           console.error("Error nukeando canal:", error);
-          return interaction.reply({ content: "❌ Error al nukear el canal. Verifica los permisos del bot.", ephemeral: true });
+          return interaction.reply({ content: "❌ Error al nukear el canal. Verifica los permisos del bot.", flags: MessageFlags.Ephemeral });
         }
       }
 
@@ -1816,7 +1816,7 @@ module.exports = (client) => {
 
         const targetMember = interaction.guild.members.cache.get(userId);
         if (!targetMember) {
-          return interaction.reply({ content: "❌ Usuario no encontrado en el servidor.", ephemeral: true });
+          return interaction.reply({ content: "❌ Usuario no encontrado en el servidor.", flags: MessageFlags.Ephemeral });
         }
 
         try {
@@ -1841,10 +1841,10 @@ module.exports = (client) => {
             .setFooter({ text: `Aplicado por ${interaction.user.tag}` });
 
           await interaction.channel.send({ embeds: [embed] });
-          return interaction.reply({ content: `✅ Permisos reducidos aplicados a ${targetMember.user.tag}`, ephemeral: true });
+          return interaction.reply({ content: `✅ Permisos reducidos aplicados a ${targetMember.user.tag}`, flags: MessageFlags.Ephemeral });
         } catch (error) {
           console.error("Error reduciendo permisos:", error);
-          return interaction.reply({ content: "❌ Error al reducir permisos. Verifica los permisos del bot.", ephemeral: true });
+          return interaction.reply({ content: "❌ Error al reducir permisos. Verifica los permisos del bot.", flags: MessageFlags.Ephemeral });
         }
       }
 
@@ -1856,7 +1856,7 @@ module.exports = (client) => {
 
         const targetUser = await interaction.client.users.fetch(userId).catch(() => null);
         if (!targetUser) {
-          return interaction.reply({ content: "❌ Usuario no encontrado.", ephemeral: true });
+          return interaction.reply({ content: "❌ Usuario no encontrado.", flags: MessageFlags.Ephemeral });
         }
 
         const embed = new EmbedBuilder()
@@ -1872,7 +1872,7 @@ module.exports = (client) => {
           .setFooter({ text: `Consultado por ${interaction.user.tag} • Nota: Integración con base de datos pendiente` });
 
         await interaction.channel.send({ embeds: [embed] });
-        return interaction.reply({ content: `✅ Historial de ${targetUser.tag} mostrado`, ephemeral: true });
+        return interaction.reply({ content: `✅ Historial de ${targetUser.tag} mostrado`, flags: MessageFlags.Ephemeral });
       }
 
       if (!interaction.isChatInputCommand()) return;
@@ -1880,13 +1880,13 @@ module.exports = (client) => {
       const { commandName, options, member, guild } = interaction;
 
       if (!isStaff(member) && !["viewwarns", "stafftools"].includes(commandName)) {
-        return interaction.reply({ content: "❌ Solo el staff puede usar estos comandos.", ephemeral: true });
+        return interaction.reply({ content: "❌ Solo el staff puede usar estos comandos.", flags: MessageFlags.Ephemeral });
       }
       
 
       if (commandName === "stafftools") {
         if (!member.roles.cache.has(HEAD_ADMIN_ROLE_ID)) {
-          return interaction.reply({ content: "❌ Solo los **Head Admin** pueden desplegar el panel de herramientas.", ephemeral: true });
+          return interaction.reply({ content: "❌ Solo los **Head Admin** pueden desplegar el panel de herramientas.", flags: MessageFlags.Ephemeral });
         }
 
         // Enviar imagen como mensaje separado primero
@@ -2040,7 +2040,7 @@ module.exports = (client) => {
 
       if (commandName === "sancion") {
         if (!isStaff(interaction.member)) {
-          return interaction.reply({ content: "❌ Solo el staff puede usar este comando.", ephemeral: true });
+          return interaction.reply({ content: "❌ Solo el staff puede usar este comando.", flags: MessageFlags.Ephemeral });
         }
         
         const targetUser = options.getUser("usuario");
@@ -2120,18 +2120,18 @@ module.exports = (client) => {
           } catch (e) {}
         }
         
-        return interaction.reply({ content: `✅ Sanción aplicada a ${targetUser.tag}.`, ephemeral: true });
+        return interaction.reply({ content: `✅ Sanción aplicada a ${targetUser.tag}.`, flags: MessageFlags.Ephemeral });
       }
 
       if (commandName === "automod") {
         const sub = options.getSubcommand();
         if (sub === "on") {
           automodEnabled = true;
-          return interaction.reply({ content: "✅ AutoMod activado.", ephemeral: true });
+          return interaction.reply({ content: "✅ AutoMod activado.", flags: MessageFlags.Ephemeral });
         }
         if (sub === "off") {
           automodEnabled = false;
-          return interaction.reply({ content: "⚠️ AutoMod desactivado.", ephemeral: true });
+          return interaction.reply({ content: "⚠️ AutoMod desactivado.", flags: MessageFlags.Ephemeral });
         }
         if (sub === "status") {
           const embed = new EmbedBuilder()
@@ -2144,7 +2144,7 @@ module.exports = (client) => {
             )
             .setColor(automodEnabled ? 0x00ff00 : 0xff0000)
             .setTimestamp();
-          return interaction.reply({ embeds: [embed], ephemeral: true });
+          return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
         }
       }
 
@@ -2152,7 +2152,7 @@ module.exports = (client) => {
         const user = options.getUser("usuario");
         const userWarns = warnings[user.id] || [];
         if (userWarns.length === 0) {
-          return interaction.reply({ content: `✅ ${user.tag} no tiene advertencias.`, ephemeral: true });
+          return interaction.reply({ content: `✅ ${user.tag} no tiene advertencias.`, flags: MessageFlags.Ephemeral });
         }
         const embed = new EmbedBuilder()
           .setTitle(`📋 Advertencias de ${user.tag}`)
@@ -2160,36 +2160,36 @@ module.exports = (client) => {
           .setColor(0xffff00)
           .setFooter({ text: `Total: ${userWarns.length} warns` })
           .setTimestamp();
-        return interaction.reply({ embeds: [embed], ephemeral: true });
+        return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
       }
 
       if (commandName === "resetwarns") {
         const user = options.getUser("usuario");
         delete warnings[user.id];
         saveWarnings();
-        return interaction.reply({ content: `✅ Warns de ${user.tag} reseteados.`, ephemeral: true });
+        return interaction.reply({ content: `✅ Warns de ${user.tag} reseteados.`, flags: MessageFlags.Ephemeral });
       }
 
       if (commandName === "removewarn") {
         const user = options.getUser("usuario");
         if (!warnings[user.id] || warnings[user.id].length === 0) {
-          return interaction.reply({ content: `❌ ${user.tag} no tiene warns.`, ephemeral: true });
+          return interaction.reply({ content: `❌ ${user.tag} no tiene warns.`, flags: MessageFlags.Ephemeral });
         }
         warnings[user.id].pop();
         if (warnings[user.id].length === 0) delete warnings[user.id];
         saveWarnings();
-        return interaction.reply({ content: `✅ Última advertencia de ${user.tag} eliminada.`, ephemeral: true });
+        return interaction.reply({ content: `✅ Última advertencia de ${user.tag} eliminada.`, flags: MessageFlags.Ephemeral });
       }
 
       if (commandName === "reloadlists") {
         reloadWordLists();
-        return interaction.reply({ content: `✅ Listas recargadas. Prohibidas: ${bannedWords.length}, Sensibles: ${sensitiveWords.length}`, ephemeral: true });
+        return interaction.reply({ content: `✅ Listas recargadas. Prohibidas: ${bannedWords.length}, Sensibles: ${sensitiveWords.length}`, flags: MessageFlags.Ephemeral });
       }
 
       if (commandName === "addword") {
         const word = options.getString("palabra").toLowerCase().trim();
         if (bannedWords.includes(word)) {
-          return interaction.reply({ content: "❌ Esa palabra ya está en la lista.", ephemeral: true });
+          return interaction.reply({ content: "❌ Esa palabra ya está en la lista.", flags: MessageFlags.Ephemeral });
         }
         bannedWords.push(word);
         saveWords(BANNED_PATH, bannedWords);
@@ -2209,14 +2209,14 @@ module.exports = (client) => {
           }
         } catch (e) {}
         
-        return interaction.reply({ content: `✅ Palabra "${word}" agregada a la lista prohibida.`, ephemeral: true });
+        return interaction.reply({ content: `✅ Palabra "${word}" agregada a la lista prohibida.`, flags: MessageFlags.Ephemeral });
       }
 
       if (commandName === "removeword") {
         const word = options.getString("palabra").toLowerCase().trim();
         const index = bannedWords.indexOf(word);
         if (index === -1) {
-          return interaction.reply({ content: "❌ Esa palabra no está en la lista.", ephemeral: true });
+          return interaction.reply({ content: "❌ Esa palabra no está en la lista.", flags: MessageFlags.Ephemeral });
         }
         bannedWords.splice(index, 1);
         saveWords(BANNED_PATH, bannedWords);
@@ -2236,14 +2236,14 @@ module.exports = (client) => {
           }
         } catch (e) {}
         
-        return interaction.reply({ content: `✅ Palabra "${word}" eliminada de la lista.`, ephemeral: true });
+        return interaction.reply({ content: `✅ Palabra "${word}" eliminada de la lista.`, flags: MessageFlags.Ephemeral });
       }
 
       if (commandName === "remove_mute") {
         const user = options.getUser("usuario");
         const targetMember = await guild.members.fetch(user.id).catch(() => null);
         if (!targetMember) {
-          return interaction.reply({ content: "❌ Usuario no encontrado en el servidor.", ephemeral: true });
+          return interaction.reply({ content: "❌ Usuario no encontrado en el servidor.", flags: MessageFlags.Ephemeral });
         }
         await targetMember.roles.remove(MUTED_ROLE_ID).catch(() => {});
         if (activeMutes.has(user.id)) {
@@ -2266,7 +2266,7 @@ module.exports = (client) => {
           }
         } catch (e) {}
         
-        return interaction.reply({ content: `✅ Mute removido de ${user.tag}.`, ephemeral: true });
+        return interaction.reply({ content: `✅ Mute removido de ${user.tag}.`, flags: MessageFlags.Ephemeral });
       }
 
       if (commandName === "vigilar") {
@@ -2295,7 +2295,7 @@ module.exports = (client) => {
             reason: `Vigilancia de ${user.tag} por ${interaction.user.tag}`
           });
         } catch (err) {
-          return interaction.reply({ content: "❌ Error creando canal de vigilancia.", ephemeral: true });
+          return interaction.reply({ content: "❌ Error creando canal de vigilancia.", flags: MessageFlags.Ephemeral });
         }
 
         activeVigilances.set(user.id, channel.id);
@@ -2322,21 +2322,21 @@ module.exports = (client) => {
           }, ms);
         }
 
-        return interaction.reply({ content: `✅ Vigilancia de ${user.tag} iniciada en ${channel}`, ephemeral: true });
+        return interaction.reply({ content: `✅ Vigilancia de ${user.tag} iniciada en ${channel}`, flags: MessageFlags.Ephemeral });
       }
 
       if (commandName === "cerrar_vigilancia") {
         const user = options.getUser("usuario");
         const channelId = activeVigilances.get(user.id);
         if (!channelId) {
-          return interaction.reply({ content: "❌ No hay vigilancia activa para ese usuario.", ephemeral: true });
+          return interaction.reply({ content: "❌ No hay vigilancia activa para ese usuario.", flags: MessageFlags.Ephemeral });
         }
         const channel = guild.channels.cache.get(channelId);
         if (channel) {
           await channel.delete("Vigilancia cerrada manualmente").catch(() => {});
         }
         activeVigilances.delete(user.id);
-        return interaction.reply({ content: `✅ Vigilancia de ${user.tag} cerrada.`, ephemeral: true });
+        return interaction.reply({ content: `✅ Vigilancia de ${user.tag} cerrada.`, flags: MessageFlags.Ephemeral });
       }
 
       if (commandName === "mantenimiento") {
@@ -2355,7 +2355,7 @@ module.exports = (client) => {
           new ButtonBuilder().setCustomId(`maint_cancel`).setLabel("❌ Cancelar").setStyle(ButtonStyle.Danger)
         );
 
-        return interaction.reply({ embeds: [confirmEmbed], components: [row], ephemeral: true });
+        return interaction.reply({ embeds: [confirmEmbed], components: [row], flags: MessageFlags.Ephemeral });
       }
 
       if (commandName === "ping_role") {
@@ -2365,14 +2365,14 @@ module.exports = (client) => {
         const content = `${role.toString()}${mensaje ? `\n\n${mensaje}` : ""}`;
         
         await interaction.channel.send({ content, allowedMentions: { roles: [role.id], parse: ["everyone"] } });
-        return interaction.reply({ content: "✅ Ping enviado.", ephemeral: true });
+        return interaction.reply({ content: "✅ Ping enviado.", flags: MessageFlags.Ephemeral });
       }
 
     } catch (err) {
       console.error("Error en interactionCreate:", err);
       try {
         if (!interaction.replied && !interaction.deferred) {
-          await interaction.reply({ content: "❌ Ocurrió un error.", ephemeral: true });
+          await interaction.reply({ content: "❌ Ocurrió un error.", flags: MessageFlags.Ephemeral });
         }
       } catch {}
     }
@@ -2474,7 +2474,7 @@ module.exports = (client) => {
         .setFooter({ text: "Usa estas herramientas responsablemente" })
         .setTimestamp();
 
-      return interaction.reply({ embeds: [guideEmbed], ephemeral: true });
+      return interaction.reply({ embeds: [guideEmbed], flags: MessageFlags.Ephemeral });
     }
   });
 
