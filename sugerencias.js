@@ -197,8 +197,8 @@ module.exports = (client) => {
             });
           }
 
-          await publicMessage.react('1268414311509004460').catch(() => {}); // Twitch (Sí)
-          await publicMessage.react('1268414284077994034').catch(() => {}); // TikTok (No)
+          await publicMessage.react('1465220343550578718').catch(() => {}); // verificado (Sí)
+          await publicMessage.react('1465219129291051150').catch(() => {}); // negado (No)
 
           const staffEmbed = new EmbedBuilder()
             .setTitle(`📋 Nueva Sugerencia para Revisar`)
