@@ -197,8 +197,8 @@ module.exports = (client) => {
             });
           }
 
-          await publicMessage.react('👍').catch(() => {});
-          await publicMessage.react('👎').catch(() => {});
+          await publicMessage.react('1431413172513804348').catch(() => {}); // emoji_104 (Verified)
+          await publicMessage.react('1431408998887981147').catch(() => {}); // emoji_99 (Refused)
 
           const staffEmbed = new EmbedBuilder()
             .setTitle(`📋 Nueva Sugerencia para Revisar`)
