@@ -222,6 +222,10 @@ function findBannedWordInText(text) {
   const lower = text.toLowerCase();
   const normalized = normalizeText(text);
   
+  // Dividir el texto en palabras individuales para búsqueda exacta
+  const lowerWords = lower.split(/\s+/);
+  const normalizedWords = normalized.split(/\s+/);
+  
   const allBannedWords = [...bannedWords, ...HIDDEN_WORDS];
   
   for (const w of allBannedWords) {
@@ -229,16 +233,21 @@ function findBannedWordInText(text) {
     const phrase = w.trim().toLowerCase();
     const normalizedPhrase = normalizeText(phrase);
     
+    // Si es una frase (contiene espacios)
     if (phrase.includes(" ")) {
       if (lower.includes(phrase) || normalized.includes(normalizedPhrase)) return w;
     } else {
-      const re = new RegExp(`\\b${phrase.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&")}\\b`, "u");
-      const reNorm = new RegExp(`\\b${normalizedPhrase.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&")}\\b`, "u");
-      if (re.test(lower) || reNorm.test(normalized)) return w;
+      // Coincidencia exacta de palabra
+      if (lowerWords.includes(phrase) || normalizedWords.includes(normalizedPhrase)) return w;
       
+      // Búsqueda sin espacios (para detectar bypass como "p a l a b r a")
       const noSpaces = lower.replace(/\s+/g, "");
       const noSpacesNorm = normalized.replace(/\s+/g, "");
-      if (noSpaces.includes(phrase) || noSpacesNorm.includes(normalizedPhrase)) return w;
+      if (noSpaces.includes(phrase) || noSpacesNorm.includes(normalizedPhrase)) {
+        // Solo marcar si la palabra sin espacios es exactamente la frase prohibida
+        // o si es una parte muy clara de la palabra (opcional, pero ayuda con el bypass)
+        if (noSpaces === phrase || noSpacesNorm === normalizedPhrase) return w;
+      }
     }
   }
   return null;
