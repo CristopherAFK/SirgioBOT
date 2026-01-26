@@ -72,11 +72,7 @@ module.exports = (client) => {
     try {
       if ((interaction.isChatInputCommand() && interaction.commandName === 'sugerir') || 
           (interaction.isButton() && interaction.customId === 'create_suggestion_btn')) {
-        const hasRole = interaction.member.roles.cache.has(SUGGESTER_ROLE_ID);
-        if (!hasRole) {
-          return interaction.reply({ content: '❌ No tienes el rol necesario para hacer sugerencias.', ephemeral: true });
-        }
-
+        
         const modal = new ModalBuilder()
           .setCustomId(`sugerencia_modal|${interaction.user.id}`)
           .setTitle('Nueva Sugerencia');
@@ -107,6 +103,9 @@ module.exports = (client) => {
 
       if (interaction.isModalSubmit()) {
         if (interaction.customId.startsWith('sugerencia_modal|')) {
+          // Check if this modal submission has already been processed to prevent duplicates
+          if (interaction.replied || interaction.deferred) return;
+
           const title = interaction.fields.getTextInputValue('suggestion_title');
           const description = interaction.fields.getTextInputValue('suggestion_description');
           
@@ -184,7 +183,7 @@ module.exports = (client) => {
           const staffChannel = await client.channels.fetch(STAFF_REVIEW_CHANNEL_ID).catch(() => null);
           
           if (staffChannel) {
-            const staffMessage = await staffChannel.send({ embeds: [staffEmbed], components: [row] });
+            await staffChannel.send({ embeds: [staffEmbed], components: [row] });
             
             // Guardar en MongoDB
             await Suggestion.create({
@@ -193,11 +192,6 @@ module.exports = (client) => {
               content: `**Título:** ${title}\n\n**Descripción:**\n${description}`,
               status: 'pending'
             });
-
-            // Guardar metadatos adicionales en un campo flexible o usar el schema existente
-            // El schema actual en database.js es limitado, pero suficiente para el ID del mensaje
-            // Para mantener la funcionalidad completa, asumimos que el schema Suggestion en database.js 
-            // es el que debemos usar.
           }
 
           await interaction.reply({
