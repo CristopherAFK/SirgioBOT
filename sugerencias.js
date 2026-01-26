@@ -70,7 +70,8 @@ module.exports = (client) => {
 
   client.on('interactionCreate', async (interaction) => {
     try {
-      if (interaction.isChatInputCommand() && interaction.commandName === 'sugerir') {
+      if ((interaction.isChatInputCommand() && interaction.commandName === 'sugerir') || 
+          (interaction.isButton() && interaction.customId === 'create_suggestion_btn')) {
         const hasRole = interaction.member.roles.cache.has(SUGGESTER_ROLE_ID);
         if (!hasRole) {
           return interaction.reply({ content: '❌ No tienes el rol necesario para hacer sugerencias.', ephemeral: true });
@@ -133,18 +134,27 @@ module.exports = (client) => {
           }
 
           let publicMessage;
+          const createSugBtn = new ButtonBuilder()
+            .setCustomId('create_suggestion_btn')
+            .setLabel('Hacer una sugerencia')
+            .setStyle(ButtonStyle.Primary)
+            .setEmoji('💡');
+          const publicRow = new ActionRowBuilder().addComponents(createSugBtn);
+
           if (fs.existsSync(ICON_PATH)) {
             const attachment = new AttachmentBuilder(ICON_PATH, { name: 'suggestion_icon.gif' });
             publicMessage = await suggestionsChannel.send({
               content: '¡Nueva sugerencia!',
               embeds: [publicEmbed],
-              files: [attachment]
+              files: [attachment],
+              components: [publicRow]
             });
           } else {
             publicEmbed.setThumbnail(null);
             publicMessage = await suggestionsChannel.send({ 
               content: '¡Nueva sugerencia!',
-              embeds: [publicEmbed] 
+              embeds: [publicEmbed],
+              components: [publicRow]
             });
           }
 
