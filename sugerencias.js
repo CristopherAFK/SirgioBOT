@@ -11,7 +11,7 @@ const {
   ButtonStyle,
   AttachmentBuilder
 } = require('discord.js');
-const { Suggestion } = require('./database');
+const { db } = require('./database');
 
 const GUILD_ID = '1212886282645147768';
 const SUGGESTIONS_CHANNEL_ID = '1440873532580954112';
@@ -22,9 +22,18 @@ const SUGGESTER_ROLE_ID = '1313716079998140536';
 const SUGGESTION_ICON = 'attachment://suggestion_icon.gif';
 const ICON_PATH = path.join(__dirname, 'suggestion_icon.gif');
 
+const processedInteractions = new Set();
+
+function cleanupProcessedInteractions() {
+  if (processedInteractions.size > 1000) {
+    const entries = Array.from(processedInteractions);
+    entries.slice(0, 500).forEach(id => processedInteractions.delete(id));
+  }
+}
+
 module.exports = (client) => {
   client.once('ready', async () => {
-    console.log('✅ Sistema de Sugerencias cargado (MongoDB)');
+    console.log('✅ Sistema de Sugerencias cargado (PostgreSQL)');
 
     try {
       const guild = client.guilds.cache.get(GUILD_ID);
@@ -39,8 +48,6 @@ module.exports = (client) => {
 
           await guild.commands.create(command);
           console.log('🟢 Comando /sugerir registrado en el servidor');
-        } else {
-          console.log('✅ Comando /sugerir ya existe');
         }
       }
     } catch (error) {
@@ -48,7 +55,6 @@ module.exports = (client) => {
     }
   });
 
-  // Detectar mensajes normales en el canal de sugerencias y rechazarlos
   client.on('messageCreate', async (message) => {
     try {
       if (message.author.bot) return;
@@ -70,11 +76,14 @@ module.exports = (client) => {
 
   client.on('interactionCreate', async (interaction) => {
     try {
-      if ((interaction.isChatInputCommand() && interaction.commandName === 'sugerir') || 
-          (interaction.isButton() && interaction.customId === 'create_suggestion_btn')) {
-        
+      if (interaction.isChatInputCommand() && interaction.commandName === 'sugerir') {
+        const interactionKey = `cmd_${interaction.id}`;
+        if (processedInteractions.has(interactionKey)) return;
+        processedInteractions.add(interactionKey);
+        cleanupProcessedInteractions();
+
         const modal = new ModalBuilder()
-          .setCustomId(`sugerencia_modal|${interaction.user.id}`)
+          .setCustomId(`sugerencia_modal_${interaction.user.id}_${Date.now()}`)
           .setTitle('Nueva Sugerencia');
 
         const titleInput = new TextInputBuilder()
@@ -99,17 +108,57 @@ module.exports = (client) => {
         );
 
         await interaction.showModal(modal);
+        return;
       }
 
-      if (interaction.isModalSubmit()) {
-        if (interaction.customId.startsWith('sugerencia_modal|')) {
-          // Check if this modal submission has already been processed to prevent duplicates
-          if (interaction.replied || interaction.deferred) return;
+      if (interaction.isButton() && interaction.customId === 'create_suggestion_btn') {
+        const interactionKey = `btn_${interaction.id}`;
+        if (processedInteractions.has(interactionKey)) return;
+        processedInteractions.add(interactionKey);
+        cleanupProcessedInteractions();
 
+        const modal = new ModalBuilder()
+          .setCustomId(`sugerencia_modal_${interaction.user.id}_${Date.now()}`)
+          .setTitle('Nueva Sugerencia');
+
+        const titleInput = new TextInputBuilder()
+          .setCustomId('suggestion_title')
+          .setLabel('Título de la sugerencia')
+          .setStyle(TextInputStyle.Short)
+          .setPlaceholder('Escribe un título breve...')
+          .setMaxLength(100)
+          .setRequired(true);
+
+        const descriptionInput = new TextInputBuilder()
+          .setCustomId('suggestion_description')
+          .setLabel('Descripción de la sugerencia')
+          .setStyle(TextInputStyle.Paragraph)
+          .setPlaceholder('Describe tu sugerencia en detalle...')
+          .setMaxLength(1000)
+          .setRequired(true);
+
+        modal.addComponents(
+          new ActionRowBuilder().addComponents(titleInput),
+          new ActionRowBuilder().addComponents(descriptionInput)
+        );
+
+        await interaction.showModal(modal);
+        return;
+      }
+
+      if (interaction.isModalSubmit() && interaction.customId.startsWith('sugerencia_modal_')) {
+        const interactionKey = `modal_${interaction.id}`;
+        if (processedInteractions.has(interactionKey)) return;
+        processedInteractions.add(interactionKey);
+        cleanupProcessedInteractions();
+
+        await interaction.deferReply({ ephemeral: true });
+
+        try {
           const title = interaction.fields.getTextInputValue('suggestion_title');
           const description = interaction.fields.getTextInputValue('suggestion_description');
           
-          const suggestionId = `sug_${Date.now()}`;
+          const suggestionId = `sug_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
           const publicEmbed = new EmbedBuilder()
             .setTitle(`💡 ${title}`)
@@ -119,7 +168,6 @@ module.exports = (client) => {
               name: interaction.user.tag,
               iconURL: interaction.user.displayAvatarURL({ dynamic: true })
             })
-            .setThumbnail(SUGGESTION_ICON)
             .addFields(
               { name: '📊 Estado', value: '🔵 Sin revisar', inline: true },
               { name: '👤 Sugerido por', value: `<@${interaction.user.id}>`, inline: true }
@@ -129,7 +177,7 @@ module.exports = (client) => {
 
           const suggestionsChannel = await client.channels.fetch(SUGGESTIONS_CHANNEL_ID).catch(() => null);
           if (!suggestionsChannel) {
-            return interaction.reply({ content: '❌ No se encontró el canal de sugerencias.', ephemeral: true });
+            return interaction.editReply({ content: '❌ No se encontró el canal de sugerencias.' });
           }
 
           let publicMessage;
@@ -142,23 +190,21 @@ module.exports = (client) => {
 
           if (fs.existsSync(ICON_PATH)) {
             const attachment = new AttachmentBuilder(ICON_PATH, { name: 'suggestion_icon.gif' });
+            publicEmbed.setThumbnail(SUGGESTION_ICON);
             publicMessage = await suggestionsChannel.send({
-              content: '¡Nueva sugerencia!',
               embeds: [publicEmbed],
               files: [attachment],
               components: [publicRow]
             });
           } else {
-            publicEmbed.setThumbnail(null);
             publicMessage = await suggestionsChannel.send({ 
-              content: '¡Nueva sugerencia!',
               embeds: [publicEmbed],
               components: [publicRow]
             });
           }
 
-          await publicMessage.react('1465220343550578718').catch(() => {}); // verificado (Sí)
-          await publicMessage.react('1465219129291051150').catch(() => {}); // negado (No)
+          await publicMessage.react('1465220343550578718').catch(() => publicMessage.react('✅').catch(() => {}));
+          await publicMessage.react('1465219129291051150').catch(() => publicMessage.react('❌').catch(() => {}));
 
           const staffEmbed = new EmbedBuilder()
             .setTitle(`📋 Nueva Sugerencia para Revisar`)
@@ -175,40 +221,66 @@ module.exports = (client) => {
             .setFooter({ text: `ID: ${suggestionId}` })
             .setTimestamp();
 
-          const acceptButton = new ButtonBuilder().setCustomId(`sug_accept|${suggestionId}`).setLabel('Aceptar').setStyle(ButtonStyle.Success).setEmoji('✅');
-          const rejectButton = new ButtonBuilder().setCustomId(`sug_reject|${suggestionId}`).setLabel('Rechazar').setStyle(ButtonStyle.Danger).setEmoji('❌');
-          const indefiniteButton = new ButtonBuilder().setCustomId(`sug_indefinite|${suggestionId}`).setLabel('Indefinido').setStyle(ButtonStyle.Secondary).setEmoji('❓');
+          const acceptButton = new ButtonBuilder()
+            .setCustomId(`sug_accept_${suggestionId}`)
+            .setLabel('Aceptar')
+            .setStyle(ButtonStyle.Success)
+            .setEmoji('✅');
+          const rejectButton = new ButtonBuilder()
+            .setCustomId(`sug_reject_${suggestionId}`)
+            .setLabel('Rechazar')
+            .setStyle(ButtonStyle.Danger)
+            .setEmoji('❌');
+          const indefiniteButton = new ButtonBuilder()
+            .setCustomId(`sug_indefinite_${suggestionId}`)
+            .setLabel('Indefinido')
+            .setStyle(ButtonStyle.Secondary)
+            .setEmoji('❓');
 
           const row = new ActionRowBuilder().addComponents(acceptButton, rejectButton, indefiniteButton);
           const staffChannel = await client.channels.fetch(STAFF_REVIEW_CHANNEL_ID).catch(() => null);
           
           if (staffChannel) {
             await staffChannel.send({ embeds: [staffEmbed], components: [row] });
-            
-            // Guardar en MongoDB
-            await Suggestion.create({
-              odId: suggestionId,
-              messageId: publicMessage.id,
-              content: `**Título:** ${title}\n\n**Descripción:**\n${description}`,
-              status: 'pending'
-            });
           }
 
-          await interaction.reply({
-            content: `✅ Tu sugerencia ha sido enviada correctamente. Puedes verla en <#${SUGGESTIONS_CHANNEL_ID}>`,
-            ephemeral: true
-          });
-        }
+          await db.createSuggestion(suggestionId, interaction.user.id, publicMessage.id, title, description);
 
-        if (interaction.customId.startsWith('sug_reason|')) {
-          const parts = interaction.customId.split('|');
-          const action = parts[1];
-          const suggestionId = parts[2];
+          await db.addAuditLog('SUGGESTION_CREATE', interaction.user.id, null, null, {
+            suggestionId,
+            title,
+            messageId: publicMessage.id
+          });
+
+          await interaction.editReply({
+            content: `✅ Tu sugerencia ha sido enviada correctamente. Puedes verla en <#${SUGGESTIONS_CHANNEL_ID}>`
+          });
+        } catch (error) {
+          console.error('Error procesando sugerencia:', error);
+          await interaction.editReply({
+            content: '❌ Hubo un error al procesar tu sugerencia. Por favor, intenta de nuevo.'
+          }).catch(() => {});
+        }
+        return;
+      }
+
+      if (interaction.isModalSubmit() && interaction.customId.startsWith('sug_reason_')) {
+        const interactionKey = `reason_${interaction.id}`;
+        if (processedInteractions.has(interactionKey)) return;
+        processedInteractions.add(interactionKey);
+        cleanupProcessedInteractions();
+
+        await interaction.deferReply({ ephemeral: true });
+
+        try {
+          const parts = interaction.customId.split('_');
+          const action = parts[2];
+          const suggestionId = parts.slice(3).join('_');
           const reason = interaction.fields.getTextInputValue('reason');
 
-          const suggestionData = await Suggestion.findOne({ odId: suggestionId });
+          const suggestionData = await db.getSuggestion(suggestionId);
           if (!suggestionData) {
-            return interaction.reply({ content: '❌ No se encontró la sugerencia en la base de datos.', ephemeral: true });
+            return interaction.editReply({ content: '❌ No se encontró la sugerencia en la base de datos.' });
           }
 
           let statusText, statusEmoji, color, dbStatus;
@@ -222,10 +294,8 @@ module.exports = (client) => {
 
           try {
             const publicChannel = await client.channels.fetch(SUGGESTIONS_CHANNEL_ID);
-            const publicMessage = await publicChannel.messages.fetch(suggestionData.messageId);
+            const publicMessage = await publicChannel.messages.fetch(suggestionData.message_id);
 
-            // Reconstruir el embed original (esto es un compromiso ya que no guardamos todo en DB)
-            // En una implementación real, guardaríamos el objeto embed completo.
             const oldEmbed = publicMessage.embeds[0];
             const updatedEmbed = EmbedBuilder.from(oldEmbed)
               .setColor(color)
@@ -236,9 +306,15 @@ module.exports = (client) => {
               )
               .setTimestamp();
 
-            await publicMessage.edit({ embeds: [updatedEmbed] });
+            const createSugBtn = new ButtonBuilder()
+              .setCustomId('create_suggestion_btn')
+              .setLabel('Hacer una sugerencia')
+              .setStyle(ButtonStyle.Primary)
+              .setEmoji('💡');
+            const publicRow = new ActionRowBuilder().addComponents(createSugBtn);
 
-            // Actualizar mensaje de staff
+            await publicMessage.edit({ embeds: [updatedEmbed], components: [publicRow] });
+
             const staffEmbed = EmbedBuilder.from(interaction.message.embeds[0])
               .setTitle(`📋 Sugerencia Revisada`)
               .setColor(color)
@@ -251,36 +327,59 @@ module.exports = (client) => {
 
             await interaction.message.edit({ embeds: [staffEmbed], components: [] });
 
-            suggestionData.status = dbStatus;
-            await suggestionData.save();
+            await db.updateSuggestionStatus(suggestionId, dbStatus, interaction.user.id, reason);
 
-            await interaction.reply({ content: `✅ Sugerencia marcada como **${statusText}**.`, ephemeral: true });
+            await db.addAuditLog('SUGGESTION_REVIEW', suggestionData.user_id, null, interaction.user.id, {
+              suggestionId,
+              status: dbStatus,
+              reason
+            });
+
+            await interaction.editReply({ content: `✅ Sugerencia marcada como **${statusText}**.` });
           } catch (error) {
             console.error('Error actualizando sugerencia:', error);
-            await interaction.reply({ content: '❌ Hubo un error al actualizar la sugerencia (mensaje original no encontrado o permisos).', ephemeral: true });
+            await interaction.editReply({ content: '❌ Hubo un error al actualizar la sugerencia.' });
           }
+        } catch (error) {
+          console.error('Error en modal de razón:', error);
+          await interaction.editReply({ content: '❌ Error procesando la revisión.' }).catch(() => {});
         }
+        return;
       }
 
       if (interaction.isButton()) {
-        if (interaction.customId.startsWith('sug_accept|') || interaction.customId.startsWith('sug_reject|') || interaction.customId.startsWith('sug_indefinite|')) {
+        const customId = interaction.customId;
+        
+        if (customId.startsWith('sug_accept_') || customId.startsWith('sug_reject_') || customId.startsWith('sug_indefinite_')) {
+          const interactionKey = `sugbtn_${interaction.id}`;
+          if (processedInteractions.has(interactionKey)) return;
+          processedInteractions.add(interactionKey);
+          cleanupProcessedInteractions();
+
           const hasStaffRole = interaction.member.roles.cache.has(STAFF_ROLE_ID);
           if (!hasStaffRole) {
             return interaction.reply({ content: '❌ Solo el staff puede revisar sugerencias.', ephemeral: true });
           }
 
-          const parts = interaction.customId.split('|');
-          const action = parts[0].replace('sug_', '');
-          const suggestionId = parts[1];
+          const parts = customId.split('_');
+          const action = parts[1];
+          const suggestionId = parts.slice(2).join('_');
 
-          const suggestionData = await Suggestion.findOne({ odId: suggestionId });
+          const suggestionData = await db.getSuggestion(suggestionId);
           if (!suggestionData) {
             return interaction.reply({ content: '❌ No se encontró la sugerencia en la base de datos.', ephemeral: true });
           }
 
-          let actionText = action === 'accept' ? 'Aceptar' : (action === 'reject' ? 'Rechazar' : 'Indefinida');
+          if (suggestionData.status !== 'pending') {
+            return interaction.reply({ content: '❌ Esta sugerencia ya fue revisada.', ephemeral: true });
+          }
 
-          const modal = new ModalBuilder().setCustomId(`sug_reason|${action}|${suggestionId}`).setTitle(`${actionText} Sugerencia`);
+          let actionText = action === 'accept' ? 'Aceptar' : (action === 'reject' ? 'Rechazar' : 'Marcar como Indefinida');
+
+          const modal = new ModalBuilder()
+            .setCustomId(`sug_reason_${action}_${suggestionId}`)
+            .setTitle(`${actionText} Sugerencia`);
+          
           const reasonInput = new TextInputBuilder()
             .setCustomId('reason')
             .setLabel('Razón de tu decisión')
@@ -295,6 +394,9 @@ module.exports = (client) => {
       }
     } catch (error) {
       console.error('Error en sistema de sugerencias:', error);
+      if (!interaction.replied && !interaction.deferred) {
+        interaction.reply({ content: '❌ Ocurrió un error.', ephemeral: true }).catch(() => {});
+      }
     }
   });
 };

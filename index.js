@@ -1,12 +1,8 @@
-// =========================
-// SirgioBOT - Sistema de Tickets mejorado
-// =========================
-
 require("dotenv").config();
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
-const { connectDB } = require('./database');
+const { connectDB, db } = require('./database');
 const {
   Client,
   GatewayIntentBits,
@@ -21,7 +17,8 @@ const {
   AttachmentBuilder,
   ModalBuilder,
   TextInputBuilder,
-  TextInputStyle
+  TextInputStyle,
+  SlashCommandBuilder
 } = require("discord.js");
 const express = require("express");
 
@@ -31,17 +28,17 @@ const client = new Client({
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
     GatewayIntentBits.GuildMembers,
-    GatewayIntentBits.GuildMessageReactions
+    GatewayIntentBits.GuildMessageReactions,
+    GatewayIntentBits.DirectMessages
   ],
-  partials: [Partials.Channel, Partials.Message, Partials.Reaction]
+  partials: [Partials.Channel, Partials.Message, Partials.Reaction, Partials.User]
 });
 
-// Conectar a la base de datos
 connectDB().then(connected => {
   if (connected) {
-    console.log("🗄️ Base de datos inicializada correctamente.");
+    console.log("🗄️ Base de datos PostgreSQL inicializada correctamente.");
   } else {
-    console.warn("⚠️ Continuando con almacenamiento local.");
+    console.error("❌ Error inicializando base de datos.");
   }
 });
 
@@ -54,11 +51,18 @@ require('./autoroles.js')(client);
 require('./sugerencias.js')(client);
 require('./notificaciones')(client);
 require('./avisos')(client);
+require('./utils/commands')(client);
+require('./utils/stats')(client);
+require('./utils/reminders')(client);
+require('./utils/ratelimit')(client);
+require('./utils/backup')(client);
+require('./utils/audit')(client);
 
 const STAFF_ROLE_IDS = [
   "1212891335929897030",
   "1229140504310972599",
-  "1230952139015327755"
+  "1230952139015327755",
+  "1230949752733175888"
 ];
 
 const MOD_ROLE_IDS = [
@@ -69,7 +73,7 @@ const MOD_ROLE_IDS = [
 
 const TICKET_CATEGORY_ID = "1228437209628020736";
 const LOGS_CHANNEL_ID = "1431416957160259764";
-const DATA_FILE = path.join(__dirname, "tickets.json");
+const GUILD_ID = "1212886282645147768";
 
 const EMOJI_IDS = {
   discord_bots: { id: "1431413172513804348", name: "emoji_104" },
@@ -128,32 +132,6 @@ R// Cada 30 o 35 dias dependiendo el mes.
 
 **¿Cuales son las recompensas por subir de nivel?**
 R// puedes verlas haciendo /rewards list.`;
-
-let data = { lastTicket: 0, userHasTicket: {}, channels: {} };
-if (fs.existsSync(DATA_FILE)) {
-  try {
-    const raw = fs.readFileSync(DATA_FILE, "utf8");
-    data = JSON.parse(raw);
-    if (!data.lastTicket) data.lastTicket = 0;
-    if (!data.userHasTicket) data.userHasTicket = {};
-    if (!data.channels) data.channels = {};
-    console.log(`📁 tickets.json cargado (lastTicket=${data.lastTicket})`);
-  } catch (err) {
-    console.error("⚠️ Error leyendo tickets.json, se recreará uno nuevo:", err);
-    data = { lastTicket: 0, userHasTicket: {}, channels: {} };
-    fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
-  }
-} else {
-  fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
-}
-
-function saveData() {
-  try {
-    fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
-  } catch (err) {
-    console.error("⚠️ Error guardando tickets.json:", err);
-  }
-}
 
 function sanitizeChannelName(name) {
   return name.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").slice(0, 90);
@@ -217,10 +195,11 @@ client.on("interactionCreate", async (interaction) => {
       const chosen = interaction.values[0];
       const userId = interaction.user.id;
 
-      if (data.userHasTicket[userId]) {
-        const chId = data.userHasTicket[userId];
-        const ch = interaction.guild.channels.cache.get(chId) || await interaction.guild.channels.fetch(chId).catch(()=>null);
-        return interaction.reply({ content: `❗️ Ya tienes un ticket abierto: ${ch ? ch.toString() : chId}`, ephemeral: true });
+      const existingTicket = await db.getTicketByOwner(userId);
+      if (existingTicket) {
+        const ch = interaction.guild.channels.cache.get(existingTicket.channel_id) || 
+                   await interaction.guild.channels.fetch(existingTicket.channel_id).catch(()=>null);
+        return interaction.reply({ content: `❗️ Ya tienes un ticket abierto: ${ch ? ch.toString() : existingTicket.channel_id}`, ephemeral: true });
       }
 
       const confirmId = `confirm_ticket_${userId}_${Date.now()}_${chosen}`;
@@ -257,8 +236,8 @@ client.on("interactionCreate", async (interaction) => {
 
       if (id.startsWith("cancel_ticket_")) {
         const parts = id.split("_");
-        const userId = parts[2];
-        if (userId !== interaction.user.id && !isStaff(interaction.member)) {
+        const odId = parts[2];
+        if (odId !== interaction.user.id && !isStaff(interaction.member)) {
           return interaction.reply({ content: "❗ Solo quien inició la apertura o el staff puede cancelar.", ephemeral: true });
         }
         return interaction.update({ content: "❌ Apertura de ticket cancelada.", embeds: [], components: [] });
@@ -266,21 +245,23 @@ client.on("interactionCreate", async (interaction) => {
 
       if (id.startsWith("confirm_ticket_")) {
         const parts = id.split("_");
-        const userId = parts[2];
+        const odId = parts[2];
         const chosen = parts.slice(4).join("_") || "otro";
 
-        if (userId !== interaction.user.id && !isStaff(interaction.member)) {
+        if (odId !== interaction.user.id && !isStaff(interaction.member)) {
           return interaction.reply({ content: "❗ Solo quien inició la apertura o el staff puede confirmar.", ephemeral: true });
         }
 
-        if (data.userHasTicket[userId]) {
-          const existingId = data.userHasTicket[userId];
-          const ch = interaction.guild.channels.cache.get(existingId) || await interaction.guild.channels.fetch(existingId).catch(()=>null);
-          return interaction.update({ content: `❗️ Ya tienes un ticket abierto: ${ch ? ch.toString() : existingId}`, embeds: [], components: [] });
+        const existingTicket = await db.getTicketByOwner(odId);
+        if (existingTicket) {
+          const ch = interaction.guild.channels.cache.get(existingTicket.channel_id) || 
+                     await interaction.guild.channels.fetch(existingTicket.channel_id).catch(()=>null);
+          return interaction.update({ content: `❗️ Ya tienes un ticket abierto: ${ch ? ch.toString() : existingTicket.channel_id}`, embeds: [], components: [] });
         }
 
-        data.lastTicket = (data.lastTicket || 0) + 1;
-        const number = String(data.lastTicket).padStart(3, "0");
+        const lastTicket = await db.getLastTicketNumber();
+        const ticketNum = lastTicket + 1;
+        const number = String(ticketNum).padStart(3, "0");
         const username = interaction.user.username || "user";
         const rawName = `${username}-${number}`;
         const chanName = sanitizeChannelName(rawName);
@@ -314,15 +295,13 @@ client.on("interactionCreate", async (interaction) => {
           });
         }
 
-        data.userHasTicket[interaction.user.id] = channel.id;
-        data.channels[channel.id] = {
-          ownerId: interaction.user.id,
-          number,
-          category: chosen,
-          createdAt: new Date().toISOString(),
-          claimedBy: null
-        };
-        saveData();
+        await db.createTicket(channel.id, interaction.user.id, number, chosen);
+
+        await db.addAuditLog('TICKET_CREATE', interaction.user.id, null, null, {
+          channelId: channel.id,
+          ticketNumber: number,
+          category: chosen
+        });
 
         const claimBtn = new ButtonBuilder().setCustomId(`claim_ticket_${channel.id}`).setLabel("🧑‍💼 Atender ticket").setStyle(ButtonStyle.Primary);
         const row = new ActionRowBuilder().addComponents(claimBtn);
@@ -349,14 +328,18 @@ client.on("interactionCreate", async (interaction) => {
 
       if (id.startsWith("claim_ticket_")) {
         const channelId = id.replace("claim_ticket_", "");
-        const ticket = data.channels[channelId];
-        if (!ticket) return interaction.reply({ content: "❗ Ticket no encontrado en registros.", ephemeral: true });
-
-        const MOD_ROLE_ID = "1229140504310972599";
-        const hasMod = interaction.member.roles.cache.has(MOD_ROLE_ID);
+        const ticket = await db.getTicketByChannel(channelId);
         
-        if (!hasMod) {
+        if (!ticket) {
+          return interaction.reply({ content: "❗ Ticket no encontrado en registros.", ephemeral: true });
+        }
+
+        if (!isMod(interaction.member)) {
           return interaction.reply({ content: "❌ Solo moderadores pueden atender tickets.", ephemeral: true });
+        }
+
+        if (ticket.claimed_by) {
+          return interaction.reply({ content: `❗ Este ticket ya fue atendido por <@${ticket.claimed_by}>.`, ephemeral: true });
         }
 
         try {
@@ -369,10 +352,15 @@ client.on("interactionCreate", async (interaction) => {
           console.warn("No se pudieron editar permisos al claim:", err);
         }
 
-        ticket.claimedBy = interaction.user.id;
-        saveData();
+        await db.claimTicket(channelId, interaction.user.id);
+        await db.updateStaffStats(interaction.user.id, 'claim');
 
-        const ownerId = ticket.ownerId;
+        await db.addAuditLog('TICKET_CLAIM', ticket.owner_id, null, interaction.user.id, {
+          channelId,
+          ticketNumber: ticket.ticket_number
+        });
+
+        const ownerId = ticket.owner_id;
         await interaction.channel.send({ content: `💬 Hola <@${ownerId}>, gracias por comunicarte con el staff. <@${interaction.user.id}> atenderá tu ticket.` });
         
         try {
@@ -412,38 +400,48 @@ client.on("interactionCreate", async (interaction) => {
       const stars = "⭐".repeat(rating) + "☆".repeat(5 - rating);
 
       try {
-        const guild = interaction.guild || await client.guilds.fetch(interaction.guildId).catch(() => null);
-        if (!guild) return console.error("No se pudo obtener la guild para la calificación");
-
-        const logsChannel = await guild.channels.fetch(LOGS_CHANNEL_ID).catch((err) => {
-          console.warn("No se pudo obtener el canal de logs:", err);
-          return null;
-        });
+        const ticketData = await db.getTicketByNumber(ticketNumber);
         
-        if (logsChannel) {
-          const ticketDataEntry = Object.entries(data.channels || {}).find(([id, t]) => t && t.number === ticketNumber);
-          const ticketData = ticketDataEntry ? ticketDataEntry[1] : null;
-          const staffMemberTag = ticketData?.claimedBy ? `<@${ticketData.claimedBy}>` : "No asignado";
+        if (ticketData) {
+          await db.rateTicket(ticketNumber, rating, comment);
           
-          const ratingEmbed = new EmbedBuilder()
-            .setTitle("⭐ Calificación de Ticket #" + ticketNumber)
-            .setDescription(`El usuario ha calificado su experiencia con el soporte`)
-            .addFields(
-              { name: "Usuario", value: `<@${interaction.user.id}>`, inline: true },
-              { name: "Staff que atendió", value: staffMemberTag, inline: true },
-              { name: "Calificación", value: `${stars} (${rating}/5)`, inline: true },
-              { name: "Comentario", value: comment || "Sin comentario", inline: false }
-            )
-            .setColor(rating >= 4 ? 0x00ff00 : rating >= 3 ? 0xffff00 : 0xff0000)
-            .setTimestamp();
+          if (ticketData.claimed_by) {
+            await db.updateStaffStats(ticketData.claimed_by, 'rate', null, rating);
+          }
 
-          await logsChannel.send({ embeds: [ratingEmbed] });
-          console.log(`📊 Calificación de ticket #${ticketNumber} enviada al canal de logs`);
-        } else {
-          console.warn("Canal de logs no encontrado para enviar calificación (ID: " + LOGS_CHANNEL_ID + ")");
+          await db.addAuditLog('TICKET_RATE', interaction.user.id, ticketData.claimed_by, null, {
+            ticketNumber,
+            rating,
+            comment
+          });
+        }
+
+        const guild = interaction.guild || client.guilds.cache.get(GUILD_ID) || await client.guilds.fetch(GUILD_ID).catch(() => null);
+        
+        if (guild) {
+          const logsChannel = await guild.channels.fetch(LOGS_CHANNEL_ID).catch(() => null);
+          
+          if (logsChannel) {
+            const staffMemberTag = ticketData?.claimed_by ? `<@${ticketData.claimed_by}>` : "No asignado";
+            
+            const ratingEmbed = new EmbedBuilder()
+              .setTitle("⭐ Calificación de Ticket #" + ticketNumber)
+              .setDescription(`El usuario ha calificado su experiencia con el soporte`)
+              .addFields(
+                { name: "Usuario", value: `<@${interaction.user.id}>`, inline: true },
+                { name: "Staff que atendió", value: staffMemberTag, inline: true },
+                { name: "Calificación", value: `${stars} (${rating}/5)`, inline: true },
+                { name: "Comentario", value: comment || "Sin comentario", inline: false }
+              )
+              .setColor(rating >= 4 ? 0x00ff00 : rating >= 3 ? 0xffff00 : 0xff0000)
+              .setTimestamp();
+
+            await logsChannel.send({ embeds: [ratingEmbed] });
+            console.log(`📊 Calificación de ticket #${ticketNumber} enviada al canal de logs`);
+          }
         }
       } catch (err) {
-        console.error("Error en bloque try-catch de calificaciones:", err);
+        console.error("Error procesando calificación:", err);
       }
 
       return interaction.reply({ content: `¡Gracias por tu calificación! ${stars}`, ephemeral: true });
@@ -467,15 +465,9 @@ client.on("messageCreate", async (message) => {
     if (!message.member) await message.guild.members.fetch(message.author.id).catch(()=>{});
     if (!isStaff(message.member)) return message.reply("❌ Solo el staff puede usar este comando.");
 
-    try {
-      const raw = fs.readFileSync(DATA_FILE, "utf8");
-      data = JSON.parse(raw);
-    } catch (err) {
-      console.warn("No se pudo recargar tickets.json:", err);
-    }
-
     const channel = message.channel;
-    const ticket = data.channels[channel.id];
+    const ticket = await db.getTicketByChannel(channel.id);
+    
     if (!ticket) {
       return message.reply("⚠️ Este canal no parece ser un ticket gestionado por el sistema.");
     }
@@ -498,7 +490,7 @@ client.on("messageCreate", async (message) => {
       console.warn("No se pudieron leer todos los mensajes para transcripción:", err);
     }
 
-    let transcript = `Transcripción - Ticket #${ticket.number} - ${channel.name}\nCreado por: <@${ticket.ownerId}>\nCategoría: ${ticket.category}\nCerrado por: <@${message.author.id}>\nFecha: ${new Date().toISOString()}\n\n--- Mensajes ---\n\n`;
+    let transcript = `Transcripción - Ticket #${ticket.ticket_number} - ${channel.name}\nCreado por: <@${ticket.owner_id}>\nCategoría: ${ticket.category}\nCerrado por: <@${message.author.id}>\nFecha: ${new Date().toISOString()}\n\n--- Mensajes ---\n\n`;
     for (const m of allMessages) {
       const time = new Date(m.createdTimestamp).toISOString();
       const author = `${m.author.tag} (${m.author.id})`;
@@ -510,7 +502,7 @@ client.on("messageCreate", async (message) => {
       transcript += `[${time}] ${author}: ${content}\n`;
     }
 
-    const filename = `transcript-${channel.name || ticket.number}.txt`;
+    const filename = `transcript-${channel.name || ticket.ticket_number}.txt`;
     const tmpPath = path.join(os.tmpdir(), `${Date.now()}-${filename}`);
     try {
       fs.writeFileSync(tmpPath, transcript, "utf8");
@@ -522,9 +514,9 @@ client.on("messageCreate", async (message) => {
       const logsChannel = await message.guild.channels.fetch(LOGS_CHANNEL_ID).catch(()=>null);
       const embed = new EmbedBuilder()
         .setTitle("📁 Transcripción de ticket")
-        .setDescription(`Se ha cerrado el ticket **#${ticket.number}** (${channel.name}).`)
+        .setDescription(`Se ha cerrado el ticket **#${ticket.ticket_number}** (${channel.name}).`)
         .addFields(
-          { name: "Usuario", value: `<@${ticket.ownerId}>`, inline: true },
+          { name: "Usuario", value: `<@${ticket.owner_id}>`, inline: true },
           { name: "Cerrado por", value: `<@${message.author.id}>`, inline: true },
           { name: "Canal", value: `${channel.name}`, inline: true }
         )
@@ -536,29 +528,38 @@ client.on("messageCreate", async (message) => {
         await logsChannel.send({ embeds: [embed], files: [attachment] }).catch(err => {
           console.warn("No se pudo enviar la transcripción al canal logs:", err);
         });
-      } else {
-        console.warn("Canal de logs no encontrado, omitiendo envío de transcripción.");
       }
     } catch (err) {
       console.error("Error enviando transcripción al canal logs:", err);
     }
 
+    await db.closeTicket(channel.id, message.author.id);
+    
+    if (ticket.claimed_by) {
+      await db.updateStaffStats(ticket.claimed_by, 'close');
+    }
+
+    await db.addAuditLog('TICKET_CLOSE', ticket.owner_id, null, message.author.id, {
+      channelId: channel.id,
+      ticketNumber: ticket.ticket_number
+    });
+
     try {
-      const ticketOwner = await client.users.fetch(ticket.ownerId).catch(() => null);
+      const ticketOwner = await client.users.fetch(ticket.owner_id).catch(() => null);
       if (ticketOwner) {
         const ratingEmbed = new EmbedBuilder()
           .setTitle("⭐ Califica tu experiencia")
-          .setDescription(`Tu ticket #${ticket.number} ha sido cerrado.\n\n¿Cómo calificarías la atención recibida?`)
+          .setDescription(`Tu ticket #${ticket.ticket_number} ha sido cerrado.\n\n¿Cómo calificarías la atención recibida?`)
           .setColor(0x5865F2)
           .setFooter({ text: "Tu opinión nos ayuda a mejorar" })
           .setTimestamp();
 
         const ratingRow = new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setCustomId(`rate_ticket_1_${ticket.number}`).setLabel("1").setStyle(ButtonStyle.Danger),
-          new ButtonBuilder().setCustomId(`rate_ticket_2_${ticket.number}`).setLabel("2").setStyle(ButtonStyle.Danger),
-          new ButtonBuilder().setCustomId(`rate_ticket_3_${ticket.number}`).setLabel("3").setStyle(ButtonStyle.Primary),
-          new ButtonBuilder().setCustomId(`rate_ticket_4_${ticket.number}`).setLabel("4").setStyle(ButtonStyle.Success),
-          new ButtonBuilder().setCustomId(`rate_ticket_5_${ticket.number}`).setLabel("5").setStyle(ButtonStyle.Success)
+          new ButtonBuilder().setCustomId(`rate_ticket_1_${ticket.ticket_number}`).setLabel("1").setStyle(ButtonStyle.Danger),
+          new ButtonBuilder().setCustomId(`rate_ticket_2_${ticket.ticket_number}`).setLabel("2").setStyle(ButtonStyle.Danger),
+          new ButtonBuilder().setCustomId(`rate_ticket_3_${ticket.ticket_number}`).setLabel("3").setStyle(ButtonStyle.Primary),
+          new ButtonBuilder().setCustomId(`rate_ticket_4_${ticket.ticket_number}`).setLabel("4").setStyle(ButtonStyle.Success),
+          new ButtonBuilder().setCustomId(`rate_ticket_5_${ticket.ticket_number}`).setLabel("5").setStyle(ButtonStyle.Success)
         );
 
         await ticketOwner.send({ embeds: [ratingEmbed], components: [ratingRow] }).catch(() => {
@@ -568,10 +569,6 @@ client.on("messageCreate", async (message) => {
     } catch (err) {
       console.error("Error enviando mensaje de calificación:", err);
     }
-
-    delete data.userHasTicket[ticket.ownerId];
-    delete data.channels[channel.id];
-    saveData();
 
     await message.reply("🗑️ Ticket cerrado. Eliminando canal en 5 segundos...");
     setTimeout(async () => {
@@ -592,10 +589,23 @@ client.on("messageCreate", async (message) => {
 client.once("ready", () => {
   console.log(`✅ SirgioBOT conectado como ${client.user.tag}`);
   client.user.setActivity("LagSupport", { type: 3 });
+  
+  setInterval(async () => {
+    try {
+      await db.cleanupRateLimits();
+      const cleaned = await db.cleanupOldWarnings();
+      if (cleaned.length > 0) {
+        console.log(`🧹 Limpiados ${cleaned.length} warns antiguos`);
+      }
+    } catch (err) {
+      console.error("Error en limpieza periódica:", err);
+    }
+  }, 60 * 60 * 1000);
 });
 
 const app = express();
 app.get("/", (req, res) => res.send("SirgioBOT is alive!"));
+app.get("/health", (req, res) => res.json({ status: "ok", uptime: process.uptime() }));
 app.listen(process.env.PORT || 3000, () => console.log("🌐 Servidor web activo para mantener el bot despierto."));
 
 client.login(process.env.DISCORD_TOKEN || process.env.TOKEN);

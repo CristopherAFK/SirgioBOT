@@ -25,7 +25,7 @@ const MOD_ROLE_ID = "1229140504310972599";
 const ADMIN_ROLE_ID = "1212891335929897030";
 const HEAD_ADMIN_ROLE_ID = "1230952139015327755";
 
-const db = require('./database');
+const { db } = require('./database');
 
 const STAFF_ROLE_IDS = [HELPER_ROLE_ID, MOD_ROLE_ID, ADMIN_ROLE_ID, HEAD_ADMIN_ROLE_ID];
 const CAN_BAN_ROLE_IDS = [MOD_ROLE_ID, ADMIN_ROLE_ID, HEAD_ADMIN_ROLE_ID];
@@ -516,15 +516,15 @@ module.exports = (client) => {
           const guild = interaction.guild || client.guilds.cache.get(GUILD_ID);
           if (!guild) return interaction.reply({ content: "❌ No se pudo obtener el servidor.", flags: MessageFlags.Ephemeral });
 
-          loadTicketData();
-          if (ticketData.userHasTicket[interaction.user.id]) {
-            const existingId = ticketData.userHasTicket[interaction.user.id];
-            const existingCh = guild.channels.cache.get(existingId) || await guild.channels.fetch(existingId).catch(() => null);
-            return interaction.reply({ content: `❗️ Ya tienes un ticket abierto: ${existingCh ? existingCh.toString() : existingId}`, flags: MessageFlags.Ephemeral });
+          const existingTicket = await db.getTicketByOwner(interaction.user.id);
+          if (existingTicket) {
+            const existingCh = guild.channels.cache.get(existingTicket.channel_id) || await guild.channels.fetch(existingTicket.channel_id).catch(() => null);
+            return interaction.reply({ content: `❗️ Ya tienes un ticket abierto: ${existingCh ? existingCh.toString() : existingTicket.channel_id}`, flags: MessageFlags.Ephemeral });
           }
 
-          ticketData.lastTicket = (ticketData.lastTicket || 0) + 1;
-          const number = String(ticketData.lastTicket).padStart(3, "0");
+          const lastTicket = await db.getLastTicketNumber();
+          const ticketNum = lastTicket + 1;
+          const number = String(ticketNum).padStart(3, "0");
           const username = interaction.user.username || "user";
           const chanName = sanitizeChannelName(`apelacion-${username}-${number}`);
 
@@ -556,15 +556,13 @@ module.exports = (client) => {
             });
           }
 
-          ticketData.userHasTicket[interaction.user.id] = channel.id;
-          ticketData.channels[channel.id] = {
-            ownerId: interaction.user.id,
-            number,
-            category: "apelacion",
-            createdAt: new Date().toISOString(),
-            claimedBy: null
-          };
-          saveTicketData();
+          await db.createTicket(channel.id, interaction.user.id, number, "apelacion");
+
+          await db.addAuditLog('TICKET_CREATE', interaction.user.id, null, null, {
+            channelId: channel.id,
+            ticketNumber: number,
+            category: 'apelacion'
+          });
 
           const claimBtn = new ButtonBuilder().setCustomId(`claim_ticket_${channel.id}`).setLabel("🧑‍💼 Atender ticket").setStyle(ButtonStyle.Primary);
           const ticketRow = new ActionRowBuilder().addComponents(claimBtn);

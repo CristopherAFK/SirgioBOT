@@ -11,8 +11,10 @@
     "axios": "^1.13.4",
     "discord.js": "^14.25.1",
     "dotenv": "^16.6.1",
+    "drizzle-orm": "^0.45.1",
     "express": "^4.22.1",
     "mongoose": "^9.1.5",
+    "pg": "^8.17.2",
     "rss-parser": "^3.13.0"
   }
 }

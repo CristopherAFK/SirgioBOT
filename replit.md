@@ -1,7 +1,7 @@
 # SirgioBOT - Discord Bot
 
 ## Overview
-SirgioBOT es un bot de Discord para el servidor de Sirgio con múltiples sistemas de moderación, tickets, autoroles y más.
+SirgioBOT es un bot de Discord para el servidor de Sirgio con múltiples sistemas de moderación, tickets, autoroles y más. Ahora utiliza PostgreSQL como base de datos principal para mayor confiabilidad.
 
 ## Características Principales
 
@@ -10,16 +10,24 @@ SirgioBOT es un bot de Discord para el servidor de Sirgio con múltiples sistema
 - Normalización de texto para detectar variaciones (números por letras, caracteres especiales)
 - Palabras ocultas que no aparecen al hacer click en "ver palabras prohibidas"
 - Comando `/sancion` unificado con opciones de Warn/Mute/Ban
-- Comando `/panelautomod` para el panel de moderación del staff
+- Comando `/stafftools` para el panel de moderación del staff
 - Sistema de categorías de sanciones (Flood, Spam, Bypass, etc.)
 - Soporte para pruebas adjuntas (imágenes/videos)
 
-### Sistema de Tickets
+### Sistema de Tickets (PostgreSQL)
 - Mensajes específicos por categoría de ticket
 - Botón "Ver Preguntas Frecuentes" en confirmación
 - Solo moderadores pueden ver el botón "Atender ticket"
 - Sistema de calificación al cerrar tickets (1-5 estrellas)
 - Transcripciones automáticas enviadas al canal de logs
+- Tickets de apelación integrados correctamente con el sistema principal
+- Estadísticas de staff (tickets atendidos, calificación promedio)
+
+### Sistema de Sugerencias (Reconstruido)
+- Usa deferReply() para evitar timeouts
+- Prevención de duplicados con tracking de interacciones
+- Almacenamiento en PostgreSQL
+- Botones de revisión para staff (Aceptar/Rechazar/Indefinido)
 
 ### Sistema de Autoroles
 - Basado en reacciones (en lugar de botones)
@@ -31,46 +39,86 @@ SirgioBOT es un bot de Discord para el servidor de Sirgio con múltiples sistema
 - Estado persistente (sobrevive reinicios)
 - Comando `/estado_postulaciones` para ver estado actual
 
-### Comandos de Staff
-- `/sancion` - Comando unificado para Warn/Mute/Ban con categorías
-- `/panelautomod` - Panel interactivo de moderación
-- `/mantenimiento` - Activa/desactiva modo mantenimiento
-- `/ping_role` - Menciona cualquier rol incluyendo @everyone
-- `/vigilar` - Inicia vigilancia de un usuario
+### Sistema de Estadísticas (/stats)
+- `/stats tickets` - Estadísticas generales de tickets
+- `/stats staff` - Ranking de staff por rendimiento
+- `/stats personal` - Estadísticas personales del staff
 
-### Permisos de Roles
-- **Helpers** (1230949752733175888): Solo pueden dar warns y mutes
-- **Moderadores** (1229140504310972599): Pueden dar warns, mutes y bans
-- **Admins** (1212891335929897030): Permisos completos
+### Sistema de Recordatorios
+- Notifica tickets sin atender después de 1 hora
+- Recuerda a usuarios sobre tickets esperando respuesta
+
+### Sistema de Auditoría (/audit)
+- `/audit recent` - Logs más recientes
+- `/audit user` - Logs por usuario
+- `/audit type` - Filtrar por tipo de acción
+- `/audit search` - Buscar en logs
+
+### Comandos de Utilidad
+- `/userinfo` - Información de usuario
+- `/serverinfo` - Información del servidor
+- `/avatar` - Avatar de usuario
+- `/banner` - Banner de usuario
+- `/ping` - Latencia del bot
+- `/membercount` - Conteo de miembros
+
+### Rate Limiting
+- Protección contra spam de comandos
+- Límites configurables por comando
+- Almacenamiento en PostgreSQL
+
+### Backup Automático
+- Backups cada 6 horas
+- Máximo 10 backups guardados
+- Almacenamiento en carpeta /backups
 
 ## Estructura de Archivos
 ```
 ├── index.js           # Archivo principal, sistema de tickets
+├── database.js        # Conexión y funciones PostgreSQL
 ├── automod.js         # Sistema de moderación automática
 ├── autoroles.js       # Sistema de autoroles por reacciones
 ├── postulaciones.js   # Sistema de postulaciones
 ├── welcome.js         # Mensajes de bienvenida
-├── sugerencias.js     # Sistema de sugerencias
+├── sugerencias.js     # Sistema de sugerencias (reconstruido)
 ├── notificaciones.js  # Notificaciones de YouTube
 ├── avisos.js          # Sistema de avisos
 ├── embed.js           # Generador de embeds
 ├── anuncio.js         # Sistema de anuncios
-├── bannedWords.json   # Lista de palabras prohibidas (visibles)
-├── sensitiveWords.json # Lista de palabras sensibles
-├── tickets.json       # Datos de tickets
-├── warns.json         # Advertencias de usuarios
-├── suggestions.json   # Sugerencias
+├── utils/
+│   ├── commands.js    # Comandos de utilidad
+│   ├── stats.js       # Sistema de estadísticas
+│   ├── reminders.js   # Sistema de recordatorios
+│   ├── ratelimit.js   # Rate limiting
+│   ├── backup.js      # Backup automático
+│   └── audit.js       # Sistema de auditoría
+├── backups/           # Carpeta de backups
+├── bannedWords.json   # Lista de palabras prohibidas (legacy)
+├── sensitiveWords.json # Lista de palabras sensibles (legacy)
 ```
+
+## Base de Datos PostgreSQL
+Tablas principales:
+- `tickets` - Información de tickets
+- `warnings` - Advertencias de usuarios
+- `sanctions` - Sanciones aplicadas
+- `suggestions` - Sugerencias
+- `banned_words` - Palabras prohibidas
+- `mutes` - Mutes activos
+- `ticket_stats` - Estadísticas de staff
+- `audit_logs` - Logs de auditoría
+- `config` - Configuración del bot
+- `rate_limits` - Rate limiting
 
 ## Variables de Entorno Requeridas
 - `DISCORD_TOKEN` o `TOKEN` - Token del bot de Discord
-- `MONGODB_URI` o `MONGO_URI` (opcional) - URI de MongoDB para persistencia
+- `DATABASE_URL` - URL de conexión PostgreSQL (automático en Replit)
 
 ## Comandos Disponibles
 
 ### Staff
 - `/sancion usuario tipo categoria [razon] [tiempo] [veces] [infracciones_adicionales] [prueba]`
-- `/panelautomod` - Panel de moderación
+- `/stafftools` - Panel de herramientas de staff
 - `/mantenimiento on|off` - Modo mantenimiento
 - `/ping_role rol [mensaje]` - Mencionar rol
 - `/viewwarns usuario` - Ver advertencias
@@ -84,15 +132,32 @@ SirgioBOT es un bot de Discord para el servidor de Sirgio con múltiples sistema
 - `/automod on|off|status` - Controlar AutoMod
 - `/abrir_postulaciones` - Abrir postulaciones
 - `/cerrar_postulaciones` - Cerrar postulaciones
+- `/stats tickets|staff|personal` - Estadísticas
+- `/audit recent|user|type|search` - Auditoría
 
 ### Usuarios
+- `/sugerir` - Enviar sugerencia
 - `/postular categoria` - Enviar postulación
 - `/estado_postulaciones` - Ver estado de postulaciones
+- `/userinfo [usuario]` - Info de usuario
+- `/serverinfo` - Info del servidor
+- `/avatar [usuario]` - Ver avatar
+- `/banner [usuario]` - Ver banner
+- `/ping` - Latencia del bot
+- `/membercount` - Conteo de miembros
 
 ### Prefijo
 - `!panel` - Enviar panel de tickets
 - `!cerrar` / `!close` - Cerrar ticket
 - `!setup-autoroles` - Configurar paneles de autoroles
+- `!aviso` - Mencionar rol de avisos
+- `!everyone` - Mencionar @everyone
+
+## Permisos de Roles
+- **Helpers** (1230949752733175888): Solo pueden dar warns y mutes
+- **Moderadores** (1229140504310972599): Pueden dar warns, mutes y bans
+- **Admins** (1212891335929897030): Permisos completos
+- **Head Admins** (1230952139015327755): Permisos completos + comandos avanzados
 
 ## Última Actualización
-Diciembre 2024 - Mejoras de automod, sistema de sanciones unificado, autoroles por reacciones, sistema de calificación de tickets.
+Enero 2026 - Migración a PostgreSQL, reconstrucción del sistema de sugerencias, corrección de bugs en tickets de apelación y calificaciones, nuevos sistemas de estadísticas, recordatorios, auditoría, rate limiting y backups.
