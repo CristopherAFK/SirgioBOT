@@ -34,6 +34,8 @@ const client = new Client({
   partials: [Partials.Channel, Partials.Message, Partials.Reaction, Partials.User]
 });
 
+client.setMaxListeners(25);
+
 connectDB().then(connected => {
   if (connected) {
     console.log("🗄️ Base de datos PostgreSQL inicializada correctamente.");
