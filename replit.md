@@ -1,7 +1,16 @@
 # SirgioBOT - Discord Bot
 
 ## Overview
-SirgioBOT es un bot de Discord para el servidor de Sirgio con múltiples sistemas de moderación, tickets, autoroles y más. Ahora utiliza PostgreSQL como base de datos principal para mayor confiabilidad.
+SirgioBOT es un bot de Discord para el servidor de Sirgio con múltiples sistemas de moderación, tickets, autoroles y más. Ahora utiliza **MongoDB** como base de datos principal para mayor confiabilidad y persistencia en Render.
+
+## Base de Datos
+El bot usa **MongoDB** (compatible con MongoDB Atlas) para almacenar:
+- Tickets y calificaciones
+- Sugerencias
+- Advertencias y sanciones
+- Estadísticas de staff
+- Logs de auditoría
+- Configuración
 
 ## Características Principales
 
@@ -14,7 +23,7 @@ SirgioBOT es un bot de Discord para el servidor de Sirgio con múltiples sistema
 - Sistema de categorías de sanciones (Flood, Spam, Bypass, etc.)
 - Soporte para pruebas adjuntas (imágenes/videos)
 
-### Sistema de Tickets (PostgreSQL)
+### Sistema de Tickets (MongoDB)
 - Mensajes específicos por categoría de ticket
 - Botón "Ver Preguntas Frecuentes" en confirmación
 - Solo moderadores pueden ver el botón "Atender ticket"
@@ -26,7 +35,7 @@ SirgioBOT es un bot de Discord para el servidor de Sirgio con múltiples sistema
 ### Sistema de Sugerencias (Reconstruido)
 - Usa deferReply() para evitar timeouts
 - Prevención de duplicados con tracking de interacciones
-- Almacenamiento en PostgreSQL
+- Almacenamiento en MongoDB
 - Botones de revisión para staff (Aceptar/Rechazar/Indefinido)
 
 ### Sistema de Autoroles
@@ -65,7 +74,6 @@ SirgioBOT es un bot de Discord para el servidor de Sirgio con múltiples sistema
 ### Rate Limiting
 - Protección contra spam de comandos
 - Límites configurables por comando
-- Almacenamiento en PostgreSQL
 
 ### Backup Automático
 - Backups cada 6 horas
@@ -75,7 +83,7 @@ SirgioBOT es un bot de Discord para el servidor de Sirgio con múltiples sistema
 ## Estructura de Archivos
 ```
 ├── index.js           # Archivo principal, sistema de tickets
-├── database.js        # Conexión y funciones PostgreSQL
+├── database.js        # Conexión y funciones MongoDB
 ├── automod.js         # Sistema de moderación automática
 ├── autoroles.js       # Sistema de autoroles por reacciones
 ├── postulaciones.js   # Sistema de postulaciones
@@ -93,26 +101,28 @@ SirgioBOT es un bot de Discord para el servidor de Sirgio con múltiples sistema
 │   ├── backup.js      # Backup automático
 │   └── audit.js       # Sistema de auditoría
 ├── backups/           # Carpeta de backups
-├── bannedWords.json   # Lista de palabras prohibidas (legacy)
-├── sensitiveWords.json # Lista de palabras sensibles (legacy)
 ```
-
-## Base de Datos PostgreSQL
-Tablas principales:
-- `tickets` - Información de tickets
-- `warnings` - Advertencias de usuarios
-- `sanctions` - Sanciones aplicadas
-- `suggestions` - Sugerencias
-- `banned_words` - Palabras prohibidas
-- `mutes` - Mutes activos
-- `ticket_stats` - Estadísticas de staff
-- `audit_logs` - Logs de auditoría
-- `config` - Configuración del bot
-- `rate_limits` - Rate limiting
 
 ## Variables de Entorno Requeridas
 - `DISCORD_TOKEN` o `TOKEN` - Token del bot de Discord
-- `DATABASE_URL` - URL de conexión PostgreSQL (automático en Replit)
+- `MONGODB_URI` o `MONGO_URI` - URL de conexión MongoDB Atlas
+
+## Configuración para Render
+
+### 1. Crear base de datos en MongoDB Atlas (Gratis)
+1. Ve a mongodb.com/atlas y crea una cuenta
+2. Crea un cluster gratuito (M0)
+3. En "Database Access", crea un usuario con contraseña
+4. En "Network Access", añade `0.0.0.0/0` para permitir acceso desde cualquier IP
+5. Obtén la URI de conexión (formato: `mongodb+srv://usuario:password@cluster.xxxxx.mongodb.net/sirgiobot`)
+
+### 2. Configurar en Render
+1. Crea un nuevo Web Service conectado a tu repo GitHub
+2. **Build Command**: `npm install`
+3. **Start Command**: `node index.js`
+4. En Environment Variables, añade:
+   - `DISCORD_TOKEN` = tu token del bot
+   - `MONGODB_URI` = tu URI de MongoDB Atlas
 
 ## Comandos Disponibles
 
@@ -160,4 +170,4 @@ Tablas principales:
 - **Head Admins** (1230952139015327755): Permisos completos + comandos avanzados
 
 ## Última Actualización
-Enero 2026 - Migración a PostgreSQL, reconstrucción del sistema de sugerencias, corrección de bugs en tickets de apelación y calificaciones, nuevos sistemas de estadísticas, recordatorios, auditoría, rate limiting y backups.
+Enero 2026 - Migración a MongoDB para persistencia en Render, reconstrucción del sistema de sugerencias, corrección de bugs en tickets de apelación y calificaciones, nuevos sistemas de estadísticas, recordatorios, auditoría, rate limiting y backups.

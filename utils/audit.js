@@ -1,30 +1,11 @@
 const {
   SlashCommandBuilder,
-  EmbedBuilder,
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle
+  EmbedBuilder
 } = require('discord.js');
-const { db } = require('../database');
+const { db, mongoose } = require('../database');
 
 const GUILD_ID = '1212886282645147768';
 const ADMIN_ROLE_ID = '1212891335929897030';
-
-const ACTION_COLORS = {
-  'TICKET_CREATE': 0x00FF00,
-  'TICKET_CLAIM': 0x3498DB,
-  'TICKET_CLOSE': 0xFF6B6B,
-  'TICKET_RATE': 0xFFD700,
-  'TICKET_REMINDER': 0xFFA500,
-  'SUGGESTION_CREATE': 0x9B59B6,
-  'SUGGESTION_REVIEW': 0xE74C3C,
-  'SANCTION_APPLY': 0xFF0000,
-  'WARN_ADD': 0xFFFF00,
-  'MUTE_APPLY': 0xFF9900,
-  'BAN_APPLY': 0x8B0000,
-  'BACKUP_CREATE': 0x00CED1,
-  'DEFAULT': 0x5865F2
-};
 
 const ACTION_EMOJIS = {
   'TICKET_CREATE': '🎟️',
@@ -118,45 +99,49 @@ module.exports = (client) => {
       const subcommand = interaction.options.getSubcommand();
       await interaction.deferReply({ ephemeral: true });
 
+      const AuditLog = mongoose.model('AuditLog');
       let logs = [];
       let title = '';
 
       switch (subcommand) {
         case 'recent': {
           const cantidad = Math.min(interaction.options.getInteger('cantidad') || 10, 25);
-          logs = await db.getAuditLogs({});
-          logs = logs.slice(0, cantidad);
+          logs = await AuditLog.find().sort({ createdAt: -1 }).limit(cantidad);
           title = `📜 Últimos ${logs.length} Logs de Auditoría`;
           break;
         }
 
         case 'user': {
           const user = interaction.options.getUser('usuario');
-          logs = await db.getAuditLogs({ userId: user.id });
+          logs = await AuditLog.find({
+            $or: [
+              { odId: user.id },
+              { targetId: user.id },
+              { staffId: user.id }
+            ]
+          }).sort({ createdAt: -1 }).limit(25);
           title = `📜 Logs de ${user.tag}`;
           break;
         }
 
         case 'type': {
           const tipo = interaction.options.getString('tipo');
-          const result = await db.query(
-            `SELECT * FROM audit_logs WHERE action_type LIKE $1 ORDER BY created_at DESC LIMIT 25`,
-            [`${tipo}%`]
-          );
-          logs = result.rows;
+          logs = await AuditLog.find({
+            actionType: new RegExp(tipo, 'i')
+          }).sort({ createdAt: -1 }).limit(25);
           title = `📜 Logs de tipo: ${tipo}`;
           break;
         }
 
         case 'search': {
           const query = interaction.options.getString('query');
-          const result = await db.query(
-            `SELECT * FROM audit_logs WHERE 
-             details::text ILIKE $1 OR action_type ILIKE $1 
-             ORDER BY created_at DESC LIMIT 25`,
-            [`%${query}%`]
-          );
-          logs = result.rows;
+          logs = await AuditLog.find({
+            $or: [
+              { actionType: new RegExp(query, 'i') },
+              { 'details.reason': new RegExp(query, 'i') },
+              { 'details.ticketNumber': query }
+            ]
+          }).sort({ createdAt: -1 }).limit(25);
           title = `🔍 Búsqueda: "${query}"`;
           break;
         }
@@ -174,18 +159,17 @@ module.exports = (client) => {
 
       let description = '';
       for (const log of logs.slice(0, 15)) {
-        const emoji = ACTION_EMOJIS[log.action_type] || ACTION_EMOJIS.DEFAULT;
-        const time = `<t:${Math.floor(new Date(log.created_at).getTime() / 1000)}:R>`;
-        const user = log.user_id ? `<@${log.user_id}>` : 'Sistema';
-        const staff = log.staff_id ? `por <@${log.staff_id}>` : '';
+        const emoji = ACTION_EMOJIS[log.actionType] || ACTION_EMOJIS.DEFAULT;
+        const time = `<t:${Math.floor(new Date(log.createdAt).getTime() / 1000)}:R>`;
+        const user = log.odId ? `<@${log.odId}>` : 'Sistema';
+        const staff = log.staffId ? `por <@${log.staffId}>` : '';
         
-        description += `${emoji} **${log.action_type}**\n`;
+        description += `${emoji} **${log.actionType}**\n`;
         description += `   ${user} ${staff} - ${time}\n`;
         
         if (log.details) {
-          const details = typeof log.details === 'string' ? JSON.parse(log.details) : log.details;
-          if (details.ticketNumber) description += `   Ticket #${details.ticketNumber}\n`;
-          if (details.reason) description += `   Razón: ${details.reason.substring(0, 50)}...\n`;
+          if (log.details.ticketNumber) description += `   Ticket #${log.details.ticketNumber}\n`;
+          if (log.details.reason) description += `   Razón: ${log.details.reason.substring(0, 50)}...\n`;
         }
         description += '\n';
       }

@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { db, pool } = require('../database');
+const { db, mongoose } = require('../database');
 
 const BACKUP_INTERVAL = 6 * 60 * 60 * 1000;
 const BACKUP_DIR = path.join(__dirname, '..', 'backups');
@@ -15,7 +15,6 @@ module.exports = (client) => {
 
   client.once('ready', () => {
     setTimeout(() => createBackup(client), 60000);
-
     setInterval(() => createBackup(client), BACKUP_INTERVAL);
   });
 };
@@ -25,20 +24,21 @@ async function createBackup(client) {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const backupFile = path.join(BACKUP_DIR, `backup_${timestamp}.json`);
 
-    const tables = ['tickets', 'warnings', 'sanctions', 'suggestions', 'banned_words', 'mutes', 'ticket_stats', 'config'];
+    const collections = ['Ticket', 'Warning', 'Sanction', 'Suggestion', 'BannedWord', 'Mute', 'TicketStats', 'Config'];
     const backup = {
       timestamp: new Date().toISOString(),
-      version: '1.0',
+      version: '2.0-mongodb',
       data: {}
     };
 
-    for (const table of tables) {
+    for (const collectionName of collections) {
       try {
-        const result = await pool.query(`SELECT * FROM ${table}`);
-        backup.data[table] = result.rows;
+        const Model = mongoose.model(collectionName);
+        const docs = await Model.find().lean();
+        backup.data[collectionName.toLowerCase()] = docs;
       } catch (err) {
-        console.warn(`No se pudo hacer backup de tabla ${table}:`, err.message);
-        backup.data[table] = [];
+        console.warn(`No se pudo hacer backup de ${collectionName}:`, err.message);
+        backup.data[collectionName.toLowerCase()] = [];
       }
     }
 
@@ -49,7 +49,7 @@ async function createBackup(client) {
 
     await db.addAuditLog('BACKUP_CREATE', null, null, null, {
       filename: path.basename(backupFile),
-      tables: tables.length,
+      collections: collections.length,
       timestamp: backup.timestamp
     });
 
@@ -81,22 +81,4 @@ async function cleanupOldBackups() {
   }
 }
 
-async function restoreBackup(backupFile) {
-  try {
-    if (!fs.existsSync(backupFile)) {
-      throw new Error('Archivo de backup no encontrado');
-    }
-
-    const backup = JSON.parse(fs.readFileSync(backupFile, 'utf8'));
-
-    console.log(`📥 Restaurando backup desde: ${backup.timestamp}`);
-
-    return { success: true, message: 'Backup restaurado correctamente' };
-  } catch (error) {
-    console.error('Error restaurando backup:', error);
-    return { success: false, message: error.message };
-  }
-}
-
 module.exports.createBackup = createBackup;
-module.exports.restoreBackup = restoreBackup;

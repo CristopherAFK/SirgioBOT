@@ -2,7 +2,7 @@ require("dotenv").config();
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
-const { connectDB, db } = require('./database');
+const { connectDB, db, mongoose } = require('./database');
 const {
   Client,
   GatewayIntentBits,
@@ -199,9 +199,9 @@ client.on("interactionCreate", async (interaction) => {
 
       const existingTicket = await db.getTicketByOwner(userId);
       if (existingTicket) {
-        const ch = interaction.guild.channels.cache.get(existingTicket.channel_id) || 
-                   await interaction.guild.channels.fetch(existingTicket.channel_id).catch(()=>null);
-        return interaction.reply({ content: `❗️ Ya tienes un ticket abierto: ${ch ? ch.toString() : existingTicket.channel_id}`, ephemeral: true });
+        const ch = interaction.guild.channels.cache.get(existingTicket.channelId) || 
+                   await interaction.guild.channels.fetch(existingTicket.channelId).catch(()=>null);
+        return interaction.reply({ content: `❗️ Ya tienes un ticket abierto: ${ch ? ch.toString() : existingTicket.channelId}`, ephemeral: true });
       }
 
       const confirmId = `confirm_ticket_${userId}_${Date.now()}_${chosen}`;
@@ -256,9 +256,9 @@ client.on("interactionCreate", async (interaction) => {
 
         const existingTicket = await db.getTicketByOwner(odId);
         if (existingTicket) {
-          const ch = interaction.guild.channels.cache.get(existingTicket.channel_id) || 
-                     await interaction.guild.channels.fetch(existingTicket.channel_id).catch(()=>null);
-          return interaction.update({ content: `❗️ Ya tienes un ticket abierto: ${ch ? ch.toString() : existingTicket.channel_id}`, embeds: [], components: [] });
+          const ch = interaction.guild.channels.cache.get(existingTicket.channelId) || 
+                     await interaction.guild.channels.fetch(existingTicket.channelId).catch(()=>null);
+          return interaction.update({ content: `❗️ Ya tienes un ticket abierto: ${ch ? ch.toString() : existingTicket.channelId}`, embeds: [], components: [] });
         }
 
         const lastTicket = await db.getLastTicketNumber();
@@ -340,8 +340,8 @@ client.on("interactionCreate", async (interaction) => {
           return interaction.reply({ content: "❌ Solo moderadores pueden atender tickets.", ephemeral: true });
         }
 
-        if (ticket.claimed_by) {
-          return interaction.reply({ content: `❗ Este ticket ya fue atendido por <@${ticket.claimed_by}>.`, ephemeral: true });
+        if (ticket.claimedBy) {
+          return interaction.reply({ content: `❗ Este ticket ya fue atendido por <@${ticket.claimedBy}>.`, ephemeral: true });
         }
 
         try {
@@ -357,12 +357,12 @@ client.on("interactionCreate", async (interaction) => {
         await db.claimTicket(channelId, interaction.user.id);
         await db.updateStaffStats(interaction.user.id, 'claim');
 
-        await db.addAuditLog('TICKET_CLAIM', ticket.owner_id, null, interaction.user.id, {
+        await db.addAuditLog('TICKET_CLAIM', ticket.ownerId, null, interaction.user.id, {
           channelId,
-          ticketNumber: ticket.ticket_number
+          ticketNumber: ticket.ticketNumber
         });
 
-        const ownerId = ticket.owner_id;
+        const ownerId = ticket.ownerId;
         await interaction.channel.send({ content: `💬 Hola <@${ownerId}>, gracias por comunicarte con el staff. <@${interaction.user.id}> atenderá tu ticket.` });
         
         try {
@@ -407,11 +407,11 @@ client.on("interactionCreate", async (interaction) => {
         if (ticketData) {
           await db.rateTicket(ticketNumber, rating, comment);
           
-          if (ticketData.claimed_by) {
-            await db.updateStaffStats(ticketData.claimed_by, 'rate', null, rating);
+          if (ticketData.claimedBy) {
+            await db.updateStaffStats(ticketData.claimedBy, 'rate', null, rating);
           }
 
-          await db.addAuditLog('TICKET_RATE', interaction.user.id, ticketData.claimed_by, null, {
+          await db.addAuditLog('TICKET_RATE', interaction.user.id, ticketData.claimedBy, null, {
             ticketNumber,
             rating,
             comment
@@ -424,7 +424,7 @@ client.on("interactionCreate", async (interaction) => {
           const logsChannel = await guild.channels.fetch(LOGS_CHANNEL_ID).catch(() => null);
           
           if (logsChannel) {
-            const staffMemberTag = ticketData?.claimed_by ? `<@${ticketData.claimed_by}>` : "No asignado";
+            const staffMemberTag = ticketData?.claimedBy ? `<@${ticketData.claimedBy}>` : "No asignado";
             
             const ratingEmbed = new EmbedBuilder()
               .setTitle("⭐ Calificación de Ticket #" + ticketNumber)
@@ -492,7 +492,7 @@ client.on("messageCreate", async (message) => {
       console.warn("No se pudieron leer todos los mensajes para transcripción:", err);
     }
 
-    let transcript = `Transcripción - Ticket #${ticket.ticket_number} - ${channel.name}\nCreado por: <@${ticket.owner_id}>\nCategoría: ${ticket.category}\nCerrado por: <@${message.author.id}>\nFecha: ${new Date().toISOString()}\n\n--- Mensajes ---\n\n`;
+    let transcript = `Transcripción - Ticket #${ticket.ticketNumber} - ${channel.name}\nCreado por: <@${ticket.ownerId}>\nCategoría: ${ticket.category}\nCerrado por: <@${message.author.id}>\nFecha: ${new Date().toISOString()}\n\n--- Mensajes ---\n\n`;
     for (const m of allMessages) {
       const time = new Date(m.createdTimestamp).toISOString();
       const author = `${m.author.tag} (${m.author.id})`;
@@ -504,7 +504,7 @@ client.on("messageCreate", async (message) => {
       transcript += `[${time}] ${author}: ${content}\n`;
     }
 
-    const filename = `transcript-${channel.name || ticket.ticket_number}.txt`;
+    const filename = `transcript-${channel.name || ticket.ticketNumber}.txt`;
     const tmpPath = path.join(os.tmpdir(), `${Date.now()}-${filename}`);
     try {
       fs.writeFileSync(tmpPath, transcript, "utf8");
@@ -516,9 +516,9 @@ client.on("messageCreate", async (message) => {
       const logsChannel = await message.guild.channels.fetch(LOGS_CHANNEL_ID).catch(()=>null);
       const embed = new EmbedBuilder()
         .setTitle("📁 Transcripción de ticket")
-        .setDescription(`Se ha cerrado el ticket **#${ticket.ticket_number}** (${channel.name}).`)
+        .setDescription(`Se ha cerrado el ticket **#${ticket.ticketNumber}** (${channel.name}).`)
         .addFields(
-          { name: "Usuario", value: `<@${ticket.owner_id}>`, inline: true },
+          { name: "Usuario", value: `<@${ticket.ownerId}>`, inline: true },
           { name: "Cerrado por", value: `<@${message.author.id}>`, inline: true },
           { name: "Canal", value: `${channel.name}`, inline: true }
         )
@@ -537,31 +537,31 @@ client.on("messageCreate", async (message) => {
 
     await db.closeTicket(channel.id, message.author.id);
     
-    if (ticket.claimed_by) {
-      await db.updateStaffStats(ticket.claimed_by, 'close');
+    if (ticket.claimedBy) {
+      await db.updateStaffStats(ticket.claimedBy, 'close');
     }
 
-    await db.addAuditLog('TICKET_CLOSE', ticket.owner_id, null, message.author.id, {
+    await db.addAuditLog('TICKET_CLOSE', ticket.ownerId, null, message.author.id, {
       channelId: channel.id,
-      ticketNumber: ticket.ticket_number
+      ticketNumber: ticket.ticketNumber
     });
 
     try {
-      const ticketOwner = await client.users.fetch(ticket.owner_id).catch(() => null);
+      const ticketOwner = await client.users.fetch(ticket.ownerId).catch(() => null);
       if (ticketOwner) {
         const ratingEmbed = new EmbedBuilder()
           .setTitle("⭐ Califica tu experiencia")
-          .setDescription(`Tu ticket #${ticket.ticket_number} ha sido cerrado.\n\n¿Cómo calificarías la atención recibida?`)
+          .setDescription(`Tu ticket #${ticket.ticketNumber} ha sido cerrado.\n\n¿Cómo calificarías la atención recibida?`)
           .setColor(0x5865F2)
           .setFooter({ text: "Tu opinión nos ayuda a mejorar" })
           .setTimestamp();
 
         const ratingRow = new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setCustomId(`rate_ticket_1_${ticket.ticket_number}`).setLabel("1").setStyle(ButtonStyle.Danger),
-          new ButtonBuilder().setCustomId(`rate_ticket_2_${ticket.ticket_number}`).setLabel("2").setStyle(ButtonStyle.Danger),
-          new ButtonBuilder().setCustomId(`rate_ticket_3_${ticket.ticket_number}`).setLabel("3").setStyle(ButtonStyle.Primary),
-          new ButtonBuilder().setCustomId(`rate_ticket_4_${ticket.ticket_number}`).setLabel("4").setStyle(ButtonStyle.Success),
-          new ButtonBuilder().setCustomId(`rate_ticket_5_${ticket.ticket_number}`).setLabel("5").setStyle(ButtonStyle.Success)
+          new ButtonBuilder().setCustomId(`rate_ticket_1_${ticket.ticketNumber}`).setLabel("1").setStyle(ButtonStyle.Danger),
+          new ButtonBuilder().setCustomId(`rate_ticket_2_${ticket.ticketNumber}`).setLabel("2").setStyle(ButtonStyle.Danger),
+          new ButtonBuilder().setCustomId(`rate_ticket_3_${ticket.ticketNumber}`).setLabel("3").setStyle(ButtonStyle.Primary),
+          new ButtonBuilder().setCustomId(`rate_ticket_4_${ticket.ticketNumber}`).setLabel("4").setStyle(ButtonStyle.Success),
+          new ButtonBuilder().setCustomId(`rate_ticket_5_${ticket.ticketNumber}`).setLabel("5").setStyle(ButtonStyle.Success)
         );
 
         await ticketOwner.send({ embeds: [ratingEmbed], components: [ratingRow] }).catch(() => {

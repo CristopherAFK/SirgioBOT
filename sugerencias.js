@@ -11,7 +11,7 @@ const {
   ButtonStyle,
   AttachmentBuilder
 } = require('discord.js');
-const { db } = require('./database');
+const { db, mongoose } = require('./database');
 
 const GUILD_ID = '1212886282645147768';
 const SUGGESTIONS_CHANNEL_ID = '1440873532580954112';
@@ -294,7 +294,7 @@ module.exports = (client) => {
 
           try {
             const publicChannel = await client.channels.fetch(SUGGESTIONS_CHANNEL_ID);
-            const publicMessage = await publicChannel.messages.fetch(suggestionData.message_id);
+            const publicMessage = await publicChannel.messages.fetch(suggestionData.messageId);
 
             const oldEmbed = publicMessage.embeds[0];
             const updatedEmbed = EmbedBuilder.from(oldEmbed)
@@ -329,7 +329,7 @@ module.exports = (client) => {
 
             await db.updateSuggestionStatus(suggestionId, dbStatus, interaction.user.id, reason);
 
-            await db.addAuditLog('SUGGESTION_REVIEW', suggestionData.user_id, null, interaction.user.id, {
+            await db.addAuditLog('SUGGESTION_REVIEW', suggestionData.odId, null, interaction.user.id, {
               suggestionId,
               status: dbStatus,
               reason

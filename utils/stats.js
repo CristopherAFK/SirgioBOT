@@ -5,7 +5,7 @@ const {
   ButtonBuilder,
   ButtonStyle
 } = require('discord.js');
-const { db } = require('../database');
+const { db, mongoose } = require('../database');
 
 const GUILD_ID = '1212886282645147768';
 const STAFF_ROLE_ID = '1230949715127042098';
@@ -89,12 +89,12 @@ module.exports = (client) => {
           for (let i = 0; i < Math.min(staffStats.length, 10); i++) {
             const staff = staffStats[i];
             const medal = medals[i] || `**${i + 1}.**`;
-            const avgRating = staff.rating_count > 0 
-              ? (parseFloat(staff.total_rating) / staff.rating_count).toFixed(2)
+            const avgRating = staff.ratingCount > 0 
+              ? (parseFloat(staff.totalRating) / staff.ratingCount).toFixed(2)
               : 'N/A';
             
-            description += `${medal} <@${staff.staff_id}>\n`;
-            description += `   📋 Atendidos: ${staff.tickets_claimed} | 🔒 Cerrados: ${staff.tickets_closed} | ⭐ Promedio: ${avgRating}\n\n`;
+            description += `${medal} <@${staff.staffId}>\n`;
+            description += `   📋 Atendidos: ${staff.ticketsClaimed} | 🔒 Cerrados: ${staff.ticketsClosed} | ⭐ Promedio: ${avgRating}\n\n`;
           }
 
           const embed = new EmbedBuilder()
@@ -121,8 +121,8 @@ module.exports = (client) => {
             return interaction.editReply({ content: '📊 Aún no tienes estadísticas. ¡Empieza a atender tickets!' });
           }
 
-          const avgRating = myStats.rating_count > 0 
-            ? (parseFloat(myStats.total_rating) / myStats.rating_count).toFixed(2)
+          const avgRating = myStats.ratingCount > 0 
+            ? (parseFloat(myStats.totalRating) / myStats.ratingCount).toFixed(2)
             : 'N/A';
 
           const embed = new EmbedBuilder()
@@ -130,12 +130,12 @@ module.exports = (client) => {
             .setColor(0x00FF80)
             .setThumbnail(interaction.user.displayAvatarURL({ dynamic: true }))
             .addFields(
-              { name: '📋 Tickets Atendidos', value: myStats.tickets_claimed.toString(), inline: true },
-              { name: '🔒 Tickets Cerrados', value: myStats.tickets_closed.toString(), inline: true },
+              { name: '📋 Tickets Atendidos', value: myStats.ticketsClaimed.toString(), inline: true },
+              { name: '🔒 Tickets Cerrados', value: myStats.ticketsClosed.toString(), inline: true },
               { name: '⭐ Calificación Promedio', value: avgRating, inline: true },
-              { name: '📝 Total de Calificaciones', value: myStats.rating_count.toString(), inline: true }
+              { name: '📝 Total de Calificaciones', value: myStats.ratingCount.toString(), inline: true }
             )
-            .setFooter({ text: `Última actualización: ${new Date(myStats.updated_at).toLocaleString()}` })
+            .setFooter({ text: `Última actualización: ${new Date(myStats.updatedAt).toLocaleString()}` })
             .setTimestamp();
 
           return interaction.editReply({ embeds: [embed] });

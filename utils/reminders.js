@@ -1,9 +1,8 @@
 const { EmbedBuilder } = require('discord.js');
-const { db } = require('../database');
+const { db, mongoose } = require('../database');
 
 const GUILD_ID = '1212886282645147768';
 const REMINDER_INTERVAL = 30 * 60 * 1000;
-const TICKET_INACTIVE_TIME = 60 * 60 * 1000;
 
 module.exports = (client) => {
   console.log('✅ Sistema de recordatorios cargado');
@@ -19,14 +18,14 @@ module.exports = (client) => {
 
 async function checkInactiveTickets(client) {
   try {
-    const result = await db.query(`
-      SELECT * FROM tickets 
-      WHERE status = 'open' 
-      AND claimed_by IS NULL 
-      AND created_at < NOW() - INTERVAL '1 hour'
-    `);
-
-    const unclaimedTickets = result.rows;
+    const Ticket = mongoose.model('Ticket');
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    
+    const unclaimedTickets = await Ticket.find({
+      status: 'open',
+      claimedBy: null,
+      createdAt: { $lt: oneHourAgo }
+    });
 
     if (unclaimedTickets.length === 0) return;
 
@@ -35,7 +34,7 @@ async function checkInactiveTickets(client) {
 
     for (const ticket of unclaimedTickets) {
       try {
-        const channel = await guild.channels.fetch(ticket.channel_id).catch(() => null);
+        const channel = await guild.channels.fetch(ticket.channelId).catch(() => null);
         if (!channel) continue;
 
         const messages = await channel.messages.fetch({ limit: 10 });
@@ -52,16 +51,16 @@ async function checkInactiveTickets(client) {
 
         const embed = new EmbedBuilder()
           .setTitle('⏰ Recordatorio')
-          .setDescription(`Este ticket lleva más de 1 hora sin ser atendido.\n\n<@${ticket.owner_id}>, el staff atenderá tu caso lo antes posible. Si tu consulta ya no es necesaria, puedes pedir que cierren el ticket.`)
+          .setDescription(`Este ticket lleva más de 1 hora sin ser atendido.\n\n<@${ticket.ownerId}>, el staff atenderá tu caso lo antes posible. Si tu consulta ya no es necesaria, puedes pedir que cierren el ticket.`)
           .setColor(0xFFA500)
-          .setFooter({ text: `Ticket #${ticket.ticket_number}` })
+          .setFooter({ text: `Ticket #${ticket.ticketNumber}` })
           .setTimestamp();
 
         await channel.send({ embeds: [embed] });
 
-        await db.addAuditLog('TICKET_REMINDER', ticket.owner_id, null, null, {
-          channelId: ticket.channel_id,
-          ticketNumber: ticket.ticket_number,
+        await db.addAuditLog('TICKET_REMINDER', ticket.ownerId, null, null, {
+          channelId: ticket.channelId,
+          ticketNumber: ticket.ticketNumber,
           reason: 'Ticket sin atender por más de 1 hora'
         });
 
@@ -70,16 +69,16 @@ async function checkInactiveTickets(client) {
       }
     }
 
-    const claimedResult = await db.query(`
-      SELECT * FROM tickets 
-      WHERE status = 'open' 
-      AND claimed_by IS NOT NULL 
-      AND claimed_at < NOW() - INTERVAL '2 hours'
-    `);
+    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+    const claimedTickets = await Ticket.find({
+      status: 'open',
+      claimedBy: { $ne: null },
+      claimedAt: { $lt: twoHoursAgo }
+    });
 
-    for (const ticket of claimedResult.rows) {
+    for (const ticket of claimedTickets) {
       try {
-        const channel = await guild.channels.fetch(ticket.channel_id).catch(() => null);
+        const channel = await guild.channels.fetch(ticket.channelId).catch(() => null);
         if (!channel) continue;
 
         const messages = await channel.messages.fetch({ limit: 5 });
@@ -102,7 +101,7 @@ async function checkInactiveTickets(client) {
         }
 
         await channel.send({
-          content: `<@${ticket.owner_id}> ¿Sigues ahí? El staff está esperando tu respuesta. Si ya no necesitas ayuda, por favor avísanos para cerrar el ticket.`
+          content: `<@${ticket.ownerId}> ¿Sigues ahí? El staff está esperando tu respuesta. Si ya no necesitas ayuda, por favor avísanos para cerrar el ticket.`
         });
 
       } catch (err) {

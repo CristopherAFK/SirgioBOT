@@ -25,7 +25,7 @@ const MOD_ROLE_ID = "1229140504310972599";
 const ADMIN_ROLE_ID = "1212891335929897030";
 const HEAD_ADMIN_ROLE_ID = "1230952139015327755";
 
-const { db } = require('./database');
+const { db, mongoose } = require('./database');
 
 const STAFF_ROLE_IDS = [HELPER_ROLE_ID, MOD_ROLE_ID, ADMIN_ROLE_ID, HEAD_ADMIN_ROLE_ID];
 const CAN_BAN_ROLE_IDS = [MOD_ROLE_ID, ADMIN_ROLE_ID, HEAD_ADMIN_ROLE_ID];

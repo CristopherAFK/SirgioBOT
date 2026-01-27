@@ -1,444 +1,386 @@
-const { Pool } = require('pg');
+const mongoose = require('mongoose');
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+const MONGODB_URI = process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb://localhost:27017/sirgiobot';
+
+const ticketSchema = new mongoose.Schema({
+  channelId: { type: String, required: true, unique: true },
+  ownerId: { type: String, required: true },
+  ticketNumber: { type: String, required: true },
+  category: { type: String, default: 'otro' },
+  status: { type: String, default: 'open' },
+  claimedBy: { type: String, default: null },
+  claimedAt: { type: Date, default: null },
+  closedBy: { type: String, default: null },
+  closedAt: { type: Date, default: null },
+  rating: { type: Number, default: null },
+  ratingComment: { type: String, default: null },
+  createdAt: { type: Date, default: Date.now }
 });
 
-const connectDB = async () => {
+const warningSchema = new mongoose.Schema({
+  odId: { type: String, required: true, index: true },
+  oderId: { type: String, required: true },
+  reason: { type: String, required: true },
+  category: { type: String, default: null },
+  date: { type: Date, default: Date.now }
+});
+
+const sanctionSchema = new mongoose.Schema({
+  odId: { type: String, required: true, index: true },
+  oderId: { type: String, required: true },
+  type: { type: String, required: true },
+  reason: { type: String, required: true },
+  category: { type: String, default: null },
+  duration: { type: String, default: null },
+  proof: { type: String, default: null },
+  date: { type: Date, default: Date.now }
+});
+
+const suggestionSchema = new mongoose.Schema({
+  suggestionId: { type: String, required: true, unique: true },
+  odId: { type: String, required: true },
+  messageId: { type: String, required: true },
+  title: { type: String, required: true },
+  content: { type: String, required: true },
+  status: { type: String, default: 'pending' },
+  reviewedBy: { type: String, default: null },
+  reviewReason: { type: String, default: null },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
+});
+
+const bannedWordSchema = new mongoose.Schema({
+  word: { type: String, required: true, unique: true },
+  addedBy: { type: String, required: true },
+  isHidden: { type: Boolean, default: false },
+  createdAt: { type: Date, default: Date.now }
+});
+
+const muteSchema = new mongoose.Schema({
+  odId: { type: String, required: true, unique: true },
+  oderId: { type: String, required: true },
+  reason: { type: String, required: true },
+  expiresAt: { type: Date, required: true },
+  createdAt: { type: Date, default: Date.now }
+});
+
+const ticketStatsSchema = new mongoose.Schema({
+  staffId: { type: String, required: true, unique: true },
+  ticketsClaimed: { type: Number, default: 0 },
+  ticketsClosed: { type: Number, default: 0 },
+  totalRating: { type: Number, default: 0 },
+  ratingCount: { type: Number, default: 0 },
+  updatedAt: { type: Date, default: Date.now }
+});
+
+const auditLogSchema = new mongoose.Schema({
+  actionType: { type: String, required: true, index: true },
+  odId: { type: String, default: null, index: true },
+  targetId: { type: String, default: null },
+  staffId: { type: String, default: null },
+  details: { type: mongoose.Schema.Types.Mixed, default: {} },
+  createdAt: { type: Date, default: Date.now }
+});
+
+const configSchema = new mongoose.Schema({
+  key: { type: String, required: true, unique: true },
+  value: { type: mongoose.Schema.Types.Mixed, required: true },
+  updatedAt: { type: Date, default: Date.now }
+});
+
+const rateLimitSchema = new mongoose.Schema({
+  odId: { type: String, required: true },
+  command: { type: String, required: true },
+  timestamp: { type: Date, default: Date.now }
+});
+rateLimitSchema.index({ odId: 1, command: 1 });
+rateLimitSchema.index({ timestamp: 1 }, { expireAfterSeconds: 300 });
+
+const Ticket = mongoose.model('Ticket', ticketSchema);
+const Warning = mongoose.model('Warning', warningSchema);
+const Sanction = mongoose.model('Sanction', sanctionSchema);
+const Suggestion = mongoose.model('Suggestion', suggestionSchema);
+const BannedWord = mongoose.model('BannedWord', bannedWordSchema);
+const Mute = mongoose.model('Mute', muteSchema);
+const TicketStats = mongoose.model('TicketStats', ticketStatsSchema);
+const AuditLog = mongoose.model('AuditLog', auditLogSchema);
+const Config = mongoose.model('Config', configSchema);
+const RateLimit = mongoose.model('RateLimit', rateLimitSchema);
+
+async function connectDB() {
   try {
-    const client = await pool.connect();
-    console.log('✅ Conectado a PostgreSQL');
-    
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS tickets (
-        id SERIAL PRIMARY KEY,
-        channel_id VARCHAR(32) UNIQUE NOT NULL,
-        owner_id VARCHAR(32) NOT NULL,
-        ticket_number VARCHAR(10) NOT NULL,
-        category VARCHAR(50),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        claimed_by VARCHAR(32),
-        claimed_at TIMESTAMP,
-        closed_by VARCHAR(32),
-        closed_at TIMESTAMP,
-        rating INTEGER,
-        rating_comment TEXT,
-        status VARCHAR(20) DEFAULT 'open'
-      )
-    `);
-
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS warnings (
-        id SERIAL PRIMARY KEY,
-        user_id VARCHAR(32) NOT NULL,
-        reason TEXT NOT NULL,
-        detected_word VARCHAR(100),
-        staff_id VARCHAR(32),
-        category VARCHAR(50),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS sanctions (
-        id SERIAL PRIMARY KEY,
-        user_id VARCHAR(32) NOT NULL,
-        user_tag VARCHAR(100),
-        type VARCHAR(20) NOT NULL,
-        reason TEXT NOT NULL,
-        category VARCHAR(50),
-        duration INTEGER DEFAULT 0,
-        staff_id VARCHAR(32) NOT NULL,
-        staff_tag VARCHAR(100),
-        proof TEXT,
-        infractions INTEGER DEFAULT 1,
-        additional_infractions TEXT[],
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        expires_at TIMESTAMP,
-        active BOOLEAN DEFAULT TRUE
-      )
-    `);
-
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS suggestions (
-        id SERIAL PRIMARY KEY,
-        suggestion_id VARCHAR(50) UNIQUE NOT NULL,
-        user_id VARCHAR(32) NOT NULL,
-        message_id VARCHAR(32),
-        title VARCHAR(200),
-        content TEXT NOT NULL,
-        status VARCHAR(20) DEFAULT 'pending',
-        reviewed_by VARCHAR(32),
-        review_reason TEXT,
-        votes_up TEXT[] DEFAULT '{}',
-        votes_down TEXT[] DEFAULT '{}',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS banned_words (
-        id SERIAL PRIMARY KEY,
-        word VARCHAR(100) UNIQUE NOT NULL,
-        added_by VARCHAR(32),
-        hidden BOOLEAN DEFAULT FALSE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS mutes (
-        id SERIAL PRIMARY KEY,
-        user_id VARCHAR(32) NOT NULL,
-        guild_id VARCHAR(32) NOT NULL,
-        reason TEXT,
-        staff_id VARCHAR(32),
-        expires_at TIMESTAMP NOT NULL,
-        active BOOLEAN DEFAULT TRUE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS ticket_stats (
-        id SERIAL PRIMARY KEY,
-        staff_id VARCHAR(32) NOT NULL,
-        tickets_claimed INTEGER DEFAULT 0,
-        tickets_closed INTEGER DEFAULT 0,
-        total_rating NUMERIC DEFAULT 0,
-        rating_count INTEGER DEFAULT 0,
-        avg_response_time INTEGER DEFAULT 0,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS audit_logs (
-        id SERIAL PRIMARY KEY,
-        action_type VARCHAR(50) NOT NULL,
-        user_id VARCHAR(32),
-        target_id VARCHAR(32),
-        staff_id VARCHAR(32),
-        details JSONB,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS config (
-        key VARCHAR(100) PRIMARY KEY,
-        value JSONB NOT NULL,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS rate_limits (
-        id SERIAL PRIMARY KEY,
-        user_id VARCHAR(32) NOT NULL,
-        command VARCHAR(50) NOT NULL,
-        used_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_tickets_owner ON tickets(owner_id)
-    `);
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets(status)
-    `);
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_warnings_user ON warnings(user_id)
-    `);
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_suggestions_status ON suggestions(status)
-    `);
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action_type)
-    `);
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_rate_limits_user ON rate_limits(user_id, command)
-    `);
-
-    client.release();
+    await mongoose.connect(MONGODB_URI);
+    console.log('✅ Conectado a MongoDB');
     return true;
   } catch (error) {
-    console.error('❌ Error conectando a PostgreSQL:', error.message);
+    console.error('❌ Error conectando a MongoDB:', error.message);
     return false;
   }
-};
+}
 
 const db = {
-  query: (text, params) => pool.query(text, params),
-  
-  async createTicket(channelId, ownerId, ticketNumber, category) {
-    const result = await pool.query(
-      `INSERT INTO tickets (channel_id, owner_id, ticket_number, category) 
-       VALUES ($1, $2, $3, $4) RETURNING *`,
-      [channelId, ownerId, ticketNumber, category]
-    );
-    return result.rows[0];
+  async createTicket(channelId, ownerId, ticketNumber, category = 'otro') {
+    const ticket = new Ticket({
+      channelId,
+      ownerId,
+      ticketNumber,
+      category
+    });
+    return await ticket.save();
   },
 
   async getTicketByChannel(channelId) {
-    const result = await pool.query(
-      'SELECT * FROM tickets WHERE channel_id = $1',
-      [channelId]
-    );
-    return result.rows[0];
+    return await Ticket.findOne({ channelId });
   },
 
   async getTicketByOwner(ownerId) {
-    const result = await pool.query(
-      `SELECT * FROM tickets WHERE owner_id = $1 AND status = 'open'`,
-      [ownerId]
-    );
-    return result.rows[0];
-  },
-
-  async claimTicket(channelId, staffId) {
-    const result = await pool.query(
-      `UPDATE tickets SET claimed_by = $1, claimed_at = CURRENT_TIMESTAMP 
-       WHERE channel_id = $2 RETURNING *`,
-      [staffId, channelId]
-    );
-    return result.rows[0];
-  },
-
-  async closeTicket(channelId, staffId) {
-    const result = await pool.query(
-      `UPDATE tickets SET closed_by = $1, closed_at = CURRENT_TIMESTAMP, status = 'closed' 
-       WHERE channel_id = $2 RETURNING *`,
-      [staffId, channelId]
-    );
-    return result.rows[0];
-  },
-
-  async rateTicket(ticketNumber, rating, comment) {
-    const result = await pool.query(
-      `UPDATE tickets SET rating = $1, rating_comment = $2 
-       WHERE ticket_number = $3 RETURNING *`,
-      [rating, comment, ticketNumber]
-    );
-    return result.rows[0];
+    return await Ticket.findOne({ ownerId, status: 'open' });
   },
 
   async getTicketByNumber(ticketNumber) {
-    const result = await pool.query(
-      'SELECT * FROM tickets WHERE ticket_number = $1',
-      [ticketNumber]
-    );
-    return result.rows[0];
+    return await Ticket.findOne({ ticketNumber });
   },
 
   async getLastTicketNumber() {
-    const result = await pool.query(
-      `SELECT MAX(CAST(ticket_number AS INTEGER)) as last FROM tickets`
-    );
-    return result.rows[0]?.last || 0;
+    const lastTicket = await Ticket.findOne().sort({ createdAt: -1 });
+    if (!lastTicket) return 0;
+    return parseInt(lastTicket.ticketNumber) || 0;
   },
 
-  async addWarning(userId, reason, detectedWord = null, staffId = null, category = null) {
-    const result = await pool.query(
-      `INSERT INTO warnings (user_id, reason, detected_word, staff_id, category) 
-       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [userId, reason, detectedWord, staffId, category]
+  async claimTicket(channelId, staffId) {
+    return await Ticket.findOneAndUpdate(
+      { channelId },
+      { claimedBy: staffId, claimedAt: new Date() },
+      { new: true }
     );
-    return result.rows[0];
   },
 
-  async getWarnings(userId) {
-    const result = await pool.query(
-      `SELECT * FROM warnings WHERE user_id = $1 
-       AND created_at > NOW() - INTERVAL '30 days' 
-       ORDER BY created_at DESC`,
-      [userId]
+  async closeTicket(channelId, closedBy) {
+    return await Ticket.findOneAndUpdate(
+      { channelId },
+      { status: 'closed', closedBy, closedAt: new Date() },
+      { new: true }
     );
-    return result.rows;
   },
 
-  async getWarningCount(userId) {
-    const result = await pool.query(
-      `SELECT COUNT(*) as count FROM warnings WHERE user_id = $1 
-       AND created_at > NOW() - INTERVAL '30 days'`,
-      [userId]
+  async rateTicket(ticketNumber, rating, comment = null) {
+    return await Ticket.findOneAndUpdate(
+      { ticketNumber },
+      { rating, ratingComment: comment },
+      { new: true }
     );
-    return parseInt(result.rows[0].count);
   },
 
-  async resetWarnings(userId) {
-    await pool.query('DELETE FROM warnings WHERE user_id = $1', [userId]);
+  async addWarning(odId, oderId, reason, category = null) {
+    const warning = new Warning({ odId, oderId, reason, category });
+    return await warning.save();
   },
 
-  async removeLastWarning(userId) {
-    const result = await pool.query(
-      `DELETE FROM warnings WHERE id = (
-        SELECT id FROM warnings WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1
-      ) RETURNING *`,
-      [userId]
-    );
-    return result.rows[0];
+  async getWarnings(odId) {
+    return await Warning.find({ odId }).sort({ date: -1 });
   },
 
-  async createSuggestion(suggestionId, userId, messageId, title, content) {
-    const result = await pool.query(
-      `INSERT INTO suggestions (suggestion_id, user_id, message_id, title, content) 
-       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [suggestionId, userId, messageId, title, content]
-    );
-    return result.rows[0];
+  async getWarningCount(odId) {
+    return await Warning.countDocuments({ odId });
+  },
+
+  async removeLastWarning(odId) {
+    const lastWarn = await Warning.findOne({ odId }).sort({ date: -1 });
+    if (lastWarn) {
+      await Warning.deleteOne({ _id: lastWarn._id });
+      return true;
+    }
+    return false;
+  },
+
+  async resetWarnings(odId) {
+    const result = await Warning.deleteMany({ odId });
+    return result.deletedCount;
+  },
+
+  async cleanupOldWarnings() {
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const result = await Warning.deleteMany({ date: { $lt: thirtyDaysAgo } });
+    return result.deletedCount;
+  },
+
+  async addSanction(odId, oderId, type, reason, category = null, duration = null, proof = null) {
+    const sanction = new Sanction({ odId, oderId, type, reason, category, duration, proof });
+    return await sanction.save();
+  },
+
+  async getSanctions(odId) {
+    return await Sanction.find({ odId }).sort({ date: -1 });
+  },
+
+  async createSuggestion(suggestionId, odId, messageId, title, content) {
+    const suggestion = new Suggestion({
+      suggestionId,
+      odId,
+      messageId,
+      title,
+      content
+    });
+    return await suggestion.save();
   },
 
   async getSuggestion(suggestionId) {
-    const result = await pool.query(
-      'SELECT * FROM suggestions WHERE suggestion_id = $1',
-      [suggestionId]
-    );
-    return result.rows[0];
+    return await Suggestion.findOne({ suggestionId });
   },
 
-  async updateSuggestionStatus(suggestionId, status, reviewedBy, reviewReason) {
-    const result = await pool.query(
-      `UPDATE suggestions SET status = $1, reviewed_by = $2, review_reason = $3 
-       WHERE suggestion_id = $4 RETURNING *`,
-      [status, reviewedBy, reviewReason, suggestionId]
+  async updateSuggestionStatus(suggestionId, status, reviewedBy = null, reason = null) {
+    return await Suggestion.findOneAndUpdate(
+      { suggestionId },
+      { 
+        status, 
+        reviewedBy, 
+        reviewReason: reason,
+        updatedAt: new Date()
+      },
+      { new: true }
     );
-    return result.rows[0];
   },
 
-  async addAuditLog(actionType, userId, targetId, staffId, details) {
-    const result = await pool.query(
-      `INSERT INTO audit_logs (action_type, user_id, target_id, staff_id, details) 
-       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [actionType, userId, targetId, staffId, details]
-    );
-    return result.rows[0];
+  async addBannedWord(word, addedBy, isHidden = false) {
+    const bannedWord = new BannedWord({ word: word.toLowerCase(), addedBy, isHidden });
+    return await bannedWord.save();
   },
 
-  async getAuditLogs(filters = {}) {
-    let query = 'SELECT * FROM audit_logs WHERE 1=1';
-    const params = [];
-    let paramIndex = 1;
-
-    if (filters.actionType) {
-      query += ` AND action_type = $${paramIndex++}`;
-      params.push(filters.actionType);
-    }
-    if (filters.userId) {
-      query += ` AND (user_id = $${paramIndex} OR target_id = $${paramIndex++})`;
-      params.push(filters.userId);
-    }
-    if (filters.staffId) {
-      query += ` AND staff_id = $${paramIndex++}`;
-      params.push(filters.staffId);
-    }
-
-    query += ' ORDER BY created_at DESC LIMIT 100';
-    const result = await pool.query(query, params);
-    return result.rows;
+  async removeBannedWord(word) {
+    const result = await BannedWord.deleteOne({ word: word.toLowerCase() });
+    return result.deletedCount > 0;
   },
 
-  async updateStaffStats(staffId, action, responseTime = null, rating = null) {
-    const existing = await pool.query(
-      'SELECT * FROM ticket_stats WHERE staff_id = $1',
-      [staffId]
+  async getBannedWords() {
+    const words = await BannedWord.find({ isHidden: false });
+    return words.map(w => w.word);
+  },
+
+  async getAllBannedWords() {
+    const words = await BannedWord.find();
+    return words.map(w => w.word);
+  },
+
+  async addMute(odId, oderId, reason, expiresAt) {
+    return await Mute.findOneAndUpdate(
+      { odId },
+      { odId, oderId, reason, expiresAt, createdAt: new Date() },
+      { upsert: true, new: true }
     );
+  },
 
-    if (existing.rows.length === 0) {
-      await pool.query(
-        `INSERT INTO ticket_stats (staff_id, tickets_claimed, tickets_closed) VALUES ($1, 0, 0)`,
-        [staffId]
-      );
-    }
+  async getMute(odId) {
+    return await Mute.findOne({ odId });
+  },
 
+  async removeMute(odId) {
+    const result = await Mute.deleteOne({ odId });
+    return result.deletedCount > 0;
+  },
+
+  async getExpiredMutes() {
+    return await Mute.find({ expiresAt: { $lte: new Date() } });
+  },
+
+  async updateStaffStats(staffId, action, ticketNumber = null, rating = null) {
+    const update = { updatedAt: new Date() };
+    
     if (action === 'claim') {
-      await pool.query(
-        `UPDATE ticket_stats SET tickets_claimed = tickets_claimed + 1, updated_at = CURRENT_TIMESTAMP 
-         WHERE staff_id = $1`,
-        [staffId]
-      );
+      update.$inc = { ticketsClaimed: 1 };
     } else if (action === 'close') {
-      await pool.query(
-        `UPDATE ticket_stats SET tickets_closed = tickets_closed + 1, updated_at = CURRENT_TIMESTAMP 
-         WHERE staff_id = $1`,
-        [staffId]
-      );
-    } else if (action === 'rate' && rating) {
-      await pool.query(
-        `UPDATE ticket_stats SET total_rating = total_rating + $1, rating_count = rating_count + 1, updated_at = CURRENT_TIMESTAMP 
-         WHERE staff_id = $2`,
-        [rating, staffId]
-      );
+      update.$inc = { ticketsClosed: 1 };
+    } else if (action === 'rate' && rating !== null) {
+      update.$inc = { totalRating: rating, ratingCount: 1 };
     }
+
+    return await TicketStats.findOneAndUpdate(
+      { staffId },
+      update,
+      { upsert: true, new: true }
+    );
   },
 
   async getStaffStats(staffId = null) {
     if (staffId) {
-      const result = await pool.query(
-        'SELECT * FROM ticket_stats WHERE staff_id = $1',
-        [staffId]
-      );
-      return result.rows[0];
+      return await TicketStats.findOne({ staffId });
     }
-    const result = await pool.query(
-      'SELECT * FROM ticket_stats ORDER BY tickets_closed DESC'
-    );
-    return result.rows;
-  },
-
-  async checkRateLimit(userId, command, limitMs) {
-    const result = await pool.query(
-      `SELECT * FROM rate_limits 
-       WHERE user_id = $1 AND command = $2 AND used_at > NOW() - INTERVAL '1 second' * $3`,
-      [userId, command, limitMs / 1000]
-    );
-    return result.rows.length > 0;
-  },
-
-  async setRateLimit(userId, command) {
-    await pool.query(
-      `INSERT INTO rate_limits (user_id, command) VALUES ($1, $2)`,
-      [userId, command]
-    );
-  },
-
-  async cleanupRateLimits() {
-    await pool.query(`DELETE FROM rate_limits WHERE used_at < NOW() - INTERVAL '1 hour'`);
-  },
-
-  async getConfig(key) {
-    const result = await pool.query('SELECT value FROM config WHERE key = $1', [key]);
-    return result.rows[0]?.value;
-  },
-
-  async setConfig(key, value) {
-    await pool.query(
-      `INSERT INTO config (key, value) VALUES ($1, $2) 
-       ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = CURRENT_TIMESTAMP`,
-      [key, value]
-    );
+    return await TicketStats.find().sort({ ticketsClosed: -1 }).limit(10);
   },
 
   async getTicketStats() {
-    const result = await pool.query(`
-      SELECT 
-        COUNT(*) FILTER (WHERE status = 'open') as open_tickets,
-        COUNT(*) FILTER (WHERE status = 'closed') as closed_tickets,
-        COUNT(*) FILTER (WHERE status = 'closed' AND closed_at > NOW() - INTERVAL '24 hours') as closed_today,
-        AVG(rating) FILTER (WHERE rating IS NOT NULL) as avg_rating,
-        COUNT(*) FILTER (WHERE rating IS NOT NULL) as rated_tickets
-      FROM tickets
-    `);
-    return result.rows[0];
+    const openTickets = await Ticket.countDocuments({ status: 'open' });
+    const closedTickets = await Ticket.countDocuments({ status: 'closed' });
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const closedToday = await Ticket.countDocuments({ 
+      status: 'closed', 
+      closedAt: { $gte: today } 
+    });
+
+    const ratedTickets = await Ticket.find({ rating: { $ne: null } });
+    const totalRating = ratedTickets.reduce((sum, t) => sum + (t.rating || 0), 0);
+    const avgRating = ratedTickets.length > 0 ? totalRating / ratedTickets.length : null;
+
+    return {
+      open_tickets: openTickets,
+      closed_tickets: closedTickets,
+      closed_today: closedToday,
+      avg_rating: avgRating,
+      rated_tickets: ratedTickets.length
+    };
   },
 
-  async cleanupOldWarnings() {
-    const result = await pool.query(
-      `DELETE FROM warnings WHERE created_at < NOW() - INTERVAL '30 days' RETURNING user_id`
+  async addAuditLog(actionType, odId = null, targetId = null, staffId = null, details = {}) {
+    const log = new AuditLog({ actionType, odId, targetId, staffId, details });
+    return await log.save();
+  },
+
+  async getAuditLogs(options = {}) {
+    const query = {};
+    if (options.odId) query.odId = options.odId;
+    if (options.actionType) query.actionType = new RegExp(options.actionType, 'i');
+    
+    return await AuditLog.find(query).sort({ createdAt: -1 }).limit(options.limit || 50);
+  },
+
+  async getConfig(key) {
+    const config = await Config.findOne({ key });
+    return config ? config.value : null;
+  },
+
+  async setConfig(key, value) {
+    return await Config.findOneAndUpdate(
+      { key },
+      { value, updatedAt: new Date() },
+      { upsert: true, new: true }
     );
-    return result.rows;
+  },
+
+  async checkRateLimit(odId, command, limitMs) {
+    const cutoff = new Date(Date.now() - limitMs);
+    const existing = await RateLimit.findOne({
+      odId,
+      command,
+      timestamp: { $gt: cutoff }
+    });
+    return !!existing;
+  },
+
+  async setRateLimit(odId, command) {
+    const rateLimit = new RateLimit({ odId, command });
+    return await rateLimit.save();
+  },
+
+  async cleanupRateLimits() {
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    await RateLimit.deleteMany({ timestamp: { $lt: fiveMinutesAgo } });
+  },
+
+  async query(queryString, params = []) {
+    console.warn('SQL query called on MongoDB - this should be migrated');
+    return { rows: [] };
   }
 };
 
-module.exports = { connectDB, db, pool };
+module.exports = { connectDB, db, mongoose };
