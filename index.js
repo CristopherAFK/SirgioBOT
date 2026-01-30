@@ -42,7 +42,7 @@ connectDB().then(async connected => {
     
     // Iniciar el bot solo después de que la DB esté lista
     try {
-      const token = process.env.DISCORD_TOKEN || process.env.TOKEN;
+      const token = (process.env.DISCORD_TOKEN || process.env.TOKEN || "").trim();
       if (!token) {
         console.error("❌ ERROR: No se encontró el token de Discord en las variables de entorno.");
         return;
@@ -51,13 +51,16 @@ connectDB().then(async connected => {
       
       // Timeout de seguridad para detectar si Discord no responde
       const loginTimeout = setTimeout(() => {
-        console.error("⚠️ El inicio de sesión está tardando demasiado. Verifica si el token es válido o si hay problemas de red.");
+        console.error("⚠️ El inicio de sesión está tardando demasiado. Esto suele pasar si el TOKEN es incorrecto o si los INTENTS no se guardaron bien en Discord.");
       }, 15000);
 
       await client.login(token);
       clearTimeout(loginTimeout);
     } catch (err) {
-      console.error("❌ Fallo crítico al iniciar sesión en Discord:", err);
+      console.error("❌ Fallo crítico al iniciar sesión en Discord:", err.message);
+      if (err.message.includes("An invalid token was provided")) {
+        console.error("💡 TIP: El token que pusiste en Render es INVÁLIDO. Copia el 'Token' de nuevo desde el Developer Portal (Bot -> Reset Token).");
+      }
       if (err.message.includes("Privileged intent")) {
         console.error("💡 TIP: Asegúrate de que los 'Privileged Gateway Intents' (Presence, Server Members, Message Content) estén activados en el Discord Developer Portal.");
       }
