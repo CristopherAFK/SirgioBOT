@@ -481,8 +481,87 @@ module.exports = (client) => {
     }
   });
 
-  client.on("interactionCreate", async (interaction) => {
+    client.on("interactionCreate", async (interaction) => {
+    if (!interaction.isChatInputCommand()) return;
+    
+    // Bypass para el staff
+    if (!isStaff(interaction.member)) {
+      return interaction.reply({ content: "❌ No tienes permiso para usar este comando.", flags: MessageFlags.Ephemeral });
+    }
+
+    const { commandName, options, user, guild, member } = interaction;
+
     try {
+      if (commandName === "sancion") {
+        const target = options.getUser("usuario");
+        const targetMember = options.getMember("usuario");
+        const type = options.getString("tipo");
+        const category = options.getString("categoria");
+        const reason = options.getString("razon");
+        const durationStr = options.getString("tiempo");
+        const times = options.getInteger("veces") || 1;
+        const additionalInfractions = options.getString("infracciones_adicionales") || "Ninguna";
+        const proof = options.getAttachment("prueba");
+
+        if (!targetMember) return interaction.reply({ content: "❌ No se encontró al usuario en el servidor.", flags: MessageFlags.Ephemeral });
+
+        let durationMs = parseDuration(durationStr);
+        const categoryLabel = SANCTION_CATEGORIES.find(c => c.value === category)?.label || category;
+
+        if (type === "warn") {
+          await applyWarn(client, guild, target, targetMember, `${categoryLabel}: ${reason}`, null, user);
+          return interaction.reply({ content: `✅ Se ha aplicado un warn a **${target.tag}** por **${categoryLabel}**.` });
+        }
+
+        if (type === "mute") {
+          if (!durationMs) durationMs = 10 * 60 * 1000; // 10m por defecto
+          await targetMember.roles.add(MUTED_ROLE_ID);
+          
+          const timeoutId = setTimeout(async () => {
+            const ref = await guild.members.fetch(target.id).catch(() => null);
+            if (ref) await ref.roles.remove(MUTED_ROLE_ID).catch(() => {});
+            activeMutes.delete(target.id);
+          }, durationMs);
+          activeMutes.set(target.id, timeoutId);
+
+          const embed = new EmbedBuilder()
+            .setTitle("🔇 Usuario silenciado")
+            .setDescription(`Has sido silenciado en **${guild.name}**`)
+            .addFields(
+              { name: "Razón", value: `${categoryLabel}: ${reason}` },
+              { name: "Duración", value: formatDuration(durationMs) }
+            )
+            .setColor(0xffa500)
+            .setTimestamp();
+          
+          await target.send({ embeds: [embed] }).catch(() => {});
+          return interaction.reply({ content: `✅ **${target.tag}** ha sido silenciado por **${formatDuration(durationMs)}**.` });
+        }
+
+        if (type === "ban") {
+          if (!canBan(member)) return interaction.reply({ content: "❌ No tienes permisos para banear.", flags: MessageFlags.Ephemeral });
+          
+          await target.send(`Has sido baneado de **${guild.name}** por: ${categoryLabel}: ${reason}`).catch(() => {});
+          await targetMember.ban({ reason: `${categoryLabel}: ${reason}` });
+          return interaction.reply({ content: `✅ **${target.tag}** ha sido baneado permanentemente.` });
+        }
+      }
+
+      if (commandName === "stafftools") {
+        const embed = new EmbedBuilder()
+          .setTitle("🛠️ Panel de Herramientas Staff")
+          .setDescription("Selecciona una acción para gestionar el servidor.")
+          .setColor(0x5865F2)
+          .setTimestamp();
+
+        const row = new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId("staff_warns_list").setLabel("Ver Warns").setStyle(ButtonStyle.Secondary),
+          new ButtonBuilder().setCustomId("staff_mute_list").setLabel("Mutes Activos").setStyle(ButtonStyle.Secondary),
+          new ButtonBuilder().setCustomId("staff_reload").setLabel("Recargar Listas").setStyle(ButtonStyle.Danger)
+        );
+
+        return interaction.reply({ embeds: [embed], components: [row] });
+      }
       if (interaction.isButton() && interaction.customId === "view_banned_words") {
         const list = loadWords(BANNED_PATH);
         const embed = new EmbedBuilder()
