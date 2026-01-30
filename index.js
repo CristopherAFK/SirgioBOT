@@ -36,11 +36,18 @@ const client = new Client({
 
 client.setMaxListeners(25);
 
-connectDB().then(connected => {
+connectDB().then(async connected => {
   if (connected) {
-    console.log("🗄️ Base de datos PostgreSQL inicializada correctamente.");
+    console.log("🗄️ Base de datos MongoDB inicializada correctamente.");
+    
+    // Iniciar el bot solo después de que la DB esté lista
+    try {
+      await client.login(process.env.DISCORD_TOKEN || process.env.TOKEN);
+    } catch (err) {
+      console.error("❌ Fallo crítico al iniciar sesión en Discord:", err);
+    }
   } else {
-    console.error("❌ Error inicializando base de datos.");
+    console.error("❌ Error inicializando base de datos MongoDB.");
   }
 });
 
@@ -617,8 +624,4 @@ client.once("ready", () => {
 
 client.on("error", (error) => {
   console.error("❌ Error de Discord:", error);
-});
-
-client.login(process.env.DISCORD_TOKEN || process.env.TOKEN).catch(err => {
-  console.error("❌ Fallo crítico al iniciar sesión en Discord:", err);
 });
