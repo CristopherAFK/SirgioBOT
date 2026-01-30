@@ -610,4 +610,15 @@ app.get("/", (req, res) => res.send("SirgioBOT is alive!"));
 app.get("/health", (req, res) => res.json({ status: "ok", uptime: process.uptime() }));
 app.listen(process.env.PORT || 3000, () => console.log("🌐 Servidor web activo para mantener el bot despierto."));
 
-client.login(process.env.DISCORD_TOKEN || process.env.TOKEN);
+client.once("ready", () => {
+  console.log(`✅ Bot encendido como ${client.user.tag}`);
+  console.log(`🌐 Servidor: ${client.guilds.cache.size} guilds`);
+});
+
+client.on("error", (error) => {
+  console.error("❌ Error de Discord:", error);
+});
+
+client.login(process.env.DISCORD_TOKEN || process.env.TOKEN).catch(err => {
+  console.error("❌ Fallo crítico al iniciar sesión en Discord:", err);
+});
