@@ -48,9 +48,19 @@ connectDB().then(async connected => {
         return;
       }
       console.log(`🔑 Intentando conectar con el token (longitud: ${token.length})...`);
+      
+      // Timeout de seguridad para detectar si Discord no responde
+      const loginTimeout = setTimeout(() => {
+        console.error("⚠️ El inicio de sesión está tardando demasiado. Verifica si el token es válido o si hay problemas de red.");
+      }, 15000);
+
       await client.login(token);
+      clearTimeout(loginTimeout);
     } catch (err) {
       console.error("❌ Fallo crítico al iniciar sesión en Discord:", err);
+      if (err.message.includes("Privileged intent")) {
+        console.error("💡 TIP: Asegúrate de que los 'Privileged Gateway Intents' (Presence, Server Members, Message Content) estén activados en el Discord Developer Portal.");
+      }
     }
   } else {
     console.error("❌ Error inicializando base de datos MongoDB.");
