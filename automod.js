@@ -562,6 +562,7 @@ module.exports = (client) => {
 
         return interaction.reply({ embeds: [embed], components: [row] });
       }
+
       if (interaction.isButton() && interaction.customId === "view_banned_words") {
         const list = loadWords(BANNED_PATH);
         const embed = new EmbedBuilder()
