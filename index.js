@@ -42,9 +42,9 @@ connectDB().then(async connected => {
     
     // Iniciar el bot solo después de que la DB esté lista
     try {
-      const token = (process.env.DISCORD_TOKEN || process.env.TOKEN || "").trim();
-      const clientId = process.env.CLIENT_ID || client.user?.id;
-
+      const rawToken = process.env.DISCORD_TOKEN || process.env.TOKEN || "";
+      const token = rawToken.trim();
+      
       if (!token) {
         console.error("❌ ERROR: No se encontró el token de Discord en las variables de entorno.");
         return;
@@ -57,20 +57,25 @@ connectDB().then(async connected => {
         console.error("⚠️ El inicio de sesión está tardando demasiado. Esto suele pasar si el TOKEN es incorrecto o si los INTENTS no se guardaron bien en Discord.");
       }, 15000);
 
-      await client.login(token);
-      clearTimeout(loginTimeout);
+      // Usar client.login directamente y capturar la promesa
+      client.login(token)
+        .then(() => {
+          clearTimeout(loginTimeout);
+          console.log(`✅ Login exitoso`);
+        })
+        .catch(err => {
+          clearTimeout(loginTimeout);
+          console.error("❌ Fallo crítico al iniciar sesión en Discord:", err.message);
+          if (err.message.includes("An invalid token was provided")) {
+            console.error("💡 TIP: El token que pusiste en Render es INVÁLIDO. Copia el 'Token' de nuevo desde el Developer Portal (Bot -> Reset Token).");
+          }
+          if (err.message.includes("Privileged intent")) {
+            console.error("💡 TIP: Asegúrate de que los 'Privileged Gateway Intents' (Presence, Server Members, Message Content) estén activados en el Discord Developer Portal.");
+          }
+        });
 
-      if (clientId) {
-        console.log(`🆔 ID de Aplicación configurado: ${clientId}`);
-      }
     } catch (err) {
-      console.error("❌ Fallo crítico al iniciar sesión en Discord:", err.message);
-      if (err.message.includes("An invalid token was provided")) {
-        console.error("💡 TIP: El token que pusiste en Render es INVÁLIDO. Copia el 'Token' de nuevo desde el Developer Portal (Bot -> Reset Token).");
-      }
-      if (err.message.includes("Privileged intent")) {
-        console.error("💡 TIP: Asegúrate de que los 'Privileged Gateway Intents' (Presence, Server Members, Message Content) estén activados en el Discord Developer Portal.");
-      }
+      console.error("❌ Error sincrónico en bloque login:", err.message);
     }
   } else {
     console.error("❌ Error inicializando base de datos MongoDB.");
