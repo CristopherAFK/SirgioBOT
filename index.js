@@ -43,10 +43,13 @@ connectDB().then(async connected => {
     // Iniciar el bot solo después de que la DB esté lista
     try {
       const token = (process.env.DISCORD_TOKEN || process.env.TOKEN || "").trim();
+      const clientId = process.env.CLIENT_ID || client.user?.id;
+
       if (!token) {
         console.error("❌ ERROR: No se encontró el token de Discord en las variables de entorno.");
         return;
       }
+      
       console.log(`🔑 Intentando conectar con el token (longitud: ${token.length})...`);
       
       // Timeout de seguridad para detectar si Discord no responde
@@ -56,6 +59,10 @@ connectDB().then(async connected => {
 
       await client.login(token);
       clearTimeout(loginTimeout);
+
+      if (clientId) {
+        console.log(`🆔 ID de Aplicación configurado: ${clientId}`);
+      }
     } catch (err) {
       console.error("❌ Fallo crítico al iniciar sesión en Discord:", err.message);
       if (err.message.includes("An invalid token was provided")) {
