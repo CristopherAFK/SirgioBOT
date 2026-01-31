@@ -42,26 +42,28 @@ connectDB().then(async connected => {
     
     // Iniciar el bot solo después de que la DB esté lista
     try {
-      const rawToken = process.env.DISCORD_TOKEN || process.env.TOKEN || "";
-      const token = rawToken.trim();
+      // Priorizar DISCORD_TOKEN para Render, pero permitir TOKEN como respaldo
+      const rawToken = process.env.DISCORD_TOKEN || process.env.TOKEN;
+      const token = rawToken ? rawToken.trim() : "";
       
       if (!token) {
         console.error("❌ ERROR: No se encontró el token de Discord en las variables de entorno.");
+        console.error("Asegúrate de configurar 'DISCORD_TOKEN' o 'TOKEN' en Render -> Environment Variables.");
         return;
       }
       
-      console.log(`🔑 Intentando conectar con el token (longitud: ${token.length})...`);
+      console.log(`🔑 Intentando conectar con Discord (longitud del token: ${token.length})...`);
       
       // Timeout de seguridad para detectar si Discord no responde
       const loginTimeout = setTimeout(() => {
-        console.error("⚠️ El inicio de sesión está tardando demasiado. Esto suele pasar si el TOKEN es incorrecto o si los INTENTS no se guardaron bien en Discord.");
+        console.error("⚠️ El inicio de sesión está tardando demasiado. Esto suele pasar si el TOKEN es incorrecto o si los INTENTS no están activados en el Discord Developer Portal.");
       }, 15000);
 
       // Usar client.login directamente y capturar la promesa
       client.login(token)
         .then(() => {
           clearTimeout(loginTimeout);
-          console.log(`✅ Login exitoso`);
+          console.log(`✅ Conexión exitosa con Discord como ${client.user.tag}`);
         })
         .catch(err => {
           clearTimeout(loginTimeout);
