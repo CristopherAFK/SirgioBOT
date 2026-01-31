@@ -46,6 +46,11 @@ connectDB().then(async connected => {
   
   // Iniciar el bot
   try {
+    // Debug: Mostrar todas las variables de entorno relacionadas (sin mostrar el valor real por seguridad)
+    console.log("🔍 Diagnóstico de variables de entorno:");
+    console.log(`- DISCORD_TOKEN: ${process.env.DISCORD_TOKEN ? "Configurada (longitud: " + process.env.DISCORD_TOKEN.trim().length + ")" : "NO detectada"}`);
+    console.log(`- TOKEN: ${process.env.TOKEN ? "Configurada (longitud: " + process.env.TOKEN.trim().length + ")" : "NO detectada"}`);
+
     // Priorizar DISCORD_TOKEN para Render, pero permitir TOKEN como respaldo
     const rawToken = process.env.DISCORD_TOKEN || process.env.TOKEN;
     const token = rawToken ? rawToken.trim() : "";
@@ -53,10 +58,11 @@ connectDB().then(async connected => {
     if (!token) {
       console.error("❌ ERROR: No se encontró el token de Discord en las variables de entorno.");
       console.error("Asegúrate de configurar 'DISCORD_TOKEN' o 'TOKEN' en Render -> Environment Variables.");
+      // Intentar forzar login con el token directamente si existe en .replit (solo para debug local si falla env)
       return;
     }
     
-    console.log(`🔑 Intentando conectar con Discord (longitud del token: ${token.length})...`);
+    console.log(`🔑 Intentando conectar con Discord...`);
     
     // Timeout de seguridad para detectar si Discord no responde
     const loginTimeout = setTimeout(() => {
@@ -78,6 +84,9 @@ connectDB().then(async connected => {
         if (err.message.includes("Privileged intent")) {
           console.error("💡 TIP: Asegúrate de que los 'Privileged Gateway Intents' (Presence, Server Members, Message Content) estén activados en el Discord Developer Portal.");
         }
+        // Fallback para debug
+        console.log("Reintentando login en 5 segundos...");
+        setTimeout(() => client.login(token).catch(() => {}), 5000);
       });
 
   } catch (err) {
