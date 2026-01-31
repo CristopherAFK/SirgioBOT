@@ -46,20 +46,16 @@ connectDB().then(async connected => {
   
   // Iniciar el bot
   try {
-    // Debug: Mostrar todas las variables de entorno relacionadas (sin mostrar el valor real por seguridad)
-    console.log("🔍 Diagnóstico de variables de entorno:");
-    console.log(`- DISCORD_TOKEN: ${process.env.DISCORD_TOKEN ? "Configurada (longitud: " + process.env.DISCORD_TOKEN.trim().length + ")" : "NO detectada"}`);
-    console.log(`- TOKEN: ${process.env.TOKEN ? "Configurada (longitud: " + process.env.TOKEN.trim().length + ")" : "NO detectada"}`);
-
-    // Priorizar DISCORD_TOKEN para Render, pero permitir TOKEN como respaldo
-    // Forzamos la limpieza de espacios en blanco y saltos de línea invisibles
-    const rawToken = process.env.DISCORD_TOKEN || process.env.TOKEN || process.env.BOT_TOKEN;
-    const token = rawToken ? rawToken.toString().replace(/\s/g, "") : "";
+    // Obtener token limpiando cualquier residuo de Render/Env
+    const token = (process.env.DISCORD_TOKEN || process.env.TOKEN || "").toString().replace(/[\r\n\t\s]/g, "");
     
-    if (!token || token.length < 50) {
-      console.error("❌ ERROR: No se encontró un token de Discord válido.");
-      console.log(`- Longitud detectada: ${token.length}`);
-      console.error("Asegúrate de configurar 'DISCORD_TOKEN' en Render sin espacios extras.");
+    console.log("🔍 Diagnóstico de variables de entorno:");
+    console.log(`- DISCORD_TOKEN: ${process.env.DISCORD_TOKEN ? "Detectada (longitud original: " + process.env.DISCORD_TOKEN.length + ")" : "NO detectada"}`);
+    console.log(`- TOKEN: ${process.env.TOKEN ? "Detectada (longitud original: " + process.env.TOKEN.length + ")" : "NO detectada"}`);
+    console.log(`- Token final procesado (longitud): ${token.length}`);
+
+    if (token.length < 50) {
+      console.error("❌ ERROR: El token detectado es demasiado corto o no existe.");
       return;
     }
     
