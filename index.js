@@ -52,13 +52,14 @@ connectDB().then(async connected => {
     console.log(`- TOKEN: ${process.env.TOKEN ? "Configurada (longitud: " + process.env.TOKEN.trim().length + ")" : "NO detectada"}`);
 
     // Priorizar DISCORD_TOKEN para Render, pero permitir TOKEN como respaldo
-    const rawToken = process.env.DISCORD_TOKEN || process.env.TOKEN;
-    const token = rawToken ? rawToken.trim() : "";
+    // Forzamos la limpieza de espacios en blanco y saltos de línea invisibles
+    const rawToken = process.env.DISCORD_TOKEN || process.env.TOKEN || process.env.BOT_TOKEN;
+    const token = rawToken ? rawToken.toString().replace(/\s/g, "") : "";
     
-    if (!token) {
-      console.error("❌ ERROR: No se encontró el token de Discord en las variables de entorno.");
-      console.error("Asegúrate de configurar 'DISCORD_TOKEN' o 'TOKEN' en Render -> Environment Variables.");
-      // Intentar forzar login con el token directamente si existe en .replit (solo para debug local si falla env)
+    if (!token || token.length < 50) {
+      console.error("❌ ERROR: No se encontró un token de Discord válido.");
+      console.log(`- Longitud detectada: ${token.length}`);
+      console.error("Asegúrate de configurar 'DISCORD_TOKEN' en Render sin espacios extras.");
       return;
     }
     
