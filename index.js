@@ -36,51 +36,52 @@ const client = new Client({
 
 client.setMaxListeners(25);
 
+// Conectar a la base de datos
 connectDB().then(async connected => {
-  if (connected) {
-    console.log("🗄️ Base de datos MongoDB inicializada correctamente.");
+  // En Replit, incluso si no hay MONGO_URI, intentaremos seguir para que el bot conecte a Discord
+  // En Render, el usuario DEBE configurar MONGODB_URI
+  if (!connected) {
+    console.warn("⚠️ No se pudo conectar a MongoDB. El bot intentará iniciar sesión de todos modos, pero algunas funciones fallarán.");
+  }
+  
+  // Iniciar el bot
+  try {
+    // Priorizar DISCORD_TOKEN para Render, pero permitir TOKEN como respaldo
+    const rawToken = process.env.DISCORD_TOKEN || process.env.TOKEN;
+    const token = rawToken ? rawToken.trim() : "";
     
-    // Iniciar el bot solo después de que la DB esté lista
-    try {
-      // Priorizar DISCORD_TOKEN para Render, pero permitir TOKEN como respaldo
-      const rawToken = process.env.DISCORD_TOKEN || process.env.TOKEN;
-      const token = rawToken ? rawToken.trim() : "";
-      
-      if (!token) {
-        console.error("❌ ERROR: No se encontró el token de Discord en las variables de entorno.");
-        console.error("Asegúrate de configurar 'DISCORD_TOKEN' o 'TOKEN' en Render -> Environment Variables.");
-        return;
-      }
-      
-      console.log(`🔑 Intentando conectar con Discord (longitud del token: ${token.length})...`);
-      
-      // Timeout de seguridad para detectar si Discord no responde
-      const loginTimeout = setTimeout(() => {
-        console.error("⚠️ El inicio de sesión está tardando demasiado. Esto suele pasar si el TOKEN es incorrecto o si los INTENTS no están activados en el Discord Developer Portal.");
-      }, 15000);
-
-      // Usar client.login directamente y capturar la promesa
-      client.login(token)
-        .then(() => {
-          clearTimeout(loginTimeout);
-          console.log(`✅ Conexión exitosa con Discord como ${client.user.tag}`);
-        })
-        .catch(err => {
-          clearTimeout(loginTimeout);
-          console.error("❌ Fallo crítico al iniciar sesión en Discord:", err.message);
-          if (err.message.includes("An invalid token was provided")) {
-            console.error("💡 TIP: El token que pusiste en Render es INVÁLIDO. Copia el 'Token' de nuevo desde el Developer Portal (Bot -> Reset Token).");
-          }
-          if (err.message.includes("Privileged intent")) {
-            console.error("💡 TIP: Asegúrate de que los 'Privileged Gateway Intents' (Presence, Server Members, Message Content) estén activados en el Discord Developer Portal.");
-          }
-        });
-
-    } catch (err) {
-      console.error("❌ Error sincrónico en bloque login:", err.message);
+    if (!token) {
+      console.error("❌ ERROR: No se encontró el token de Discord en las variables de entorno.");
+      console.error("Asegúrate de configurar 'DISCORD_TOKEN' o 'TOKEN' en Render -> Environment Variables.");
+      return;
     }
-  } else {
-    console.error("❌ Error inicializando base de datos MongoDB.");
+    
+    console.log(`🔑 Intentando conectar con Discord (longitud del token: ${token.length})...`);
+    
+    // Timeout de seguridad para detectar si Discord no responde
+    const loginTimeout = setTimeout(() => {
+      console.error("⚠️ El inicio de sesión está tardando demasiado. Esto suele pasar si el TOKEN es incorrecto o si los INTENTS no están activados en el Discord Developer Portal.");
+    }, 15000);
+
+    // Usar client.login directamente y capturar la promesa
+    client.login(token)
+      .then(() => {
+        clearTimeout(loginTimeout);
+        console.log(`✅ Conexión exitosa con Discord como ${client.user.tag}`);
+      })
+      .catch(err => {
+        clearTimeout(loginTimeout);
+        console.error("❌ Fallo crítico al iniciar sesión en Discord:", err.message);
+        if (err.message.includes("An invalid token was provided")) {
+          console.error("💡 TIP: El token que pusiste en Render es INVÁLIDO. Copia el 'Token' de nuevo desde el Developer Portal (Bot -> Reset Token).");
+        }
+        if (err.message.includes("Privileged intent")) {
+          console.error("💡 TIP: Asegúrate de que los 'Privileged Gateway Intents' (Presence, Server Members, Message Content) estén activados en el Discord Developer Portal.");
+        }
+      });
+
+  } catch (err) {
+    console.error("❌ Error sincrónico en bloque login:", err.message);
   }
 });
 
