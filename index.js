@@ -125,7 +125,6 @@ client.once("ready", () => {
   }, 60 * 60 * 1000);
 });
 
-const express = require("express");
 const app = express();
 app.get("/", (req, res) => res.send("SirgioBOT is alive!"));
 app.get("/health", (req, res) => res.json({ status: "ok", uptime: process.uptime() }));
