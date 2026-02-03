@@ -473,14 +473,13 @@ module.exports = (client) => {
       if (owner) {
         try {
           const closeEmbed = new EmbedBuilder()
-            .setAuthor({ name: "Spreen" })
             .setTitle("Ticket Cerrado")
             .setDescription(
               `Hola ${owner.username}, su ticket de Discord ha sido cerrado por un miembro de nuestro staff.\n\n` +
               "• **¿Quieres dejar una reseña?**\n" +
               "Puedes seleccionar con uno de los botones de abajo si quieres dejar una puntuación al soporte o una opinión. Nos ayuda mucho que lleguen opiniones de cualquier tipo para mejorar el soporte."
             )
-            .setColor(0x2b2d31)
+            .setColor(0x00FFFF)
             .setTimestamp();
 
           const ratingBtnRow = new ActionRowBuilder().addComponents(

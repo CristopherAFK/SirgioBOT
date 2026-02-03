@@ -19,8 +19,7 @@ const STAFF_REVIEW_CHANNEL_ID = '1435091853308461179';
 const STAFF_ROLE_ID = '1230949715127042098';
 const SUGGESTER_ROLE_ID = '1313716079998140536';
 
-const SUGGESTION_ICON = 'attachment://suggestion_icon.gif';
-const ICON_PATH = path.join(__dirname, 'suggestion_icon.gif');
+const SUGGESTION_ICON_URL = 'https://media.discordapp.net/attachments/1420914042251509990/1430698897927307347/79794618.png';
 
 const processedInteractions = new Set();
 
@@ -188,12 +187,10 @@ module.exports = (client) => {
             .setEmoji('💡');
           const publicRow = new ActionRowBuilder().addComponents(createSugBtn);
 
-          if (fs.existsSync(ICON_PATH)) {
-            const attachment = new AttachmentBuilder(ICON_PATH, { name: 'suggestion_icon.gif' });
-            publicEmbed.setThumbnail(SUGGESTION_ICON);
+          if (SUGGESTION_ICON_URL) {
+            publicEmbed.setThumbnail(SUGGESTION_ICON_URL);
             publicMessage = await suggestionsChannel.send({
               embeds: [publicEmbed],
-              files: [attachment],
               components: [publicRow]
             });
           } else {
@@ -314,10 +311,8 @@ module.exports = (client) => {
             const publicRow = new ActionRowBuilder().addComponents(createSugBtn);
 
             const editOptions = { embeds: [updatedEmbed], components: [publicRow] };
-            if (fs.existsSync(ICON_PATH)) {
-              const attachment = new AttachmentBuilder(ICON_PATH, { name: 'suggestion_icon.gif' });
-              updatedEmbed.setThumbnail(SUGGESTION_ICON);
-              editOptions.files = [attachment];
+            if (SUGGESTION_ICON_URL) {
+              updatedEmbed.setThumbnail(SUGGESTION_ICON_URL);
             }
 
             await publicMessage.edit(editOptions);
