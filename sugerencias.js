@@ -313,7 +313,14 @@ module.exports = (client) => {
               .setEmoji('💡');
             const publicRow = new ActionRowBuilder().addComponents(createSugBtn);
 
-            await publicMessage.edit({ embeds: [updatedEmbed], components: [publicRow] });
+            const editOptions = { embeds: [updatedEmbed], components: [publicRow] };
+            if (fs.existsSync(ICON_PATH)) {
+              const attachment = new AttachmentBuilder(ICON_PATH, { name: 'suggestion_icon.gif' });
+              updatedEmbed.setThumbnail(SUGGESTION_ICON);
+              editOptions.files = [attachment];
+            }
+
+            await publicMessage.edit(editOptions);
 
             const staffEmbed = EmbedBuilder.from(interaction.message.embeds[0])
               .setTitle(`📋 Sugerencia Revisada`)

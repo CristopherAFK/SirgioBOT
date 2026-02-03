@@ -469,19 +469,30 @@ module.exports = (client) => {
         await logsChannel.send({ embeds: [logEmbed], files: [attachment] });
       }
 
-      const ratingBtnRow = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId(`rate_ticket_5_${ticket.ticketNumber}`).setLabel("⭐⭐⭐⭐⭐").setStyle(ButtonStyle.Success),
-        new ButtonBuilder().setCustomId(`rate_ticket_4_${ticket.ticketNumber}`).setLabel("⭐⭐⭐⭐").setStyle(ButtonStyle.Success),
-        new ButtonBuilder().setCustomId(`rate_ticket_3_${ticket.ticketNumber}`).setLabel("⭐⭐⭐").setStyle(ButtonStyle.Primary),
-        new ButtonBuilder().setCustomId(`rate_ticket_2_${ticket.ticketNumber}`).setLabel("⭐⭐").setStyle(ButtonStyle.Danger),
-        new ButtonBuilder().setCustomId(`rate_ticket_1_${ticket.ticketNumber}`).setLabel("⭐").setStyle(ButtonStyle.Danger)
-      );
-
       const owner = await client.users.fetch(ticket.ownerId).catch(() => null);
       if (owner) {
         try {
+          const closeEmbed = new EmbedBuilder()
+            .setAuthor({ name: "Spreen" })
+            .setTitle("Ticket Cerrado")
+            .setDescription(
+              `Hola ${owner.username}, su ticket de Discord ha sido cerrado por un miembro de nuestro staff.\n\n` +
+              "• **¿Quieres dejar una reseña?**\n" +
+              "Puedes seleccionar con uno de los botones de abajo si quieres dejar una puntuación al soporte o una opinión. Nos ayuda mucho que lleguen opiniones de cualquier tipo para mejorar el soporte."
+            )
+            .setColor(0x2b2d31)
+            .setTimestamp();
+
+          const ratingBtnRow = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId(`rate_ticket_1_${ticket.ticketNumber}`).setEmoji("⭐").setLabel("1").setStyle(ButtonStyle.Danger),
+            new ButtonBuilder().setCustomId(`rate_ticket_2_${ticket.ticketNumber}`).setEmoji("⭐").setLabel("2").setStyle(ButtonStyle.Danger),
+            new ButtonBuilder().setCustomId(`rate_ticket_3_${ticket.ticketNumber}`).setEmoji("⭐").setLabel("3").setStyle(ButtonStyle.Primary),
+            new ButtonBuilder().setCustomId(`rate_ticket_4_${ticket.ticketNumber}`).setEmoji("⭐").setLabel("4").setStyle(ButtonStyle.Success),
+            new ButtonBuilder().setCustomId(`rate_ticket_5_${ticket.ticketNumber}`).setEmoji("⭐").setLabel("5").setStyle(ButtonStyle.Success)
+          );
+
           await owner.send({ 
-            content: `Tu ticket #${ticket.ticketNumber} ha sido cerrado. Por favor, califica la atención recibida:`,
+            embeds: [closeEmbed],
             components: [ratingBtnRow]
           });
           await owner.send({ files: [attachment] });
