@@ -13,18 +13,18 @@
       <h1>Staff Panel</h1>
       <p>SirgioBOT - Panel de Moderacion</p>
       <div class="form-group">
-        <label>Clave de Acceso</label>
-        <input type="password" id="login-key" placeholder="Ingresa la clave del panel">
+        <label>Usuario</label>
+        <input type="text" id="login-username" placeholder="Ingresa tu usuario" autocomplete="username">
       </div>
       <div class="form-group">
-        <label>Rol</label>
-        <select id="login-role">
-          <option value="helper">Helper</option>
-          <option value="moderator">Moderador</option>
-          <option value="admin">Admin / Owner</option>
-        </select>
+        <label>Contraseña</label>
+        <input type="password" id="login-password" placeholder="Ingresa tu contraseña" autocomplete="current-password">
       </div>
       <button class="btn btn-primary btn-full" onclick="login()">Iniciar Sesion</button>
+      <script>
+        document.getElementById('login-password').addEventListener('keydown', function(e) { if (e.key === 'Enter') login(); });
+        document.getElementById('login-username').addEventListener('keydown', function(e) { if (e.key === 'Enter') document.getElementById('login-password').focus(); });
+      </script>
     </div>
   </div>
 
@@ -79,6 +79,7 @@
       </nav>
       <div class="sidebar-footer">
         <div class="user-info">
+          <span class="username-display" id="username-display">-</span>
           <span class="role-badge" id="role-badge">-</span>
           <button class="btn btn-sm btn-danger" onclick="logout()">Salir</button>
         </div>

@@ -12,13 +12,24 @@ function setupStaffPanel(app, client) {
   app.use('/panel', express.static(path.join(__dirname, 'public')));
 
   const sessions = new Map();
-  const PANEL_KEY = process.env.PANEL_KEY || 'staff2024';
   const GUILD_ID = process.env.GUILD_ID || '';
+
+  function hashPassword(password) {
+    return crypto.createHash('sha256').update(password).digest('hex');
+  }
+
+  const ACCOUNTS = {
+    'agustito': { password: hashPassword('maximo202430'), role: 'moderator', discordId: '1196639548877320202', displayName: 'Agustito' },
+    'gars': { password: hashPassword('garcia14052012'), role: 'admin', discordId: '1032482231677108224', displayName: 'Gars' },
+    'sirgio': { password: hashPassword('SirgioTeam2026'), role: 'owner', discordId: '956700088103747625', displayName: 'Sirgio' },
+    'katherine_zero': { password: hashPassword('GOHA071020HQRRXLA0'), role: 'helper', discordId: '1307811551729946756', displayName: 'Katherine_Zero' }
+  };
 
   const ROLE_PERMISSIONS = {
     helper: ['warn', 'mute', 'unmute'],
     moderator: ['warn', 'mute', 'unmute', 'ban', 'timeout', 'send_embed', 'send_dm', 'edit_message', 'block_links'],
-    admin: ['warn', 'mute', 'unmute', 'ban', 'timeout', 'send_embed', 'send_dm', 'edit_message', 'block_links', 'lock_channel', 'unlock_channel', 'nuke_channel', 'clear_messages', 'quarantine', 'reduce_warn', 'view_history', 'user_info', 'server_info', 'role_info']
+    admin: ['warn', 'mute', 'unmute', 'ban', 'timeout', 'send_embed', 'send_dm', 'edit_message', 'block_links', 'lock_channel', 'unlock_channel', 'nuke_channel', 'clear_messages', 'quarantine', 'reduce_warn', 'view_history', 'user_info', 'server_info', 'role_info'],
+    owner: ['warn', 'mute', 'unmute', 'ban', 'timeout', 'send_embed', 'send_dm', 'edit_message', 'block_links', 'lock_channel', 'unlock_channel', 'nuke_channel', 'clear_messages', 'quarantine', 'reduce_warn', 'view_history', 'user_info', 'server_info', 'role_info']
   };
 
   function authenticate(req, res, next) {
@@ -42,17 +53,17 @@ function setupStaffPanel(app, client) {
   }
 
   router.post('/login', (req, res) => {
-    const { key, role } = req.body;
-    if (key !== PANEL_KEY) {
-      return res.status(401).json({ error: 'Clave incorrecta' });
+    const { username, password } = req.body;
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Usuario y contraseña requeridos' });
     }
-    const validRoles = ['helper', 'moderator', 'admin'];
-    if (!validRoles.includes(role)) {
-      return res.status(400).json({ error: 'Rol inválido' });
+    const account = ACCOUNTS[username.toLowerCase()];
+    if (!account || account.password !== hashPassword(password)) {
+      return res.status(401).json({ error: 'Usuario o contraseña incorrectos' });
     }
     const token = crypto.randomBytes(32).toString('hex');
-    sessions.set(token, { role, loginAt: Date.now() });
-    res.json({ token, role });
+    sessions.set(token, { role: account.role, username: account.displayName, discordId: account.discordId, loginAt: Date.now() });
+    res.json({ token, role: account.role, username: account.displayName });
   });
 
   router.post('/logout', authenticate, (req, res) => {
@@ -71,6 +82,7 @@ function setupStaffPanel(app, client) {
       guildIcon: guild ? guild.iconURL() : null,
       memberCount: guild ? guild.memberCount : 0,
       role: req.session.role,
+      username: req.session.username,
       permissions: ROLE_PERMISSIONS[req.session.role] || []
     });
   });

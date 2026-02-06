@@ -123,7 +123,7 @@ El bot usa **MongoDB** (compatible con MongoDB Atlas) para almacenar:
 ## Variables de Entorno Requeridas
 - `DISCORD_TOKEN` o `TOKEN` - Token del bot de Discord
 - `MONGODB_URI` o `MONGO_URI` - URL de conexión MongoDB Atlas
-- `PANEL_KEY` - Clave de acceso al Staff Panel (default: "staff2024")
+- `PANEL_KEY` - (OBSOLETO - ya no se usa, el login es por cuentas individuales)
 - `GUILD_ID` - ID del servidor Discord (opcional, usa el primero disponible si no se configura)
 
 ## Configuración para Render

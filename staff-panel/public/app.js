@@ -1,6 +1,7 @@
 const API_BASE = '/api';
 let sessionToken = null;
 let currentRole = null;
+let currentUsername = null;
 let permissions = [];
 let channelsCache = [];
 let rolesCache = [];
@@ -29,13 +30,14 @@ function toast(msg, type = 'info') {
 }
 
 async function login() {
-  const key = document.getElementById('login-key').value;
-  const role = document.getElementById('login-role').value;
-  if (!key) return toast('Ingresa la clave', 'error');
+  const username = document.getElementById('login-username').value;
+  const password = document.getElementById('login-password').value;
+  if (!username || !password) return toast('Ingresa usuario y contraseña', 'error');
   try {
-    const data = await api('POST', '/login', { key, role });
+    const data = await api('POST', '/login', { username, password });
     sessionToken = data.token;
     currentRole = data.role;
+    currentUsername = data.username;
     document.getElementById('login-page').style.display = 'none';
     document.getElementById('app-page').style.display = 'flex';
     initApp();
@@ -48,16 +50,20 @@ function logout() {
   api('POST', '/logout').catch(() => {});
   sessionToken = null;
   currentRole = null;
+  currentUsername = null;
   permissions = [];
   document.getElementById('app-page').style.display = 'none';
   document.getElementById('login-page').style.display = 'flex';
-  document.getElementById('login-key').value = '';
+  document.getElementById('login-username').value = '';
+  document.getElementById('login-password').value = '';
 }
 
 async function initApp() {
   const badge = document.getElementById('role-badge');
-  badge.textContent = currentRole;
+  const roleLabels = { helper: 'Helper', moderator: 'Moderador', admin: 'Admin', owner: 'Dueño' };
+  badge.textContent = roleLabels[currentRole] || currentRole;
   badge.className = 'role-badge ' + currentRole;
+  document.getElementById('username-display').textContent = currentUsername || '-';
 
   try {
     const status = await api('GET', '/status');

@@ -223,6 +223,13 @@ body {
 .role-badge.helper { background: rgba(67, 181, 129, 0.2); color: var(--success); }
 .role-badge.moderator { background: rgba(250, 166, 26, 0.2); color: var(--warning); }
 .role-badge.admin { background: rgba(240, 71, 71, 0.2); color: var(--danger); }
+.role-badge.owner { background: rgba(160, 100, 255, 0.2); color: #a064ff; }
+
+.username-display {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
 
 .main-content {
   flex: 1;
