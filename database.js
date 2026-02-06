@@ -88,6 +88,14 @@ const configSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now }
 });
 
+const tempBanSchema = new mongoose.Schema({
+  odId: { type: String, required: true, unique: true },
+  oderId: { type: String, required: true },
+  reason: { type: String, required: true },
+  expiresAt: { type: Date, required: true },
+  createdAt: { type: Date, default: Date.now }
+});
+
 const rateLimitSchema = new mongoose.Schema({
   odId: { type: String, required: true },
   command: { type: String, required: true },
@@ -105,6 +113,7 @@ const Mute = mongoose.model('Mute', muteSchema);
 const TicketStats = mongoose.model('TicketStats', ticketStatsSchema);
 const AuditLog = mongoose.model('AuditLog', auditLogSchema);
 const Config = mongoose.model('Config', configSchema);
+const TempBan = mongoose.model('TempBan', tempBanSchema);
 const RateLimit = mongoose.model('RateLimit', rateLimitSchema);
 
 async function connectDB() {
@@ -370,6 +379,35 @@ const db = {
   async setRateLimit(odId, command) {
     const rateLimit = new RateLimit({ odId, command });
     return await rateLimit.save();
+  },
+
+  async addTempBan(odId, oderId, reason, expiresAt) {
+    return await TempBan.findOneAndUpdate(
+      { odId },
+      { odId, oderId, reason, expiresAt, createdAt: new Date() },
+      { upsert: true, new: true }
+    );
+  },
+
+  async getTempBan(odId) {
+    return await TempBan.findOne({ odId });
+  },
+
+  async removeTempBan(odId) {
+    const result = await TempBan.deleteOne({ odId });
+    return result.deletedCount > 0;
+  },
+
+  async getExpiredTempBans() {
+    return await TempBan.find({ expiresAt: { $lte: new Date() } });
+  },
+
+  async getActiveTempBans() {
+    return await TempBan.find({ expiresAt: { $gt: new Date() } });
+  },
+
+  async getActiveMutes() {
+    return await Mute.find({ expiresAt: { $gt: new Date() } });
   },
 
   async cleanupRateLimits() {

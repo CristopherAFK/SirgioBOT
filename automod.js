@@ -164,6 +164,7 @@ function getMuteMinutesForWarnCount(count) {
 }
 
 const activeMutes = new Map();
+const activeTempBans = new Map();
 const activeVigilances = new Map();
 const userMessageHistory = new Map();
 const processedModals = new Set();
@@ -336,13 +337,18 @@ async function applyWarn(client, guild, user, member, reason, detectedWord = nul
   if (muteMinutes > 0 && member) {
     try {
       await member.roles.add(MUTED_ROLE_ID).catch(() => {});
+      const muteDurationMs = muteMinutes * 60 * 1000;
+      const expiresAt = new Date(Date.now() + muteDurationMs);
+      await db.addMute(member.id, staffUser ? staffUser.id : "automod", reason, expiresAt).catch(e => console.error("Error guardando mute en DB:", e));
+      if (activeMutes.has(member.id)) clearTimeout(activeMutes.get(member.id));
       const timeoutId = setTimeout(async () => {
         try {
           const refreshed = await guild.members.fetch(member.id).catch(() => null);
           if (refreshed) await refreshed.roles.remove(MUTED_ROLE_ID).catch(() => {});
         } catch {}
         activeMutes.delete(member.id);
-      }, muteMinutes * 60 * 1000);
+        await db.removeMute(member.id).catch(() => {});
+      }, muteDurationMs);
       activeMutes.set(member.id, timeoutId);
     } catch (e) {
       console.error("Error aplicando mute:", e);
@@ -381,6 +387,86 @@ module.exports = (client) => {
     return { bannedWordsCount: bannedWords.length, sensitiveWordsCount: sensitiveWords.length };
   };
 
+  async function restoreMutesFromDB(guild) {
+    try {
+      const expiredMutes = await db.getExpiredMutes();
+      for (const mute of expiredMutes) {
+        try {
+          const member = await guild.members.fetch(mute.odId).catch(() => null);
+          if (member) await member.roles.remove(MUTED_ROLE_ID).catch(() => {});
+          await db.removeMute(mute.odId);
+          console.log(`🔓 Mute expirado removido: ${mute.odId}`);
+        } catch (e) {
+          console.error(`Error removiendo mute expirado ${mute.odId}:`, e);
+        }
+      }
+
+      const activeMutesDB = await db.getActiveMutes();
+      for (const mute of activeMutesDB) {
+        const remainingMs = mute.expiresAt.getTime() - Date.now();
+        if (remainingMs <= 0) continue;
+
+        try {
+          const member = await guild.members.fetch(mute.odId).catch(() => null);
+          if (member) {
+            await member.roles.add(MUTED_ROLE_ID).catch(() => {});
+            if (activeMutes.has(mute.odId)) clearTimeout(activeMutes.get(mute.odId));
+            const timeoutId = setTimeout(async () => {
+              try {
+                const refreshed = await guild.members.fetch(mute.odId).catch(() => null);
+                if (refreshed) await refreshed.roles.remove(MUTED_ROLE_ID).catch(() => {});
+              } catch {}
+              activeMutes.delete(mute.odId);
+              await db.removeMute(mute.odId).catch(() => {});
+            }, remainingMs);
+            activeMutes.set(mute.odId, timeoutId);
+            console.log(`🔇 Mute restaurado: ${mute.odId} (${formatDuration(remainingMs)} restante)`);
+          } else {
+            await db.removeMute(mute.odId);
+          }
+        } catch (e) {
+          console.error(`Error restaurando mute ${mute.odId}:`, e);
+        }
+      }
+      console.log(`✅ Mutes restaurados: ${activeMutesDB.length} activos, ${expiredMutes.length} expirados limpiados`);
+    } catch (e) {
+      console.error("Error restaurando mutes desde DB:", e);
+    }
+  }
+
+  async function restoreTempBansFromDB(guild) {
+    try {
+      const expiredBans = await db.getExpiredTempBans();
+      for (const ban of expiredBans) {
+        try {
+          await guild.members.unban(ban.odId, "Ban temporal expirado (restaurado tras reinicio)").catch(() => {});
+          await db.removeTempBan(ban.odId);
+          console.log(`🔓 Ban temporal expirado, desbaneado: ${ban.odId}`);
+        } catch (e) {
+          console.error(`Error desbaneando ${ban.odId}:`, e);
+        }
+      }
+
+      const pendingBans = await db.getActiveTempBans();
+      for (const ban of pendingBans) {
+        const remainingMs = ban.expiresAt.getTime() - Date.now();
+        if (remainingMs <= 0) continue;
+
+        const timeoutId = setTimeout(async () => {
+          try {
+            await guild.members.unban(ban.odId, "Ban temporal expirado").catch(() => {});
+          } catch {}
+          await db.removeTempBan(ban.odId).catch(() => {});
+        }, remainingMs);
+        activeTempBans.set(ban.odId, timeoutId);
+        console.log(`🔨 Ban temporal restaurado: ${ban.odId} (${formatDuration(remainingMs)} restante)`);
+      }
+      console.log(`✅ Bans temporales restaurados: ${pendingBans.length} activos, ${expiredBans.length} expirados limpiados`);
+    } catch (e) {
+      console.error("Error restaurando bans temporales desde DB:", e);
+    }
+  }
+
   client.once("ready", async () => {
     console.log("✅ AutoMod mejorado cargado");
     cleanupExpiredWarns(client);
@@ -391,6 +477,35 @@ module.exports = (client) => {
       console.error("❌ No se pudo encontrar el servidor con ID:", GUILD_ID);
       return;
     }
+
+    await restoreMutesFromDB(guild);
+    await restoreTempBansFromDB(guild);
+
+    setInterval(async () => {
+      try {
+        const expiredMutes = await db.getExpiredMutes();
+        for (const mute of expiredMutes) {
+          const member = await guild.members.fetch(mute.odId).catch(() => null);
+          if (member) await member.roles.remove(MUTED_ROLE_ID).catch(() => {});
+          await db.removeMute(mute.odId).catch(() => {});
+          if (activeMutes.has(mute.odId)) {
+            clearTimeout(activeMutes.get(mute.odId));
+            activeMutes.delete(mute.odId);
+          }
+        }
+        const expiredBans = await db.getExpiredTempBans();
+        for (const ban of expiredBans) {
+          await guild.members.unban(ban.odId, "Ban temporal expirado").catch(() => {});
+          await db.removeTempBan(ban.odId).catch(() => {});
+          if (activeTempBans.has(ban.odId)) {
+            clearTimeout(activeTempBans.get(ban.odId));
+            activeTempBans.delete(ban.odId);
+          }
+        }
+      } catch (e) {
+        console.error("Error en limpieza periódica de mutes/bans:", e);
+      }
+    }, 5 * 60 * 1000);
 
     try {
       const categoryChoices = SANCTION_CATEGORIES.slice(0, 25).map(c => ({ name: c.label, value: c.value }));
@@ -523,11 +638,14 @@ module.exports = (client) => {
           if (type === "mute") {
             if (!durationMs) durationMs = 10 * 60 * 1000; // 10m por defecto
             await targetMember.roles.add(MUTED_ROLE_ID);
-            
+            const expiresAt = new Date(Date.now() + durationMs);
+            await db.addMute(target.id, user.id, `${categoryLabel}: ${reason}`, expiresAt).catch(e => console.error("Error guardando mute en DB:", e));
+            if (activeMutes.has(target.id)) clearTimeout(activeMutes.get(target.id));
             const timeoutId = setTimeout(async () => {
               const ref = await guild.members.fetch(target.id).catch(() => null);
               if (ref) await ref.roles.remove(MUTED_ROLE_ID).catch(() => {});
               activeMutes.delete(target.id);
+              await db.removeMute(target.id).catch(() => {});
             }, durationMs);
             activeMutes.set(target.id, timeoutId);
 
@@ -548,9 +666,25 @@ module.exports = (client) => {
           if (type === "ban") {
             if (!canBan(member)) return interaction.reply({ content: "❌ No tienes permisos para banear.", flags: MessageFlags.Ephemeral });
             
-            await target.send(`Has sido baneado de **${guild.name}** por: ${categoryLabel}: ${reason}`).catch(() => {});
-            await targetMember.ban({ reason: `${categoryLabel}: ${reason}` });
-            return interaction.reply({ content: `✅ **${target.tag}** ha sido baneado permanentemente.` });
+            const banReason = `${categoryLabel}: ${reason}`;
+            if (durationMs) {
+              const expiresAt = new Date(Date.now() + durationMs);
+              await db.addTempBan(target.id, user.id, banReason, expiresAt).catch(e => console.error("Error guardando tempban en DB:", e));
+              await target.send(`Has sido baneado temporalmente de **${guild.name}** por: ${banReason}\nDuración: **${formatDuration(durationMs)}**`).catch(() => {});
+              await targetMember.ban({ reason: banReason });
+              const timeoutId = setTimeout(async () => {
+                try {
+                  await guild.members.unban(target.id, "Ban temporal expirado").catch(() => {});
+                } catch {}
+                await db.removeTempBan(target.id).catch(() => {});
+              }, durationMs);
+              activeTempBans.set(target.id, timeoutId);
+              return interaction.reply({ content: `✅ **${target.tag}** ha sido baneado temporalmente por **${formatDuration(durationMs)}**.` });
+            } else {
+              await target.send(`Has sido baneado de **${guild.name}** por: ${banReason}`).catch(() => {});
+              await targetMember.ban({ reason: banReason });
+              return interaction.reply({ content: `✅ **${target.tag}** ha sido baneado permanentemente.` });
+            }
           }
           return;
         }
@@ -1265,6 +1399,8 @@ module.exports = (client) => {
           
           if (member) {
             await member.roles.add(MUTED_ROLE_ID).catch(() => {});
+            const expiresAt = new Date(Date.now() + ms);
+            await db.addMute(member.id, interaction.user.id, reason, expiresAt).catch(e => console.error("Error guardando mute en DB:", e));
             if (activeMutes.has(member.id)) {
               clearTimeout(activeMutes.get(member.id));
             }
@@ -1274,6 +1410,7 @@ module.exports = (client) => {
                 if (refreshed) await refreshed.roles.remove(MUTED_ROLE_ID).catch(() => {});
               } catch {}
               activeMutes.delete(member.id);
+              await db.removeMute(member.id).catch(() => {});
             }, ms);
             activeMutes.set(member.id, timeoutId);
           }
@@ -1314,9 +1451,12 @@ module.exports = (client) => {
             return interaction.reply({ content: "❌ No tienes permisos para banear.", flags: MessageFlags.Ephemeral });
           }
 
+          const banDurationMs = parseDuration(duration);
+          const banReason = `${reason} - Por: ${interaction.user.tag}`;
+
           const embed = new EmbedBuilder()
             .setTitle("🔨 Has sido baneado")
-            .setDescription(`Has sido baneado del servidor por: **${reason}**`)
+            .setDescription(`Has sido baneado del servidor por: **${reason}**${banDurationMs ? `\nDuración: **${formatDuration(banDurationMs)}**` : ''}`)
             .setColor(0x000000)
             .setFooter({ text: "SirgioBOT - Moderación" })
             .setTimestamp();
@@ -1328,9 +1468,21 @@ module.exports = (client) => {
           await user.send({ embeds: [embed], components: [row] }).catch(() => {});
 
           if (member) {
-            await member.ban({ reason: `${reason} - Por: ${interaction.user.tag}` }).catch(() => {});
+            await member.ban({ reason: banReason }).catch(() => {});
           } else {
-            await guild.members.ban(userId, { reason: `${reason} - Por: ${interaction.user.tag}` }).catch(() => {});
+            await guild.members.ban(userId, { reason: banReason }).catch(() => {});
+          }
+
+          if (banDurationMs) {
+            const expiresAt = new Date(Date.now() + banDurationMs);
+            await db.addTempBan(userId, interaction.user.id, reason, expiresAt).catch(e => console.error("Error guardando tempban en DB:", e));
+            const timeoutId = setTimeout(async () => {
+              try {
+                await guild.members.unban(userId, "Ban temporal expirado").catch(() => {});
+              } catch {}
+              await db.removeTempBan(userId).catch(() => {});
+            }, banDurationMs);
+            activeTempBans.set(userId, timeoutId);
           }
 
           const logCh = guild.channels.cache.get(LOG_CHANNEL_ID);
@@ -1424,7 +1576,11 @@ module.exports = (client) => {
         if (!member) return interaction.reply({ content: "❌ Usuario no encontrado en el servidor.", flags: MessageFlags.Ephemeral });
 
         await member.roles.remove(MUTED_ROLE_ID).catch(() => {});
-        activeMutes.delete(userId);
+        if (activeMutes.has(userId)) {
+          clearTimeout(activeMutes.get(userId));
+          activeMutes.delete(userId);
+        }
+        await db.removeMute(userId).catch(() => {});
 
         const user = await client.users.fetch(userId).catch(() => null);
         if (user) {
@@ -1458,6 +1614,7 @@ module.exports = (client) => {
             clearTimeout(activeMutes.get(userId));
             activeMutes.delete(userId);
           }
+          await db.removeMute(userId).catch(() => {});
 
           const user = await client.users.fetch(userId).catch(() => null);
           if (user) {
@@ -1562,12 +1719,23 @@ module.exports = (client) => {
         const extraMs = parseDuration(extraTimeStr);
         if (!extraMs) return interaction.reply({ content: "❌ Formato de duración inválido.", flags: MessageFlags.Ephemeral });
 
-        if (!activeMutes.has(userId)) {
+        const hasMuteRole = member.roles.cache.has(MUTED_ROLE_ID);
+        const dbMute = await db.getMute(userId).catch(() => null);
+        if (!activeMutes.has(userId) && !hasMuteRole && !dbMute) {
           return interaction.reply({ content: "❌ Este usuario no tiene mute activo.", flags: MessageFlags.Ephemeral });
         }
 
-        const oldTimeout = activeMutes.get(userId);
-        clearTimeout(oldTimeout);
+        if (activeMutes.has(userId)) {
+          clearTimeout(activeMutes.get(userId));
+        }
+
+        let remainingMs = 0;
+        if (dbMute && dbMute.expiresAt) {
+          remainingMs = Math.max(0, dbMute.expiresAt.getTime() - Date.now());
+        }
+        const totalMs = remainingMs + extraMs;
+        const expiresAt = new Date(Date.now() + totalMs);
+        await db.addMute(userId, interaction.user.id, dbMute?.reason || "Mute extendido", expiresAt).catch(e => console.error("Error guardando mute en DB:", e));
 
         const newTimeout = setTimeout(async () => {
           try {
@@ -1575,7 +1743,8 @@ module.exports = (client) => {
             if (refreshed) await refreshed.roles.remove(MUTED_ROLE_ID).catch(() => {});
           } catch {}
           activeMutes.delete(userId);
-        }, extraMs);
+          await db.removeMute(userId).catch(() => {});
+        }, totalMs);
 
         activeMutes.set(userId, newTimeout);
 
@@ -2138,12 +2307,16 @@ module.exports = (client) => {
           
           if (targetMember) {
             await targetMember.roles.add(MUTED_ROLE_ID).catch(() => {});
+            const expiresAt = new Date(Date.now() + ms);
+            await db.addMute(targetMember.id, interaction.user.id, `${categoria}: ${razon}`, expiresAt).catch(e => console.error("Error guardando mute en DB:", e));
+            if (activeMutes.has(targetMember.id)) clearTimeout(activeMutes.get(targetMember.id));
             const timeoutId = setTimeout(async () => {
               try {
                 const refreshed = await guild.members.fetch(targetMember.id).catch(() => null);
                 if (refreshed) await refreshed.roles.remove(MUTED_ROLE_ID).catch(() => {});
               } catch {}
               activeMutes.delete(targetMember.id);
+              await db.removeMute(targetMember.id).catch(() => {});
             }, ms);
             activeMutes.set(targetMember.id, timeoutId);
           }
@@ -2171,8 +2344,18 @@ module.exports = (client) => {
           const ms = parseDuration(tiempo);
           
           try {
-            if (targetMember) {
-              await guild.bans.create(targetUser.id, { reason: `${categoria}: ${razon}` }).catch(() => {});
+            await guild.bans.create(targetUser.id, { reason: `${categoria}: ${razon}` }).catch(() => {});
+            
+            if (ms) {
+              const expiresAt = new Date(Date.now() + ms);
+              await db.addTempBan(targetUser.id, interaction.user.id, `${categoria}: ${razon}`, expiresAt).catch(e => console.error("Error guardando tempban en DB:", e));
+              const timeoutId = setTimeout(async () => {
+                try {
+                  await guild.members.unban(targetUser.id, "Ban temporal expirado").catch(() => {});
+                } catch {}
+                await db.removeTempBan(targetUser.id).catch(() => {});
+              }, ms);
+              activeTempBans.set(targetUser.id, timeoutId);
             }
           } catch (e) {}
           
@@ -2326,6 +2509,7 @@ module.exports = (client) => {
           clearTimeout(activeMutes.get(user.id));
           activeMutes.delete(user.id);
         }
+        await db.removeMute(user.id).catch(() => {});
 
         const dmEmbed = new EmbedBuilder()
           .setTitle("🔊 Mute removido")

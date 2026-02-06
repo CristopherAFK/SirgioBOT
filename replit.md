@@ -8,6 +8,8 @@ El bot usa **MongoDB** (compatible con MongoDB Atlas) para almacenar:
 - Tickets y calificaciones
 - Sugerencias
 - Advertencias y sanciones
+- Mutes activos (persistentes a reinicios)
+- Bans temporales (persistentes a reinicios)
 - Estadísticas de staff
 - Logs de auditoría
 - Configuración
@@ -170,4 +172,10 @@ El bot usa **MongoDB** (compatible con MongoDB Atlas) para almacenar:
 - **Head Admins** (1230952139015327755): Permisos completos + comandos avanzados
 
 ## Última Actualización
+Febrero 2026 - Persistencia de Mutes y Bans temporales en MongoDB:
+- Los mutes ahora se guardan en MongoDB y se restauran automáticamente tras reinicios del bot en Render
+- Los bans temporales (con duración) se guardan en MongoDB y se desbanean automáticamente al expirar, incluso tras reinicios
+- Al iniciar, el bot restaura todos los mutes activos y bans temporales pendientes, recalculando el tiempo restante
+- Se limpia automáticamente mutes y bans expirados durante el reinicio
+
 Enero 2026 - Migración a MongoDB para persistencia en Render, reconstrucción del sistema de sugerencias, corrección de bugs en tickets de apelación y calificaciones, nuevos sistemas de estadísticas, recordatorios, auditoría, rate limiting y backups.
