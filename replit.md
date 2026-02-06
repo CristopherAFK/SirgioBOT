@@ -82,6 +82,15 @@ El bot usa **MongoDB** (compatible con MongoDB Atlas) para almacenar:
 - Máximo 10 backups guardados
 - Almacenamiento en carpeta /backups
 
+### Staff Panel Web
+- Panel web accesible en `/panel/` para gestión del servidor
+- Autenticación por clave (PANEL_KEY env var, default: "staff2024")
+- Roles: Helper, Moderador, Admin con permisos diferenciados
+- API REST en `/api/` que ejecuta acciones via Discord.js
+- Herramientas: Warn, Mute, Unmute, Ban, Timeout, Lock/Unlock/Nuke Channel, Clear Messages, Send Embed, Send DM, Edit Message, Block Links, Quarantine, Reduce Warn, View History, Server/User/Role Info
+- Audit logging para todas las acciones
+- Búsqueda de usuarios en tiempo real
+
 ## Estructura de Archivos
 ```
 ├── index.js           # Archivo principal, sistema de tickets
@@ -95,6 +104,12 @@ El bot usa **MongoDB** (compatible con MongoDB Atlas) para almacenar:
 ├── avisos.js          # Sistema de avisos
 ├── embed.js           # Generador de embeds
 ├── anuncio.js         # Sistema de anuncios
+├── staff-panel/
+│   ├── routes.js      # API REST del Staff Panel
+│   └── public/
+│       ├── index.html # Frontend del panel
+│       ├── styles.css # Estilos del panel
+│       └── app.js     # JavaScript del frontend
 ├── utils/
 │   ├── commands.js    # Comandos de utilidad
 │   ├── stats.js       # Sistema de estadísticas
@@ -108,6 +123,8 @@ El bot usa **MongoDB** (compatible con MongoDB Atlas) para almacenar:
 ## Variables de Entorno Requeridas
 - `DISCORD_TOKEN` o `TOKEN` - Token del bot de Discord
 - `MONGODB_URI` o `MONGO_URI` - URL de conexión MongoDB Atlas
+- `PANEL_KEY` - Clave de acceso al Staff Panel (default: "staff2024")
+- `GUILD_ID` - ID del servidor Discord (opcional, usa el primero disponible si no se configura)
 
 ## Configuración para Render
 

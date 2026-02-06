@@ -2,10 +2,10 @@ require("dotenv").config();
 const { Client, GatewayIntentBits, Partials } = require("discord.js");
 const { connectDB, db } = require('./database');
 const express = require("express");
+const { setupStaffPanel } = require('./staff-panel/routes');
 
-// Servidor Web para Render (Debe estar ANTES del login para pasar el Health Check)
 const app = express();
-app.get("/", (req, res) => res.send("SirgioBOT is alive!"));
+app.get("/", (req, res) => res.redirect("/panel/"));
 app.get("/health", (req, res) => res.json({ status: "ok", uptime: process.uptime() }));
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, "0.0.0.0", () => {
@@ -25,6 +25,8 @@ const client = new Client({
   partials: [Partials.Channel, Partials.Message, Partials.Reaction, Partials.User]
 });
 
+setupStaffPanel(app, client);
+
 const MAX_RETRIES = 5;
 const RETRY_DELAYS = [5000, 10000, 30000, 60000, 120000];
 
@@ -36,7 +38,8 @@ async function startBot(retryCount = 0) {
   if (!token || token.length < 50) {
     console.error("❌ ERROR: Token no válido o no configurado en las variables de entorno.");
     console.error("Token recibido (primeros 10 chars):", token.substring(0, 10));
-    process.exit(1);
+    console.log("🌐 Staff Panel sigue disponible en /panel/ sin conexión al bot.");
+    return;
   }
 
   console.log("✅ Token validado (longitud:", token.length, ")");
