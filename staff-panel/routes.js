@@ -22,7 +22,8 @@ function setupStaffPanel(app, client) {
     'agustito': { password: hashPassword('maximo202430'), role: 'moderator', discordId: '1196639548877320202', displayName: 'Agustito' },
     'gars': { password: hashPassword('garcia14052012'), role: 'admin', discordId: '1032482231677108224', displayName: 'Gars' },
     'sirgio': { password: hashPassword('SirgioTeam2026'), role: 'owner', discordId: '956700088103747625', displayName: 'Sirgio' },
-    'katherine_zero': { password: hashPassword('GOHA071020HQRRXLA0'), role: 'helper', discordId: '1307811551729946756', displayName: 'Katherine_Zero' }
+    'katherine_zero': { password: hashPassword('GOHA071020HQRRXLA0'), role: 'helper', discordId: '1307811551729946756', displayName: 'Katherine_Zero' },
+    'mzingerkai': { password: hashPassword('Mzin531'), role: 'moderator', discordId: '926219678798454875', displayName: 'Mzingerkai' }
   };
 
   const ROLE_PERMISSIONS = {
