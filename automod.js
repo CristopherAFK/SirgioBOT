@@ -481,11 +481,19 @@ module.exports = (client) => {
     }
   });
 
+    const AUTOMOD_COMMANDS = [
+      "automod", "sancion", "stafftools", "viewwarns", "resetwarns", "removewarn",
+      "reloadlists", "addword", "removeword", "remove_mute", "vigilar",
+      "cerrar_vigilancia", "mantenimiento", "ping_role"
+    ];
+
     client.on("interactionCreate", async (interaction) => {
     try {
       if (interaction.isChatInputCommand()) {
-        // Bypass para el staff
-        if (!isStaff(interaction.member)) {
+        const cmdName = interaction.commandName;
+        if (!AUTOMOD_COMMANDS.includes(cmdName)) return;
+
+        if (!isStaff(interaction.member) && !["viewwarns", "stafftools"].includes(cmdName)) {
           return interaction.reply({ content: "❌ No tienes permiso para usar este comando.", flags: MessageFlags.Ephemeral });
         }
 
@@ -1248,36 +1256,8 @@ module.exports = (client) => {
         const member = await guild.members.fetch(userId).catch(() => null);
 
         if (actionType === "warn") {
-          if (!warnings[userId]) warnings[userId] = [];
-          warnings[userId].push({ reason: `Advertencia manual: ${reason}`, date: new Date().toISOString(), detectedWord: null });
-          saveWarnings();
-
-          const warnCount = warnings[userId].length;
-          const embed = new EmbedBuilder()
-            .setTitle("⚠️ Advertencia recibida")
-            .setDescription(`Has recibido una advertencia por: **${reason}**`)
-            .setColor(0xffff00)
-            .setFooter({ text: "SirgioBOT - Moderación" })
-            .setTimestamp();
-
-          await user.send({ embeds: [embed] }).catch(() => {});
-
-          const logCh = guild.channels.cache.get(LOG_CHANNEL_ID);
-          if (logCh) {
-            const logEmbed = new EmbedBuilder()
-              .setColor(0xffff00)
-              .setTitle("⚠️ Advertencia aplicada")
-              .addFields(
-                { name: "Usuario", value: `${user.tag} (${userId})`, inline: true },
-                { name: "Staff", value: `${interaction.user.tag}`, inline: true },
-                { name: "Razón", value: reason, inline: false },
-                { name: "Warns totales", value: `${warnCount}`, inline: true }
-              )
-              .setTimestamp();
-            logCh.send({ embeds: [logEmbed] }).catch(() => {});
-          }
-
-          return interaction.reply({ content: `✅ Advertencia aplicada a ${user.tag}`, flags: MessageFlags.Ephemeral });
+          const result = await applyWarn(client, guild, user, member, `Advertencia manual: ${reason}`, null, interaction.user);
+          return interaction.reply({ content: `✅ Advertencia aplicada a ${user.tag} (warns totales: ${result.warnCount}${result.muteMinutes > 0 ? `, muteado ${result.muteMinutes}m` : ''})`, flags: MessageFlags.Ephemeral });
         }
 
         if (actionType === "mute") {
@@ -1467,18 +1447,30 @@ module.exports = (client) => {
 
         if (!member) return interaction.reply({ content: "❌ Usuario no encontrado en el servidor.", flags: MessageFlags.Ephemeral });
 
-        // Verificar si el usuario está muteado
-        const muteRole = guild.roles.cache.find(role => role.name === "Muted" || role.name === "Silenciado");
-        if (!muteRole || !member.roles.cache.has(muteRole.id)) {
+        if (!member.roles.cache.has(MUTED_ROLE_ID)) {
           return interaction.reply({ content: "❌ El usuario no está silenciado.", flags: MessageFlags.Ephemeral });
         }
 
         try {
-          await member.roles.remove(muteRole, `Mute removido por ${interaction.user.tag} - Razón: ${reason}`);
+          await member.roles.remove(MUTED_ROLE_ID, `Mute removido por ${interaction.user.tag} - Razón: ${reason}`);
           
-          // Log del unmute
-          const logChannel = guild.channels.cache.find(ch => ch.name === "logs" || ch.name === "mod-logs");
-          if (logChannel) {
+          if (activeMutes.has(userId)) {
+            clearTimeout(activeMutes.get(userId));
+            activeMutes.delete(userId);
+          }
+
+          const user = await client.users.fetch(userId).catch(() => null);
+          if (user) {
+            const dmEmbed = new EmbedBuilder()
+              .setTitle("🔊 Mute removido")
+              .setDescription(`Tu mute ha sido removido.\n**Razón:** ${reason}`)
+              .setColor(0x00ff00)
+              .setTimestamp();
+            user.send({ embeds: [dmEmbed] }).catch(() => {});
+          }
+
+          const logCh = guild.channels.cache.get(LOG_CHANNEL_ID);
+          if (logCh) {
             const logEmbed = new EmbedBuilder()
               .setTitle("🔊 Silencio Removido")
               .addFields(
@@ -1489,7 +1481,7 @@ module.exports = (client) => {
               .setColor(0x00ff00)
               .setTimestamp();
             
-            logChannel.send({ embeds: [logEmbed] });
+            logCh.send({ embeds: [logEmbed] }).catch(() => {});
           }
 
           return interaction.reply({ content: `✅ Silencio removido a ${member.user.tag}. Razón: ${reason}`, flags: MessageFlags.Ephemeral });
@@ -1964,13 +1956,9 @@ module.exports = (client) => {
       }
 
       if (!interaction.isChatInputCommand()) return;
+      if (!AUTOMOD_COMMANDS.includes(interaction.commandName)) return;
 
       const { commandName, options, member, guild } = interaction;
-
-      if (!isStaff(member) && !["viewwarns", "stafftools"].includes(commandName)) {
-        return interaction.reply({ content: "❌ Solo el staff puede usar estos comandos.", flags: MessageFlags.Ephemeral });
-      }
-      
 
       if (commandName === "stafftools") {
         if (!member.roles.cache.has(HEAD_ADMIN_ROLE_ID)) {
@@ -2338,6 +2326,13 @@ module.exports = (client) => {
           clearTimeout(activeMutes.get(user.id));
           activeMutes.delete(user.id);
         }
+
+        const dmEmbed = new EmbedBuilder()
+          .setTitle("🔊 Mute removido")
+          .setDescription("Tu mute ha sido removido por un miembro del staff.")
+          .setColor(0x00ff00)
+          .setTimestamp();
+        await user.send({ embeds: [dmEmbed] }).catch(() => {});
         
         try {
           const logCh = guild?.channels.cache.get(LOG_CHANNEL_ID);

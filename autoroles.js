@@ -183,10 +183,19 @@ module.exports = (client) => {
 
         try {
             if (reaction.partial) {
-                await reaction.fetch();
+                try { await reaction.fetch(); } catch (e) {
+                    console.error('Error fetching partial reaction:', e.message);
+                    return;
+                }
+            }
+            if (reaction.message.partial) {
+                try { await reaction.message.fetch(); } catch (e) {
+                    console.error('Error fetching partial message:', e.message);
+                    return;
+                }
             }
         } catch (error) {
-            console.error('Error fetching reaction:', error);
+            console.error('Error fetching reaction/message:', error);
             return;
         }
 
@@ -195,15 +204,32 @@ module.exports = (client) => {
 
         if (!roleId) return;
 
+        const messageHasAutorolEmbed = reaction.message.embeds?.some(e => {
+            const title = e.title || '';
+            return title.includes('Auto Roles');
+        });
+        if (!messageHasAutorolEmbed) return;
+
         try {
             const guild = reaction.message.guild;
             if (!guild) return;
 
-            const member = await guild.members.fetch(user.id);
-            const role = guild.roles.cache.get(roleId) || await guild.roles.fetch(roleId);
+            const member = await guild.members.fetch(user.id).catch(() => null);
+            if (!member) {
+                console.error(`Miembro no encontrado: ${user.id}`);
+                return;
+            }
+
+            const role = guild.roles.cache.get(roleId) || await guild.roles.fetch(roleId).catch(() => null);
 
             if (!role) {
                 console.error(`Rol no encontrado: ${roleId}`);
+                return;
+            }
+
+            const botMember = guild.members.me;
+            if (botMember && role.position >= botMember.roles.highest.position) {
+                console.error(`No se puede asignar el rol ${role.name} - posición más alta que el bot`);
                 return;
             }
 
@@ -216,7 +242,7 @@ module.exports = (client) => {
                 } catch {}
             }
         } catch (error) {
-            console.error('Error añadiendo rol:', error);
+            console.error('Error añadiendo rol:', error.message);
         }
     });
 
@@ -225,10 +251,19 @@ module.exports = (client) => {
 
         try {
             if (reaction.partial) {
-                await reaction.fetch();
+                try { await reaction.fetch(); } catch (e) {
+                    console.error('Error fetching partial reaction:', e.message);
+                    return;
+                }
+            }
+            if (reaction.message.partial) {
+                try { await reaction.message.fetch(); } catch (e) {
+                    console.error('Error fetching partial message:', e.message);
+                    return;
+                }
             }
         } catch (error) {
-            console.error('Error fetching reaction:', error);
+            console.error('Error fetching reaction/message:', error);
             return;
         }
 
@@ -237,12 +272,23 @@ module.exports = (client) => {
 
         if (!roleId) return;
 
+        const messageHasAutorolEmbed = reaction.message.embeds?.some(e => {
+            const title = e.title || '';
+            return title.includes('Auto Roles');
+        });
+        if (!messageHasAutorolEmbed) return;
+
         try {
             const guild = reaction.message.guild;
             if (!guild) return;
 
-            const member = await guild.members.fetch(user.id);
-            const role = guild.roles.cache.get(roleId) || await guild.roles.fetch(roleId);
+            const member = await guild.members.fetch(user.id).catch(() => null);
+            if (!member) {
+                console.error(`Miembro no encontrado: ${user.id}`);
+                return;
+            }
+
+            const role = guild.roles.cache.get(roleId) || await guild.roles.fetch(roleId).catch(() => null);
 
             if (!role) {
                 console.error(`Rol no encontrado: ${roleId}`);
@@ -258,7 +304,7 @@ module.exports = (client) => {
                 } catch {}
             }
         } catch (error) {
-            console.error('Error removiendo rol:', error);
+            console.error('Error removiendo rol:', error.message);
         }
     });
 };

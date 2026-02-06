@@ -25,10 +25,12 @@ const client = new Client({
   partials: [Partials.Channel, Partials.Message, Partials.Reaction, Partials.User]
 });
 
-async function startBot() {
+const MAX_RETRIES = 5;
+const RETRY_DELAYS = [5000, 10000, 30000, 60000, 120000];
+
+async function startBot(retryCount = 0) {
   console.log("🚀 Iniciando SirgioBOT...");
 
-  // 1. Validar Token PRIMERO
   const token = (process.env.DISCORD_TOKEN || process.env.TOKEN || "").trim();
   
   if (!token || token.length < 50) {
@@ -39,23 +41,31 @@ async function startBot() {
 
   console.log("✅ Token validado (longitud:", token.length, ")");
 
-  // 2. Conectar a Discord PRIMERO
   try {
     console.log("🔌 Intentando conectar a Discord...");
     await client.login(token);
     console.log("✅ Login exitoso, esperando evento ready...");
   } catch (err) {
-    console.error("❌ Fallo crítico al iniciar sesión en Discord:");
-    console.error("Error completo:", err);
+    console.error("❌ Fallo al iniciar sesión en Discord:", err.message);
     
     if (err.message.includes("Privileged intent")) {
       console.error("💡 TIP: Activa 'Privileged Gateway Intents' en el Discord Developer Portal.");
+      process.exit(1);
     }
-    if (err.message.includes("token")) {
-      console.error("💡 TIP: Verifica que el token sea correcto y no tenga espacios.");
+    if (err.code === 'TokenInvalid' || (err.message && err.message.includes('TOKEN_INVALID'))) {
+      console.error("💡 TIP: El token es inválido. Verifica que sea correcto.");
+      process.exit(1);
     }
-    
-    process.exit(1);
+
+    if (retryCount < MAX_RETRIES) {
+      const delay = RETRY_DELAYS[retryCount] || 120000;
+      console.log(`🔄 Reintentando conexión en ${delay / 1000}s... (intento ${retryCount + 1}/${MAX_RETRIES})`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return startBot(retryCount + 1);
+    } else {
+      console.error("❌ Se agotaron los reintentos de conexión. Reiniciando proceso...");
+      process.exit(1);
+    }
   }
 }
 
@@ -127,5 +137,24 @@ client.on("shardError", (error) => {
   console.error("❌ Error de Shard:", error);
 });
 
-// Iniciar el bot
+client.on("shardDisconnect", (event, id) => {
+  console.warn(`⚠️ Shard ${id} desconectado. Código: ${event?.code}. El cliente intentará reconectar automáticamente.`);
+});
+
+client.on("shardReconnecting", (id) => {
+  console.log(`🔄 Shard ${id} reconectando...`);
+});
+
+client.on("shardResume", (id, replayedEvents) => {
+  console.log(`✅ Shard ${id} reconectado. Eventos repetidos: ${replayedEvents}`);
+});
+
+process.on("unhandledRejection", (error) => {
+  console.error("❌ Unhandled Rejection:", error);
+});
+
+process.on("uncaughtException", (error) => {
+  console.error("❌ Uncaught Exception:", error);
+});
+
 startBot();
