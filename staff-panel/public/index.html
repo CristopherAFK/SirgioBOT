@@ -81,6 +81,12 @@
           </div>
         </div>
         <div class="nav-category">
+          <div class="nav-category-title">Asistente</div>
+          <div class="nav-item" data-page="ai-assistant" onclick="navigateTo('ai-assistant')">
+            <span class="icon">&#129302;</span> Asistente IA
+          </div>
+        </div>
+        <div class="nav-category">
           <div class="nav-category-title">Ajustes</div>
           <div class="nav-item" data-page="settings" onclick="navigateTo('settings')">
             <span class="icon">&#127912;</span> Personalizar
@@ -295,6 +301,36 @@
               </div>
               <button class="btn btn-success" onclick="createNote()">Guardar Nota</button>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI Assistant -->
+      <div id="page-ai-assistant" class="page" style="display:none">
+        <div class="page-header">
+          <h1>Asistente IA</h1>
+          <p>Consulta sobre reglas, sanciones y moderacion</p>
+        </div>
+        <div class="ai-chat-container">
+          <div class="ai-chat-messages" id="ai-chat-messages">
+            <div class="ai-welcome-message">
+              <div class="ai-welcome-icon">&#129302;</div>
+              <h3>Hola, soy el Asistente de Moderacion</h3>
+              <p>Puedo ayudarte con:</p>
+              <div class="ai-suggestions">
+                <button class="ai-suggestion-btn" onclick="sendAISuggestion('Un usuario esta haciendo spam en el chat general, que hago?')">Un usuario hace spam</button>
+                <button class="ai-suggestion-btn" onclick="sendAISuggestion('Que sancion aplico si alguien envia contenido NSFW?')">Contenido NSFW</button>
+                <button class="ai-suggestion-btn" onclick="sendAISuggestion('Explicame la regla 7 sobre multicuentas')">Regla de multicuentas</button>
+                <button class="ai-suggestion-btn" onclick="sendAISuggestion('Un usuario tiene 5 warns, que deberia pasar?')">Escalacion de warns</button>
+              </div>
+            </div>
+          </div>
+          <div class="ai-chat-input-area">
+            <button class="ai-clear-btn" onclick="clearAIChat()" title="Nueva conversacion">&#128260;</button>
+            <div class="ai-input-wrapper">
+              <textarea id="ai-chat-input" placeholder="Describe la situacion o pregunta sobre las reglas..." rows="1" onkeydown="handleAIChatKeydown(event)" oninput="autoResizeTextarea(this)"></textarea>
+            </div>
+            <button class="ai-send-btn" id="ai-send-btn" onclick="sendAIMessage()">&#10148;</button>
           </div>
         </div>
       </div>

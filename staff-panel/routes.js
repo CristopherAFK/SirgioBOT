@@ -592,6 +592,151 @@ function setupStaffPanel(app, client) {
     }
   });
 
+  // === AI ASSISTANT ===
+
+  const OpenAI = require('openai');
+  const serverRules = require('./server-rules.json');
+
+  function getOpenAIClient() {
+    if (process.env.AI_INTEGRATIONS_OPENAI_BASE_URL && process.env.AI_INTEGRATIONS_OPENAI_API_KEY) {
+      return new OpenAI({
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+      });
+    }
+    if (process.env.OPENAI_API_KEY) {
+      return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    }
+    return null;
+  }
+
+  const AI_SYSTEM_PROMPT = `Eres el Asistente IA del Staff de ${serverRules.serverName}. Tu trabajo es ayudar a los moderadores a tomar decisiones correctas sobre sanciones y responder preguntas sobre las reglas del servidor.
+
+REGLAS DEL SERVIDOR:
+${serverRules.rules.map(r => `${r.number}. ${r.title}: ${r.description}
+   Severidad: ${r.severity}
+   Sanciones: ${JSON.stringify(r.sanctions)}`).join('\n\n')}
+
+CATEGORIAS DE SANCIONES DISPONIBLES:
+${serverRules.sanctionCategories.map(c => `- ${c.label} (${c.value}) - Reglas relacionadas: ${c.relatedRules.length > 0 ? c.relatedRules.join(', ') : 'general'}`).join('\n')}
+
+ESCALACION DE WARNS:
+${Object.entries(serverRules.escalationGuidelines.warnThresholds).map(([k, v]) => `- ${k.replace('_', ' ')}: ${v}`).join('\n')}
+
+PRINCIPIOS GENERALES:
+${serverRules.escalationGuidelines.generalPrinciples.map(p => `- ${p}`).join('\n')}
+
+JERARQUIA DE ROLES:
+- Helper: Solo puede ${serverRules.roleHierarchy.helper.canDo.join(', ')}
+- Moderator: Puede ${serverRules.roleHierarchy.moderator.canDo.join(', ')}
+- Admin: Acceso completo
+- Owner: Acceso completo
+
+INSTRUCCIONES:
+1. Responde SIEMPRE en espanol
+2. Cuando te describan una situacion, recomienda la sancion apropiada segun las reglas
+3. Indica que regla se infringe y la categoria de sancion
+4. Si hay dudas sobre la severidad, sugiere consultar con un admin
+5. Se conciso pero completo en tus respuestas
+6. Si te preguntan sobre una regla especifica, explica con detalle
+7. Sugiere el comando correcto cuando sea posible (ej: /sancion warn, mute, ban)
+8. Ten en cuenta el rol del staff que pregunta - un Helper no puede banear
+9. Si la situacion es ambigua, da multiples opciones con pros y contras
+10. Nunca inventes reglas que no existan`;
+
+  const aiChatHistories = new Map();
+
+  router.post('/ai/chat', authenticate, async (req, res) => {
+    const openaiClient = getOpenAIClient();
+    if (!openaiClient) {
+      return res.status(503).json({ error: 'Asistente IA no configurado. Configura OPENAI_API_KEY en las variables de entorno.' });
+    }
+
+    const { message, conversationId } = req.body;
+    if (!message) return res.status(400).json({ error: 'Mensaje requerido' });
+
+    const chatId = conversationId || `${req.session.username}_${Date.now()}`;
+
+    if (!aiChatHistories.has(chatId)) {
+      aiChatHistories.set(chatId, []);
+    }
+
+    const history = aiChatHistories.get(chatId);
+    history.push({ role: 'user', content: message });
+
+    const contextMessage = `[Contexto: El miembro del staff "${req.session.username}" tiene rol "${req.session.role}". Permisos: ${(ROLE_PERMISSIONS[req.session.role] || []).join(', ')}]`;
+
+    try {
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      res.flushHeaders();
+
+      let clientDisconnected = false;
+      req.on('close', () => { clientDisconnected = true; });
+
+      const messages = [
+        { role: 'system', content: AI_SYSTEM_PROMPT },
+        { role: 'system', content: contextMessage },
+        ...history.slice(-20)
+      ];
+
+      const stream = await openaiClient.chat.completions.create({
+        model: 'gpt-5-mini',
+        messages,
+        stream: true,
+        max_completion_tokens: 2048,
+      });
+
+      let fullResponse = '';
+
+      for await (const chunk of stream) {
+        if (clientDisconnected) break;
+        const content = chunk.choices[0]?.delta?.content || '';
+        if (content) {
+          fullResponse += content;
+          res.write(`data: ${JSON.stringify({ content, conversationId: chatId })}\n\n`);
+        }
+      }
+
+      history.push({ role: 'assistant', content: fullResponse });
+
+      if (history.length > 40) {
+        history.splice(0, history.length - 40);
+      }
+
+      if (aiChatHistories.size > 200) {
+        const oldest = aiChatHistories.keys().next().value;
+        aiChatHistories.delete(oldest);
+      }
+
+      if (!clientDisconnected) {
+        res.write(`data: ${JSON.stringify({ done: true, conversationId: chatId })}\n\n`);
+        res.end();
+      }
+    } catch (err) {
+      console.error('AI Assistant error:', err.message);
+      if (res.headersSent) {
+        res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`);
+        res.end();
+      } else {
+        res.status(500).json({ error: 'Error del asistente: ' + err.message });
+      }
+    }
+  });
+
+  router.post('/ai/clear', authenticate, (req, res) => {
+    const { conversationId } = req.body;
+    if (conversationId && aiChatHistories.has(conversationId)) {
+      aiChatHistories.delete(conversationId);
+    }
+    res.json({ success: true });
+  });
+
+  router.get('/ai/rules', authenticate, (req, res) => {
+    res.json(serverRules);
+  });
+
   // === AUDIT LOGS ===
 
   router.get('/logs', authenticate, async (req, res) => {

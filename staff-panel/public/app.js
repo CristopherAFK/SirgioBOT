@@ -751,6 +751,241 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') closeModal();
 });
 
+let aiConversationId = null;
+let aiIsStreaming = false;
+
+function escapeHTML(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function formatAIMarkdown(text) {
+  let safe = escapeHTML(text);
+  safe = safe.replace(/```(\w*)\n?([\s\S]*?)```/g, '<pre><code>$2</code></pre>');
+  safe = safe.replace(/`([^`]+)`/g, '<code>$1</code>');
+  safe = safe.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  safe = safe.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+  const lines = safe.split('\n');
+  let result = [];
+  let inList = false;
+  let listType = null;
+  for (const line of lines) {
+    const ulMatch = line.match(/^\s*[-*]\s+(.+)$/);
+    const olMatch = line.match(/^\s*(\d+)\.\s+(.+)$/);
+    if (ulMatch) {
+      if (!inList || listType !== 'ul') {
+        if (inList) result.push(`</${listType}>`);
+        result.push('<ul>');
+        inList = true;
+        listType = 'ul';
+      }
+      result.push(`<li>${ulMatch[1]}</li>`);
+    } else if (olMatch) {
+      if (!inList || listType !== 'ol') {
+        if (inList) result.push(`</${listType}>`);
+        result.push('<ol>');
+        inList = true;
+        listType = 'ol';
+      }
+      result.push(`<li>${olMatch[2]}</li>`);
+    } else {
+      if (inList) {
+        result.push(`</${listType}>`);
+        inList = false;
+        listType = null;
+      }
+      if (line.trim() === '') {
+        result.push('</p><p>');
+      } else {
+        result.push(line);
+      }
+    }
+  }
+  if (inList) result.push(`</${listType}>`);
+  let html = result.join('\n');
+  html = html.replace(/\n/g, '<br>');
+  html = html.replace(/<br><ul>/g, '<ul>');
+  html = html.replace(/<br><ol>/g, '<ol>');
+  html = html.replace(/<\/ul><br>/g, '</ul>');
+  html = html.replace(/<\/ol><br>/g, '</ol>');
+  html = html.replace(/<br><li>/g, '<li>');
+  html = html.replace(/<\/li><br>/g, '</li>');
+  if (!html.startsWith('<')) html = '<p>' + html;
+  if (!html.endsWith('>')) html += '</p>';
+  return html;
+}
+
+function addAIMessage(role, content) {
+  const container = document.getElementById('ai-chat-messages');
+  const welcome = container.querySelector('.ai-welcome-message');
+  if (welcome) welcome.remove();
+
+  const div = document.createElement('div');
+  div.className = 'ai-message ' + role;
+
+  const avatarEmoji = role === 'user' ? '&#128100;' : '&#129302;';
+  const bubbleContent = role === 'user' ? content.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>') : formatAIMarkdown(content);
+
+  div.innerHTML = `
+    <div class="ai-message-avatar">${avatarEmoji}</div>
+    <div class="ai-message-bubble">${bubbleContent}</div>
+  `;
+
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+  return div;
+}
+
+function addAITypingIndicator() {
+  const container = document.getElementById('ai-chat-messages');
+  const div = document.createElement('div');
+  div.className = 'ai-message assistant';
+  div.id = 'ai-typing';
+  div.innerHTML = `
+    <div class="ai-message-avatar">&#129302;</div>
+    <div class="ai-message-bubble">
+      <div class="ai-typing-indicator"><span></span><span></span><span></span></div>
+    </div>
+  `;
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+}
+
+function removeAITypingIndicator() {
+  const typing = document.getElementById('ai-typing');
+  if (typing) typing.remove();
+}
+
+async function sendAIMessage() {
+  if (aiIsStreaming) return;
+  const input = document.getElementById('ai-chat-input');
+  const message = input.value.trim();
+  if (!message) return;
+
+  input.value = '';
+  input.style.height = 'auto';
+  addAIMessage('user', message);
+  addAITypingIndicator();
+
+  aiIsStreaming = true;
+  const sendBtn = document.getElementById('ai-send-btn');
+  sendBtn.disabled = true;
+
+  try {
+    const response = await fetch(API_BASE + '/ai/chat', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Session-Token': sessionToken
+      },
+      body: JSON.stringify({ message, conversationId: aiConversationId })
+    });
+
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.error || 'Error del servidor');
+    }
+
+    removeAITypingIndicator();
+
+    const assistantDiv = addAIMessage('assistant', '');
+    const bubble = assistantDiv.querySelector('.ai-message-bubble');
+    let fullText = '';
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        try {
+          const data = JSON.parse(line.slice(6));
+          if (data.content) {
+            fullText += data.content;
+            bubble.innerHTML = formatAIMarkdown(fullText);
+            const container = document.getElementById('ai-chat-messages');
+            container.scrollTop = container.scrollHeight;
+          }
+          if (data.conversationId) {
+            aiConversationId = data.conversationId;
+          }
+          if (data.error) {
+            throw new Error(data.error);
+          }
+        } catch (e) {
+          if (e instanceof SyntaxError) continue;
+          throw e;
+        }
+      }
+    }
+  } catch (e) {
+    removeAITypingIndicator();
+    toast('Error del asistente: ' + e.message, 'error');
+    addAIMessage('assistant', 'Lo siento, hubo un error al procesar tu consulta. Intenta de nuevo.');
+  } finally {
+    aiIsStreaming = false;
+    sendBtn.disabled = false;
+    input.focus();
+  }
+}
+
+function sendAISuggestion(text) {
+  document.getElementById('ai-chat-input').value = text;
+  sendAIMessage();
+}
+
+async function clearAIChat() {
+  if (aiConversationId) {
+    try {
+      await fetch(API_BASE + '/ai/clear', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Session-Token': sessionToken
+        },
+        body: JSON.stringify({ conversationId: aiConversationId })
+      });
+    } catch (e) {}
+  }
+  aiConversationId = null;
+  const container = document.getElementById('ai-chat-messages');
+  container.innerHTML = `
+    <div class="ai-welcome-message">
+      <div class="ai-welcome-icon">&#129302;</div>
+      <h3>Hola, soy el Asistente de Moderacion</h3>
+      <p>Puedo ayudarte con:</p>
+      <div class="ai-suggestions">
+        <button class="ai-suggestion-btn" onclick="sendAISuggestion('Un usuario esta haciendo spam en el chat general, que hago?')">Un usuario hace spam</button>
+        <button class="ai-suggestion-btn" onclick="sendAISuggestion('Que sancion aplico si alguien envia contenido NSFW?')">Contenido NSFW</button>
+        <button class="ai-suggestion-btn" onclick="sendAISuggestion('Explicame la regla 7 sobre multicuentas')">Regla de multicuentas</button>
+        <button class="ai-suggestion-btn" onclick="sendAISuggestion('Un usuario tiene 5 warns, que deberia pasar?')">Escalacion de warns</button>
+      </div>
+    </div>
+  `;
+  toast('Conversacion limpiada', 'info');
+}
+
+function handleAIChatKeydown(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendAIMessage();
+  }
+}
+
+function autoResizeTextarea(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+}
+
 const THEMES = {
   default: {
     name: 'Default', preview: '#5865f2',

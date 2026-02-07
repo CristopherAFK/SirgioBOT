@@ -204,7 +204,23 @@ El bot usa **MongoDB** (compatible con MongoDB Atlas) para almacenar:
 - Solo el autor de la nota o un admin/dueño puede eliminarla
 - Página "Notas Internas" en la barra lateral
 
+### Asistente IA de Moderación
+- Asistente IA integrado en el Staff Panel para ayudar con decisiones de moderación
+- Conoce las 10 reglas del servidor, categorías de sanciones, escalación de warns y jerarquía de roles
+- Soporte dual de OpenAI: Replit AI Integrations (desarrollo) + API key manual (Render producción)
+- Chat con streaming de respuestas (SSE) y formato markdown
+- Botones de sugerencias rápidas para consultas comunes
+- Historial de conversación persistente en memoria por sesión
+- Página "Asistente IA" en la barra lateral
+- Archivo de reglas: `staff-panel/server-rules.json`
+
 ## Última Actualización
+Febrero 2026 - Asistente IA de Moderación:
+- Nuevo asistente IA con acceso a las 10 reglas del servidor y guías de sanción
+- Recomienda sanciones según las reglas, considerando el rol del staff que consulta
+- Soporte dual OpenAI: funciona en Replit (AI Integrations) y Render (OPENAI_API_KEY)
+- Chat UI con streaming, markdown, sugerencias rápidas y limpieza de conversación
+
 Febrero 2026 - Persistencia de Mutes y Bans temporales en MongoDB:
 - Los mutes ahora se guardan en MongoDB y se restauran automáticamente tras reinicios del bot en Render
 - Los bans temporales (con duración) se guardan en MongoDB y se desbanean automáticamente al expirar, incluso tras reinicios
