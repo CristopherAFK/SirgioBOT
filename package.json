@@ -14,9 +14,15 @@
     "discord.js": "^14.25.1",
     "dotenv": "^16.6.1",
     "drizzle-orm": "^0.45.1",
+    "drizzle-zod": "^0.8.3",
     "express": "^4.22.1",
     "mongoose": "^9.1.6",
+    "openai": "^6.18.0",
+    "p-limit": "^7.3.0",
+    "p-retry": "^7.1.1",
     "pg": "^8.18.0",
-    "rss-parser": "^3.13.0"
+    "rss-parser": "^3.13.0",
+    "zod": "^4.3.6",
+    "zod-validation-error": "^5.0.0"
   }
 }
