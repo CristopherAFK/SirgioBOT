@@ -682,10 +682,10 @@ INSTRUCCIONES:
       ];
 
       const stream = await openaiClient.chat.completions.create({
-        model: 'gpt-5-mini',
+        model: 'gpt-4o-mini',
         messages,
         stream: true,
-        max_completion_tokens: 2048,
+        max_tokens: 2048,
       });
 
       let fullResponse = '';
