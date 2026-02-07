@@ -188,6 +188,22 @@ El bot usa **MongoDB** (compatible con MongoDB Atlas) para almacenar:
 - **Admins** (1212891335929897030): Permisos completos
 - **Head Admins** (1230952139015327755): Permisos completos + comandos avanzados
 
+### Personalización de Tema
+- 6 temas predefinidos: Default, Lo-fi, Anime, Cartoon, Simple, Videojuegos
+- Personalización custom: fuente, color de botones, fondo y texto
+- Preferencias guardadas por usuario en localStorage
+- Página "Personalizar" en la barra lateral
+
+### Foto de Perfil de Discord
+- Muestra la foto de perfil del usuario de Discord en la barra lateral
+- Se obtiene automáticamente al iniciar sesión cuando el bot está conectado
+
+### Notas Internas del Staff
+- Los miembros del staff pueden añadir notas privadas sobre cualquier usuario
+- Almacenamiento en MongoDB (colección staff_notes)
+- Solo el autor de la nota o un admin/dueño puede eliminarla
+- Página "Notas Internas" en la barra lateral
+
 ## Última Actualización
 Febrero 2026 - Persistencia de Mutes y Bans temporales en MongoDB:
 - Los mutes ahora se guardan en MongoDB y se restauran automáticamente tras reinicios del bot en Render

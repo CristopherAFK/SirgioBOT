@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Staff Panel - SirgioBOT</title>
   <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600;700&family=Orbitron:wght@400;600;700&family=Inter:wght@400;600;700&family=Roboto:wght@400;600;700&family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 </head>
 <body>
@@ -45,6 +46,9 @@
           <div class="nav-item" data-page="logs" onclick="navigateTo('logs')">
             <span class="icon">&#128220;</span> Audit Logs
           </div>
+          <div class="nav-item" data-page="notes" onclick="navigateTo('notes')">
+            <span class="icon">&#128221;</span> Notas Internas
+          </div>
         </div>
         <div class="nav-category">
           <div class="nav-category-title">Moderacion</div>
@@ -76,9 +80,16 @@
             <span class="icon">&#8505;</span> Consultas
           </div>
         </div>
+        <div class="nav-category">
+          <div class="nav-category-title">Ajustes</div>
+          <div class="nav-item" data-page="settings" onclick="navigateTo('settings')">
+            <span class="icon">&#127912;</span> Personalizar
+          </div>
+        </div>
       </nav>
       <div class="sidebar-footer">
         <div class="user-info">
+          <img id="user-avatar" class="user-avatar" src="" alt="" style="display:none">
           <span class="username-display" id="username-display">-</span>
           <span class="role-badge" id="role-badge">-</span>
           <button class="btn btn-sm btn-danger" onclick="logout()">Salir</button>
@@ -253,6 +264,94 @@
         </div>
         <div class="card">
           <div class="card-body" id="all-logs"></div>
+        </div>
+      </div>
+
+      <!-- Notes -->
+      <div id="page-notes" class="page" style="display:none">
+        <div class="page-header">
+          <h1>Notas Internas</h1>
+          <p>Notas privadas del staff sobre usuarios</p>
+        </div>
+        <div class="card">
+          <div class="card-body">
+            <div class="form-group search-input">
+              <input type="text" id="notes-user" placeholder="Buscar usuario..." oninput="searchUsers('notes-user')">
+              <input type="hidden" id="notes-user_id">
+              <input type="hidden" id="notes-user_tag">
+              <div class="search-results" id="notes-user_results"></div>
+            </div>
+            <button class="btn btn-primary" onclick="loadNotes()" style="margin-top:8px">Cargar Notas</button>
+          </div>
+        </div>
+        <div id="notes-container"></div>
+        <div id="notes-form" style="display:none">
+          <div class="card" style="margin-top:16px">
+            <div class="card-header">&#128221; Nueva Nota</div>
+            <div class="card-body">
+              <div class="form-group">
+                <label>Contenido</label>
+                <textarea id="note-content" placeholder="Escribe tu nota sobre este usuario..."></textarea>
+              </div>
+              <button class="btn btn-success" onclick="createNote()">Guardar Nota</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Settings -->
+      <div id="page-settings" class="page" style="display:none">
+        <div class="page-header">
+          <h1>Personalizar</h1>
+          <p>Cambia la apariencia del panel</p>
+        </div>
+        <div class="card">
+          <div class="card-header">&#127912; Temas Predefinidos</div>
+          <div class="card-body">
+            <div class="themes-grid" id="themes-grid"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">&#9998; Personalizacion Avanzada</div>
+          <div class="card-body">
+            <div class="custom-theme-controls">
+              <div class="form-group">
+                <label>Fuente</label>
+                <select id="custom-font" onchange="applyCustomFromControls()" style="width:100%;padding:10px 14px;background:var(--bg-input);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);font-size:14px;">
+                  <option value="'Segoe UI', system-ui, -apple-system, sans-serif">Segoe UI</option>
+                  <option value="'Inter', system-ui, sans-serif">Inter</option>
+                  <option value="Georgia, serif">Georgia</option>
+                  <option value="'Quicksand', sans-serif">Quicksand</option>
+                  <option value="'Comic Sans MS', 'Chalkboard SE', cursive">Comic Sans MS</option>
+                  <option value="'Orbitron', monospace">Orbitron</option>
+                  <option value="'Roboto', sans-serif">Roboto</option>
+                  <option value="'Montserrat', sans-serif">Montserrat</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Color de Botones (Accent)</label>
+                <div class="color-picker-wrapper">
+                  <input type="color" id="custom-accent" value="#5865f2" onchange="applyCustomFromControls()">
+                  <span id="custom-accent-text">#5865f2</span>
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Color de Fondo</label>
+                <div class="color-picker-wrapper">
+                  <input type="color" id="custom-bg" value="#1a1a2e" onchange="applyCustomFromControls()">
+                  <span id="custom-bg-text">#1a1a2e</span>
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Color de Texto</label>
+                <div class="color-picker-wrapper">
+                  <input type="color" id="custom-text" value="#ffffff" onchange="applyCustomFromControls()">
+                  <span id="custom-text-text">#ffffff</span>
+                </div>
+              </div>
+            </div>
+            <button class="btn btn-warning" onclick="resetTheme()" style="margin-top:16px">Restablecer</button>
+          </div>
         </div>
       </div>
     </main>

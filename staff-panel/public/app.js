@@ -2,6 +2,7 @@ const API_BASE = '/api';
 let sessionToken = null;
 let currentRole = null;
 let currentUsername = null;
+let currentDiscordId = null;
 let permissions = [];
 let channelsCache = [];
 let rolesCache = [];
@@ -51,6 +52,7 @@ function logout() {
   sessionToken = null;
   currentRole = null;
   currentUsername = null;
+  currentDiscordId = null;
   permissions = [];
   document.getElementById('app-page').style.display = 'none';
   document.getElementById('login-page').style.display = 'flex';
@@ -68,6 +70,7 @@ async function initApp() {
   try {
     const status = await api('GET', '/status');
     permissions = status.permissions || [];
+    currentDiscordId = status.discordId || null;
     const botStatus = document.getElementById('bot-status');
     if (status.botOnline) {
       botStatus.textContent = (status.guildName || 'Servidor') + ' - Online';
@@ -76,10 +79,18 @@ async function initApp() {
       botStatus.textContent = 'Bot desconectado';
       botStatus.className = 'bot-status';
     }
+    const avatar = document.getElementById('user-avatar');
+    if (status.avatarUrl) {
+      avatar.src = status.avatarUrl;
+      avatar.style.display = 'block';
+    } else {
+      avatar.style.display = 'none';
+    }
     updatePermissions();
     loadDashboard(status);
     loadChannels();
     loadRoles();
+    loadSavedTheme();
   } catch (e) {
     toast('Error al conectar: ' + e.message, 'error');
   }
@@ -183,6 +194,8 @@ function navigateTo(page) {
 
   if (page === 'logs') loadLogs('all-logs');
   if (page === 'dashboard') initApp();
+  if (page === 'notes') loadNotesPage();
+  if (page === 'settings') renderThemeSettings();
 
   const sidebar = document.getElementById('sidebar');
   if (window.innerWidth <= 768) sidebar.classList.remove('open');
@@ -738,6 +751,196 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') closeModal();
 });
 
-document.getElementById('login-key').addEventListener('keypress', e => {
-  if (e.key === 'Enter') login();
-});
+const THEMES = {
+  default: {
+    name: 'Default', preview: '#5865f2',
+    font: "'Segoe UI', system-ui, -apple-system, sans-serif",
+    vars: { '--bg-primary': '#1a1a2e', '--bg-secondary': '#16213e', '--bg-card': '#1e2746', '--bg-input': '#0f1629', '--accent': '#5865f2', '--accent-hover': '#4752c4', '--text-primary': '#ffffff', '--text-secondary': '#b9bbbe', '--text-muted': '#72767d', '--border': '#2c2f47' }
+  },
+  lofi: {
+    name: 'Lo-fi', preview: '#c4a882',
+    font: "Georgia, serif",
+    vars: { '--bg-primary': '#2d2a24', '--bg-secondary': '#262320', '--bg-card': '#35322b', '--bg-input': '#23201b', '--accent': '#c4a882', '--accent-hover': '#b09570', '--text-primary': '#f5f0e8', '--text-secondary': '#c9c0b1', '--text-muted': '#8a8070', '--border': '#4a4539' }
+  },
+  anime: {
+    name: 'Anime', preview: '#ff6bcb',
+    font: "'Quicksand', sans-serif",
+    vars: { '--bg-primary': '#1a0a2e', '--bg-secondary': '#150826', '--bg-card': '#2d1b4e', '--bg-input': '#130720', '--accent': '#ff6bcb', '--accent-hover': '#e055b0', '--text-primary': '#f8f0ff', '--text-secondary': '#c8b0e0', '--text-muted': '#8a6aaa', '--border': '#3d2560' }
+  },
+  cartoon: {
+    name: 'Cartoon', preview: '#ffd166',
+    font: "'Comic Sans MS', 'Chalkboard SE', cursive",
+    vars: { '--bg-primary': '#1e3a5f', '--bg-secondary': '#1a3050', '--bg-card': '#264b73', '--bg-input': '#152840', '--accent': '#ffd166', '--accent-hover': '#e6b84d', '--text-primary': '#ffffff', '--text-secondary': '#c0d8f0', '--text-muted': '#7a9ab8', '--border': '#345a80' }
+  },
+  simple: {
+    name: 'Simple', preview: '#4a90d9',
+    font: "'Inter', system-ui, sans-serif",
+    vars: { '--bg-primary': '#1e1e1e', '--bg-secondary': '#1a1a1a', '--bg-card': '#2d2d2d', '--bg-input': '#171717', '--accent': '#4a90d9', '--accent-hover': '#3a7bc0', '--text-primary': '#f0f0f0', '--text-secondary': '#b0b0b0', '--text-muted': '#707070', '--border': '#3a3a3a' }
+  },
+  videojuegos: {
+    name: 'Videojuegos', preview: '#00ff88',
+    font: "'Orbitron', monospace",
+    vars: { '--bg-primary': '#0a0e17', '--bg-secondary': '#080c14', '--bg-card': '#131a2a', '--bg-input': '#060a12', '--accent': '#00ff88', '--accent-hover': '#00cc6e', '--text-primary': '#e0ffe8', '--text-secondary': '#80c898', '--text-muted': '#40785a', '--border': '#1a2840' }
+  }
+};
+
+function applyTheme(themeName) {
+  const theme = THEMES[themeName];
+  if (!theme) return;
+  const root = document.documentElement;
+  Object.entries(theme.vars).forEach(([k, v]) => root.style.setProperty(k, v));
+  document.body.style.fontFamily = theme.font;
+  saveThemeToStorage({ theme: themeName });
+}
+
+function applyCustomColors(options) {
+  const root = document.documentElement;
+  if (options.font) document.body.style.fontFamily = options.font;
+  if (options.accent) {
+    root.style.setProperty('--accent', options.accent);
+    const r = parseInt(options.accent.slice(1,3),16), g = parseInt(options.accent.slice(3,5),16), b = parseInt(options.accent.slice(5,7),16);
+    root.style.setProperty('--accent-hover', `rgb(${Math.max(0,r-20)},${Math.max(0,g-20)},${Math.max(0,b-20)})`);
+  }
+  if (options.bg) {
+    root.style.setProperty('--bg-primary', options.bg);
+    const r = parseInt(options.bg.slice(1,3),16), g = parseInt(options.bg.slice(3,5),16), b = parseInt(options.bg.slice(5,7),16);
+    root.style.setProperty('--bg-secondary', `rgb(${Math.max(0,r-4)},${Math.max(0,g-4)},${Math.max(0,b-4)})`);
+  }
+  if (options.text) root.style.setProperty('--text-primary', options.text);
+  saveThemeToStorage({ custom: options });
+}
+
+function applyCustomFromControls() {
+  const font = document.getElementById('custom-font').value;
+  const accent = document.getElementById('custom-accent').value;
+  const bg = document.getElementById('custom-bg').value;
+  const text = document.getElementById('custom-text').value;
+  document.getElementById('custom-accent-text').textContent = accent;
+  document.getElementById('custom-bg-text').textContent = bg;
+  document.getElementById('custom-text-text').textContent = text;
+  applyCustomColors({ font, accent, bg, text });
+}
+
+function resetTheme() {
+  applyTheme('default');
+  if (currentUsername) localStorage.removeItem('panelTheme_' + currentUsername);
+  toast('Tema restablecido', 'success');
+  renderThemeSettings();
+}
+
+function saveThemeToStorage(data) {
+  if (!currentUsername) return;
+  localStorage.setItem('panelTheme_' + currentUsername, JSON.stringify(data));
+}
+
+function loadSavedTheme() {
+  if (!currentUsername) return;
+  const saved = localStorage.getItem('panelTheme_' + currentUsername);
+  if (!saved) return;
+  try {
+    const data = JSON.parse(saved);
+    if (data.theme) applyTheme(data.theme);
+    if (data.custom) {
+      const root = document.documentElement;
+      if (data.custom.font) document.body.style.fontFamily = data.custom.font;
+      if (data.custom.accent) {
+        root.style.setProperty('--accent', data.custom.accent);
+        const r = parseInt(data.custom.accent.slice(1,3),16), g = parseInt(data.custom.accent.slice(3,5),16), b = parseInt(data.custom.accent.slice(5,7),16);
+        root.style.setProperty('--accent-hover', `rgb(${Math.max(0,r-20)},${Math.max(0,g-20)},${Math.max(0,b-20)})`);
+      }
+      if (data.custom.bg) {
+        root.style.setProperty('--bg-primary', data.custom.bg);
+        const r = parseInt(data.custom.bg.slice(1,3),16), g = parseInt(data.custom.bg.slice(3,5),16), b = parseInt(data.custom.bg.slice(5,7),16);
+        root.style.setProperty('--bg-secondary', `rgb(${Math.max(0,r-4)},${Math.max(0,g-4)},${Math.max(0,b-4)})`);
+      }
+      if (data.custom.text) root.style.setProperty('--text-primary', data.custom.text);
+    }
+  } catch (e) {}
+}
+
+function renderThemeSettings() {
+  const grid = document.getElementById('themes-grid');
+  if (!grid) return;
+  grid.innerHTML = Object.entries(THEMES).map(([key, theme]) => `
+    <div class="theme-card" onclick="applyTheme('${key}')">
+      <div class="theme-preview" style="background:${theme.vars['--bg-primary']}">
+        <div class="theme-preview-accent" style="background:${theme.preview}"></div>
+        <div class="theme-preview-text" style="color:${theme.vars['--text-primary']};font-family:${theme.font}">Aa</div>
+      </div>
+      <div class="theme-name">${theme.name}</div>
+    </div>
+  `).join('');
+}
+
+let currentNotesUserId = null;
+let currentNotesUserTag = null;
+
+function loadNotesPage() {
+  currentNotesUserId = null;
+  currentNotesUserTag = null;
+  document.getElementById('notes-container').innerHTML = '';
+  document.getElementById('notes-form').style.display = 'none';
+  const userInput = document.getElementById('notes-user');
+  if (userInput) userInput.value = '';
+  const userIdInput = document.getElementById('notes-user_id');
+  if (userIdInput) userIdInput.value = '';
+}
+
+async function loadNotes() {
+  const userId = document.getElementById('notes-user_id').value;
+  const userTag = document.getElementById('notes-user').value;
+  if (!userId) return toast('Selecciona un usuario primero', 'error');
+  currentNotesUserId = userId;
+  currentNotesUserTag = userTag;
+  document.getElementById('notes-form').style.display = 'block';
+  try {
+    const notes = await api('GET', '/notes/' + userId);
+    const container = document.getElementById('notes-container');
+    if (notes.length === 0) {
+      container.innerHTML = '<div class="card" style="margin-top:16px"><div class="card-body"><div class="empty-state"><div class="empty-icon">&#128221;</div><p>No hay notas para este usuario</p></div></div></div>';
+      return;
+    }
+    container.innerHTML = '<div class="card" style="margin-top:16px"><div class="card-header">&#128203; Notas de ' + userTag + '</div><div class="card-body">' +
+      notes.map(n => {
+        const date = new Date(n.createdAt).toLocaleString('es');
+        const canDelete = n.authorId === currentDiscordId || ['admin', 'owner'].includes(currentRole);
+        const deleteBtn = canDelete ? `<button class="btn btn-sm btn-danger" onclick="deleteNote('${n._id}')">Eliminar</button>` : '';
+        return `<div class="note-card">
+          <div class="note-header">
+            <span class="note-author">${n.authorName}</span>
+            <span class="note-date">${date}</span>
+          </div>
+          <div class="note-content">${n.content.replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>')}</div>
+          ${deleteBtn ? '<div class="note-footer">' + deleteBtn + '</div>' : ''}
+        </div>`;
+      }).join('') + '</div></div>';
+  } catch (e) {
+    toast('Error cargando notas: ' + e.message, 'error');
+  }
+}
+
+async function createNote() {
+  if (!currentNotesUserId) return toast('Selecciona un usuario primero', 'error');
+  const content = document.getElementById('note-content').value.trim();
+  if (!content) return toast('Escribe el contenido de la nota', 'error');
+  try {
+    await api('POST', '/notes', { targetUserId: currentNotesUserId, targetTag: currentNotesUserTag, content });
+    toast('Nota guardada', 'success');
+    document.getElementById('note-content').value = '';
+    loadNotes();
+  } catch (e) {
+    toast('Error: ' + e.message, 'error');
+  }
+}
+
+async function deleteNote(noteId) {
+  if (!confirm('Eliminar esta nota?')) return;
+  try {
+    await api('DELETE', '/notes/' + noteId);
+    toast('Nota eliminada', 'success');
+    loadNotes();
+  } catch (e) {
+    toast('Error: ' + e.message, 'error');
+  }
+}
+

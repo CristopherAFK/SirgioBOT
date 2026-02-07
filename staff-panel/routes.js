@@ -1,5 +1,5 @@
 const express = require('express');
-const { db } = require('../database');
+const { db, mongoose } = require('../database');
 const path = require('path');
 const crypto = require('crypto');
 
@@ -73,8 +73,15 @@ function setupStaffPanel(app, client) {
     res.json({ success: true });
   });
 
-  router.get('/status', authenticate, (req, res) => {
+  router.get('/status', authenticate, async (req, res) => {
     const guild = getGuild();
+    let avatarUrl = null;
+    if (guild && req.session.discordId) {
+      try {
+        const member = await guild.members.fetch(req.session.discordId);
+        avatarUrl = member.user.displayAvatarURL({ size: 64, dynamic: true });
+      } catch (e) { avatarUrl = null; }
+    }
     res.json({
       botOnline: client && client.isReady(),
       botUser: client && client.isReady() ? { tag: client.user.tag, avatar: client.user.displayAvatarURL() } : null,
@@ -84,7 +91,9 @@ function setupStaffPanel(app, client) {
       memberCount: guild ? guild.memberCount : 0,
       role: req.session.role,
       username: req.session.username,
-      permissions: ROLE_PERMISSIONS[req.session.role] || []
+      discordId: req.session.discordId,
+      permissions: ROLE_PERMISSIONS[req.session.role] || [],
+      avatarUrl
     });
   });
 
@@ -530,6 +539,54 @@ function setupStaffPanel(app, client) {
         permissions: role.permissions.toArray(),
         createdAt: role.createdAt
       });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // === STAFF NOTES ===
+
+  router.get('/notes/:userId', authenticate, async (req, res) => {
+    try {
+      const notes = await mongoose.connection.db.collection('staff_notes')
+        .find({ targetUserId: req.params.userId })
+        .sort({ createdAt: -1 })
+        .toArray();
+      res.json(notes);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.post('/notes', authenticate, async (req, res) => {
+    const { targetUserId, targetTag, content } = req.body;
+    if (!targetUserId || !content) return res.status(400).json({ error: 'Faltan campos' });
+    try {
+      const note = {
+        authorId: req.session.discordId,
+        authorName: req.session.username,
+        targetUserId,
+        targetTag: targetTag || targetUserId,
+        content,
+        createdAt: new Date()
+      };
+      await mongoose.connection.db.collection('staff_notes').insertOne(note);
+      res.json({ success: true, note });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.delete('/notes/:noteId', authenticate, async (req, res) => {
+    try {
+      const { ObjectId } = require('mongodb');
+      const note = await mongoose.connection.db.collection('staff_notes').findOne({ _id: new ObjectId(req.params.noteId) });
+      if (!note) return res.status(404).json({ error: 'Nota no encontrada' });
+      if (note.authorId !== req.session.discordId && !['admin', 'owner'].includes(req.session.role)) {
+        return res.status(403).json({ error: 'Solo el autor o un admin puede eliminar esta nota' });
+      }
+      await mongoose.connection.db.collection('staff_notes').deleteOne({ _id: new ObjectId(req.params.noteId) });
+      res.json({ success: true });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
