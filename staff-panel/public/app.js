@@ -873,60 +873,14 @@ async function sendAIMessage() {
   sendBtn.disabled = true;
 
   try {
-    const response = await fetch(API_BASE + '/ai/chat', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Session-Token': sessionToken
-      },
-      body: JSON.stringify({ message, conversationId: aiConversationId })
-    });
-
-    if (!response.ok) {
-      const err = await response.json();
-      throw new Error(err.error || 'Error del servidor');
-    }
-
+    const data = await api('POST', '/ai/chat', { message, conversationId: aiConversationId });
     removeAITypingIndicator();
 
-    const assistantDiv = addAIMessage('assistant', '');
-    const bubble = assistantDiv.querySelector('.ai-message-bubble');
-    let fullText = '';
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
-
-      for (const line of lines) {
-        if (!line.startsWith('data: ')) continue;
-        try {
-          const data = JSON.parse(line.slice(6));
-          if (data.content) {
-            fullText += data.content;
-            bubble.innerHTML = formatAIMarkdown(fullText);
-            const container = document.getElementById('ai-chat-messages');
-            container.scrollTop = container.scrollHeight;
-          }
-          if (data.conversationId) {
-            aiConversationId = data.conversationId;
-          }
-          if (data.error) {
-            throw new Error(data.error);
-          }
-        } catch (e) {
-          if (e instanceof SyntaxError) continue;
-          throw e;
-        }
-      }
+    if (data.conversationId) {
+      aiConversationId = data.conversationId;
     }
+
+    addAIMessage('assistant', data.response);
   } catch (e) {
     removeAITypingIndicator();
     toast('Error del asistente: ' + e.message, 'error');

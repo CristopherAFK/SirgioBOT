@@ -667,13 +667,7 @@ INSTRUCCIONES:
     const contextMessage = `[Contexto: El miembro del staff "${req.session.username}" tiene rol "${req.session.role}". Permisos: ${(ROLE_PERMISSIONS[req.session.role] || []).join(', ')}]`;
 
     try {
-      res.setHeader('Content-Type', 'text/event-stream');
-      res.setHeader('Cache-Control', 'no-cache');
-      res.setHeader('Connection', 'keep-alive');
-      res.flushHeaders();
-
-      let clientDisconnected = false;
-      req.on('close', () => { clientDisconnected = true; });
+      console.log('[AI] Starting chat for:', req.session.username, 'message:', message.substring(0, 50));
 
       const messages = [
         { role: 'system', content: AI_SYSTEM_PROMPT },
@@ -681,23 +675,14 @@ INSTRUCCIONES:
         ...history.slice(-20)
       ];
 
-      const stream = await openaiClient.chat.completions.create({
+      const completion = await openaiClient.chat.completions.create({
         model: 'gpt-4o-mini',
         messages,
-        stream: true,
         max_tokens: 2048,
       });
 
-      let fullResponse = '';
-
-      for await (const chunk of stream) {
-        if (clientDisconnected) break;
-        const content = chunk.choices[0]?.delta?.content || '';
-        if (content) {
-          fullResponse += content;
-          res.write(`data: ${JSON.stringify({ content, conversationId: chatId })}\n\n`);
-        }
-      }
+      const fullResponse = completion.choices[0]?.message?.content || 'No pude generar una respuesta.';
+      console.log('[AI] Response length:', fullResponse.length);
 
       history.push({ role: 'assistant', content: fullResponse });
 
@@ -710,18 +695,10 @@ INSTRUCCIONES:
         aiChatHistories.delete(oldest);
       }
 
-      if (!clientDisconnected) {
-        res.write(`data: ${JSON.stringify({ done: true, conversationId: chatId })}\n\n`);
-        res.end();
-      }
+      res.json({ response: fullResponse, conversationId: chatId });
     } catch (err) {
-      console.error('AI Assistant error:', err.message);
-      if (res.headersSent) {
-        res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`);
-        res.end();
-      } else {
-        res.status(500).json({ error: 'Error del asistente: ' + err.message });
-      }
+      console.error('[AI] Error:', err.message);
+      res.status(500).json({ error: 'Error del asistente: ' + err.message });
     }
   });
 
