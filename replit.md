@@ -215,6 +215,7 @@ El bot usa **MongoDB** (compatible con MongoDB Atlas) para almacenar:
 - Página "Asistente IA" en la barra lateral
 - Archivo de reglas: `staff-panel/server-rules.json`
 - Guía de sanciones: `staff-panel/sanctions-guide.json`
+- Comandos del bot: `staff-panel/bot-commands.json`
 
 ## Última Actualización
 Febrero 2026 - Guía de Sanciones integrada al Asistente IA:

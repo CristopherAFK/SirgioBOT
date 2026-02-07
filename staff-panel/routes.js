@@ -597,6 +597,7 @@ function setupStaffPanel(app, client) {
   const OpenAI = require('openai');
   const serverRules = require('./server-rules.json');
   const sanctionsGuide = require('./sanctions-guide.json');
+  const botCommands = require('./bot-commands.json');
 
   function getOpenAIClient() {
     if (process.env.AI_INTEGRATIONS_OPENAI_BASE_URL && process.env.AI_INTEGRATIONS_OPENAI_API_KEY) {
@@ -642,6 +643,35 @@ JERARQUIA DE ROLES:
 - Admin: Acceso completo
 - Owner: Acceso completo
 
+COMANDOS DEL BOT DISPONIBLES:
+
+Comandos de Moderacion:
+${botCommands.slashCommands.moderacion.map(c => {
+    let line = `${c.command} - ${c.description}`;
+    if (c.options?.length) line += `\n   Opciones: ${c.options.map(o => `${o.name}(${o.required ? 'requerido' : 'opcional'}): ${o.description}${o.choices ? ' [' + (Array.isArray(o.choices) ? o.choices.join(', ') : o.choices) + ']' : ''}`).join(', ')}`;
+    if (c.permissions) line += `\n   Permisos: ${c.permissions}`;
+    if (c.examples) line += `\n   Ejemplos: ${c.examples.join(' | ')}`;
+    if (c.subcommands) line += `\n   Subcomandos: ${c.subcommands.join(', ')}`;
+    return line;
+  }).join('\n\n')}
+
+Comandos de Estadisticas:
+${botCommands.slashCommands.estadisticas.map(c => `${c.command} - ${c.description}`).join('\n')}
+
+Comandos de Auditoria:
+${botCommands.slashCommands.auditoria.map(c => `${c.command} - ${c.description}`).join('\n')}
+
+Comandos de Utilidad:
+${botCommands.slashCommands.utilidad.map(c => `${c.command} - ${c.description}`).join('\n')}
+
+Otros Comandos:
+${botCommands.slashCommands.otros.map(c => `${c.command} - ${c.description}`).join('\n')}
+
+Comandos con Prefijo (!):
+${botCommands.prefixCommands.map(c => `${c.command} - ${c.description} (${c.permissions})`).join('\n')}
+
+Formatos de Tiempo: ${botCommands.timeFormats.examples.join(', ')}
+
 INSTRUCCIONES:
 1. Responde SIEMPRE en espanol
 2. Cuando te describan una situacion, recomienda la sancion EXACTA segun la Guia de Sanciones (duracion especifica, tipo de sancion)
@@ -650,11 +680,12 @@ INSTRUCCIONES:
 5. Si hay dudas sobre la severidad, sugiere consultar con un admin
 6. Se conciso pero completo en tus respuestas
 7. Si te preguntan sobre una regla especifica, explica con detalle incluyendo las duraciones exactas
-8. Sugiere el comando correcto cuando sea posible (ej: /sancion warn, mute, ban con la duracion exacta)
+8. Sugiere el comando COMPLETO y EXACTO que debe usar el staff, incluyendo todas las opciones necesarias (usuario, tipo, categoria, razon, tiempo)
 9. Ten en cuenta el rol del staff que pregunta - un Helper no puede banear
 10. Si la situacion es ambigua, da multiples opciones con pros y contras
-11. Nunca inventes reglas ni sanciones que no existan en la guia
-12. Recuerda que el permaban solo debe aplicarse con aprobacion de un Admin`;
+11. Nunca inventes reglas, sanciones ni comandos que no existan
+12. Recuerda que el permaban solo debe aplicarse con aprobacion de un Admin
+13. Cuando sugiras un comando, usa el formato exacto con las opciones correctas del bot`;
 
   const aiChatHistories = new Map();
 

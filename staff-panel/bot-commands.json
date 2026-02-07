@@ -1,0 +1,298 @@
+{
+  "title": "Comandos del Bot - SirgioBOT",
+  "slashCommands": {
+    "moderacion": [
+      {
+        "command": "/sancion",
+        "description": "Aplica una sanción a un usuario (warn/mute/ban)",
+        "options": [
+          { "name": "usuario", "type": "usuario", "required": true, "description": "Usuario a sancionar" },
+          { "name": "tipo", "type": "opción", "required": true, "description": "Tipo de sanción", "choices": ["warn", "mute", "ban"] },
+          { "name": "categoria", "type": "opción", "required": true, "description": "Categoría de la infracción", "choices": ["Flood", "Spam", "Wall of Text", "Bypass de AutoMod", "Vacío legal", "Romper Norma", "Hacks en eventos", "Bypass de palabras prohibidas", "Uso de canales incorrecto", "Mención de CP", "Hacer publicidad", "Perfil inapropiado/comprometido", "Amenaza", "Intento de Raid", "Ticket innecesario", "Seguridad", "Acoso", "Contenido NSFW", "Desinformación", "Trolleo", "Otro"] },
+          { "name": "razon", "type": "texto", "required": true, "description": "Razón detallada de la sanción" },
+          { "name": "tiempo", "type": "texto", "required": false, "description": "Duración (ej: 10m, 1h, 2d, 30d) - Solo para mute/ban" },
+          { "name": "veces", "type": "número", "required": false, "description": "Veces que cometió la infracción" },
+          { "name": "infracciones_adicionales", "type": "texto", "required": false, "description": "Otras infracciones cometidas (separadas por coma)" },
+          { "name": "prueba", "type": "archivo", "required": false, "description": "Archivo de prueba (imagen/video)" }
+        ],
+        "permissions": "Helper: solo warn y mute | Moderador: warn, mute y ban | Admin/Owner: todo",
+        "examples": [
+          "/sancion usuario:@User tipo:warn categoria:Flood razon:Envió 20 mensajes seguidos",
+          "/sancion usuario:@User tipo:mute categoria:Spam razon:Spam de links tiempo:30m",
+          "/sancion usuario:@User tipo:ban categoria:Contenido NSFW razon:Contenido explícito reincidente tiempo:7d",
+          "/sancion usuario:@User tipo:mute categoria:Acoso razon:Insultos graves a otro miembro tiempo:2h veces:2"
+        ]
+      },
+      {
+        "command": "/stafftools",
+        "description": "Abre el panel de herramientas para el staff",
+        "options": [],
+        "permissions": "Staff"
+      },
+      {
+        "command": "/viewwarns",
+        "description": "Muestra las advertencias de un usuario",
+        "options": [
+          { "name": "usuario", "type": "usuario", "required": true, "description": "Usuario objetivo" }
+        ],
+        "permissions": "Staff"
+      },
+      {
+        "command": "/resetwarns",
+        "description": "Resetea todas las advertencias de un usuario",
+        "options": [
+          { "name": "usuario", "type": "usuario", "required": true, "description": "Usuario objetivo" }
+        ],
+        "permissions": "Admin/Owner"
+      },
+      {
+        "command": "/removewarn",
+        "description": "Elimina la última advertencia de un usuario",
+        "options": [
+          { "name": "usuario", "type": "usuario", "required": true, "description": "Usuario objetivo" }
+        ],
+        "permissions": "Staff"
+      },
+      {
+        "command": "/remove_mute",
+        "description": "Quita el mute a un usuario",
+        "options": [
+          { "name": "usuario", "type": "usuario", "required": true, "description": "Usuario objetivo" }
+        ],
+        "permissions": "Staff"
+      },
+      {
+        "command": "/vigilar",
+        "description": "Inicia vigilancia de un usuario por un tiempo determinado",
+        "options": [
+          { "name": "usuario", "type": "usuario", "required": true, "description": "Usuario a vigilar" },
+          { "name": "tiempo", "type": "texto", "required": true, "description": "Duración (ej: 10m, 1h, 2d o 0 para indefinido)" }
+        ],
+        "permissions": "Staff"
+      },
+      {
+        "command": "/cerrar_vigilancia",
+        "description": "Cierra la vigilancia de un usuario",
+        "options": [
+          { "name": "usuario", "type": "usuario", "required": true, "description": "Usuario" }
+        ],
+        "permissions": "Staff"
+      },
+      {
+        "command": "/automod",
+        "description": "Controla el sistema de AutoMod",
+        "subcommands": ["on", "off", "status"],
+        "permissions": "Admin/Owner"
+      },
+      {
+        "command": "/addword",
+        "description": "Agrega una palabra a la lista prohibida",
+        "options": [
+          { "name": "palabra", "type": "texto", "required": true, "description": "Palabra a agregar" }
+        ],
+        "permissions": "Staff"
+      },
+      {
+        "command": "/removeword",
+        "description": "Quita una palabra de la lista prohibida",
+        "options": [
+          { "name": "palabra", "type": "texto", "required": true, "description": "Palabra a quitar" }
+        ],
+        "permissions": "Staff"
+      },
+      {
+        "command": "/reloadlists",
+        "description": "Recarga las listas de palabras prohibidas",
+        "options": [],
+        "permissions": "Staff"
+      },
+      {
+        "command": "/mantenimiento",
+        "description": "Activa o desactiva el modo mantenimiento del bot",
+        "options": [
+          { "name": "accion", "type": "opción", "required": true, "description": "Activar o desactivar", "choices": ["on", "off"] }
+        ],
+        "permissions": "Admin/Owner"
+      },
+      {
+        "command": "/ping_role",
+        "description": "Hace ping a un rol específico con un mensaje opcional",
+        "options": [
+          { "name": "rol", "type": "rol", "required": true, "description": "Rol a mencionar" },
+          { "name": "mensaje", "type": "texto", "required": false, "description": "Mensaje opcional" }
+        ],
+        "permissions": "Staff"
+      }
+    ],
+    "estadisticas": [
+      {
+        "command": "/stats tickets",
+        "description": "Estadísticas generales de tickets",
+        "permissions": "Staff"
+      },
+      {
+        "command": "/stats staff",
+        "description": "Ranking de staff por rendimiento (tickets atendidos, calificación)",
+        "permissions": "Staff"
+      },
+      {
+        "command": "/stats personal",
+        "description": "Tus estadísticas personales como staff",
+        "permissions": "Staff"
+      }
+    ],
+    "auditoria": [
+      {
+        "command": "/audit recent",
+        "description": "Muestra los logs más recientes",
+        "options": [
+          { "name": "cantidad", "type": "número", "required": false, "description": "Cantidad de logs" }
+        ],
+        "permissions": "Staff"
+      },
+      {
+        "command": "/audit user",
+        "description": "Logs de un usuario específico",
+        "options": [
+          { "name": "usuario", "type": "usuario", "required": true, "description": "Usuario a buscar" }
+        ],
+        "permissions": "Staff"
+      },
+      {
+        "command": "/audit type",
+        "description": "Filtrar logs por tipo de acción",
+        "options": [
+          { "name": "tipo", "type": "opción", "required": true, "description": "Tipo de acción" }
+        ],
+        "permissions": "Staff"
+      },
+      {
+        "command": "/audit search",
+        "description": "Buscar en los logs por texto",
+        "options": [
+          { "name": "query", "type": "texto", "required": true, "description": "Texto a buscar" }
+        ],
+        "permissions": "Staff"
+      }
+    ],
+    "utilidad": [
+      {
+        "command": "/userinfo",
+        "description": "Muestra información detallada de un usuario",
+        "options": [
+          { "name": "usuario", "type": "usuario", "required": false, "description": "Usuario (si no se pone, muestra tu info)" }
+        ],
+        "permissions": "Todos"
+      },
+      {
+        "command": "/serverinfo",
+        "description": "Muestra información del servidor",
+        "permissions": "Todos"
+      },
+      {
+        "command": "/avatar",
+        "description": "Muestra el avatar de un usuario",
+        "options": [
+          { "name": "usuario", "type": "usuario", "required": false, "description": "Usuario" }
+        ],
+        "permissions": "Todos"
+      },
+      {
+        "command": "/banner",
+        "description": "Muestra el banner de un usuario",
+        "options": [
+          { "name": "usuario", "type": "usuario", "required": false, "description": "Usuario" }
+        ],
+        "permissions": "Todos"
+      },
+      {
+        "command": "/ping",
+        "description": "Muestra la latencia del bot",
+        "permissions": "Todos"
+      },
+      {
+        "command": "/membercount",
+        "description": "Muestra el conteo de miembros del servidor",
+        "permissions": "Todos"
+      }
+    ],
+    "otros": [
+      {
+        "command": "/sugerir",
+        "description": "Envía una sugerencia para el servidor",
+        "permissions": "Todos"
+      },
+      {
+        "command": "/postular",
+        "description": "Envía una postulación para unirse al staff",
+        "options": [
+          { "name": "categoria", "type": "opción", "required": true, "description": "Categoría de postulación" }
+        ],
+        "permissions": "Todos (cuando postulaciones están abiertas)"
+      },
+      {
+        "command": "/estado_postulaciones",
+        "description": "Ver si las postulaciones están abiertas o cerradas",
+        "permissions": "Todos"
+      },
+      {
+        "command": "/abrir_postulaciones",
+        "description": "Abre las postulaciones",
+        "permissions": "Admin/Owner"
+      },
+      {
+        "command": "/cerrar_postulaciones",
+        "description": "Cierra las postulaciones",
+        "permissions": "Admin/Owner"
+      },
+      {
+        "command": "/embed",
+        "description": "Crea y envía un embed personalizado",
+        "options": [
+          { "name": "color", "type": "texto", "required": false, "description": "Color del embed en hex" },
+          { "name": "canal", "type": "canal", "required": false, "description": "Canal donde enviar" }
+        ],
+        "permissions": "Staff"
+      },
+      {
+        "command": "/anuncio",
+        "description": "Envía un anuncio oficial",
+        "options": [
+          { "name": "canal", "type": "canal", "required": false, "description": "Canal donde enviar" }
+        ],
+        "permissions": "Admin/Owner"
+      }
+    ]
+  },
+  "prefixCommands": [
+    {
+      "command": "!panel",
+      "description": "Envía el panel de tickets al canal actual",
+      "permissions": "Admin/Owner"
+    },
+    {
+      "command": "!cerrar / !close",
+      "description": "Cierra el ticket actual (también: !eliminar, !borrar)",
+      "permissions": "Staff o creador del ticket"
+    },
+    {
+      "command": "!setup-autoroles",
+      "description": "Configura y envía los paneles de autoroles",
+      "permissions": "Admin/Owner"
+    },
+    {
+      "command": "!aviso",
+      "description": "Menciona el rol de avisos (@Avisos)",
+      "permissions": "Staff"
+    },
+    {
+      "command": "!everyone",
+      "description": "Menciona @everyone",
+      "permissions": "Admin/Owner"
+    }
+  ],
+  "timeFormats": {
+    "description": "Formatos de tiempo aceptados para mutes y bans",
+    "examples": ["10m = 10 minutos", "30m = 30 minutos", "1h = 1 hora", "2h = 2 horas", "12h = 12 horas", "1d = 1 día", "3d = 3 días", "7d = 7 días", "30d = 30 días"]
+  }
+}
