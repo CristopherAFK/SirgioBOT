@@ -596,6 +596,7 @@ function setupStaffPanel(app, client) {
 
   const OpenAI = require('openai');
   const serverRules = require('./server-rules.json');
+  const sanctionsGuide = require('./sanctions-guide.json');
 
   function getOpenAIClient() {
     if (process.env.AI_INTEGRATIONS_OPENAI_BASE_URL && process.env.AI_INTEGRATIONS_OPENAI_API_KEY) {
@@ -617,6 +618,15 @@ ${serverRules.rules.map(r => `${r.number}. ${r.title}: ${r.description}
    Severidad: ${r.severity}
    Sanciones: ${JSON.stringify(r.sanctions)}`).join('\n\n')}
 
+GUIA DE SANCIONES DETALLADA:
+${sanctionsGuide.rules.map(r => {
+    const sanctions = Object.entries(r.sanctions).map(([k, v]) => `   - ${k.replace(/_/g, ' ')}: ${v}`).join('\n');
+    return `${r.number}. ${r.title}${r.description ? ' (' + r.description + ')' : ''}:\n${sanctions}${r.nota ? '\n   NOTA: ' + r.nota : ''}`;
+  }).join('\n\n')}
+
+NOTAS IMPORTANTES PARA EL STAFF:
+${sanctionsGuide.staffNotes.map(n => `- ${n}`).join('\n')}
+
 CATEGORIAS DE SANCIONES DISPONIBLES:
 ${serverRules.sanctionCategories.map(c => `- ${c.label} (${c.value}) - Reglas relacionadas: ${c.relatedRules.length > 0 ? c.relatedRules.join(', ') : 'general'}`).join('\n')}
 
@@ -634,15 +644,17 @@ JERARQUIA DE ROLES:
 
 INSTRUCCIONES:
 1. Responde SIEMPRE en espanol
-2. Cuando te describan una situacion, recomienda la sancion apropiada segun las reglas
-3. Indica que regla se infringe y la categoria de sancion
-4. Si hay dudas sobre la severidad, sugiere consultar con un admin
-5. Se conciso pero completo en tus respuestas
-6. Si te preguntan sobre una regla especifica, explica con detalle
-7. Sugiere el comando correcto cuando sea posible (ej: /sancion warn, mute, ban)
-8. Ten en cuenta el rol del staff que pregunta - un Helper no puede banear
-9. Si la situacion es ambigua, da multiples opciones con pros y contras
-10. Nunca inventes reglas que no existan`;
+2. Cuando te describan una situacion, recomienda la sancion EXACTA segun la Guia de Sanciones (duracion especifica, tipo de sancion)
+3. Indica que regla se infringe, la categoria de sancion y si es primera falta, reincidencia o caso grave
+4. Siempre pregunta si es primera falta o reincidencia para dar la sancion correcta
+5. Si hay dudas sobre la severidad, sugiere consultar con un admin
+6. Se conciso pero completo en tus respuestas
+7. Si te preguntan sobre una regla especifica, explica con detalle incluyendo las duraciones exactas
+8. Sugiere el comando correcto cuando sea posible (ej: /sancion warn, mute, ban con la duracion exacta)
+9. Ten en cuenta el rol del staff que pregunta - un Helper no puede banear
+10. Si la situacion es ambigua, da multiples opciones con pros y contras
+11. Nunca inventes reglas ni sanciones que no existan en la guia
+12. Recuerda que el permaban solo debe aplicarse con aprobacion de un Admin`;
 
   const aiChatHistories = new Map();
 

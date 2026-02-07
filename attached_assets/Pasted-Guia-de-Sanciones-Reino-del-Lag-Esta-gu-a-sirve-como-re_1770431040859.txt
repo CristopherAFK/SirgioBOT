@@ -1,0 +1,157 @@
+Guia de Sanciones - Reino del Lag
+Esta guía sirve como referencia para el equipo de moderación.
+
+Las sanciones pueden ajustarse según el contexto, la intención y el historial del usuario.
+En caso de duda, consulta con un Administrador antes de aplicar sanciones mayores (bans o expulsiones).
+
+🔹 1. Falta de respeto hacia otros miembros
+
+Primera falta: 20 minutos de aislamiento o mute.
+
+Reincidencia: 30 minutos → 2 horas → 12 horas.
+
+Si incluye insultos graves o acoso: hasta ban de 3 días.
+
+🔹 2. Lenguaje inapropiado / ofensas leves
+
+Primera falta: 10 minutos de mute o aislamiento.
+
+Reincidencia: 30 min → 2h → 12h.
+
+Ofensas graves, racismo o discriminación: ban de 3 a 7 días.
+
+🔹 3. Spam, flood o walltext
+
+Primera falta: 15 minutos de aislamiento.
+
+Reincidencia: 30 minutos → 2 horas.
+
+Flood masivo o con links: Mute de 2h.
+
+🔹 4. Contenido NSFW o adulto
+
+Primera falta: 1 día de aislamiento.
+
+Reincidencia: ban de 7 días.
+
+Tercera falta o contenido explícito severo: permaban inmediato.
+
+🔹 5. Bromas o contenido relacionado con CP
+
+Primera falta: 1 hora aislado.
+
+Reincidencia: 12 horas aislado.
+
+Casos graves: Ban de 30 dias.
+
+No se toleran bromas, menciones ni insinuaciones sobre este tema.
+
+🔹 6. Publicidad o autopromoción sin permiso
+
+Primera falta: 2 horas de aislamiento.
+
+Reincidencia: 1 día → 3 días.
+
+Spam masivo o de servidores ajenos: ban de 7 días.
+
+🔹 7. Nombres o fotos de perfil inapropiados
+
+Advertencia + solicitud de cambio.
+
+Negarse o reincidir: 1h de aislamiento.
+
+Si es NSFW o racista: 1 día → ban de 3 días.
+
+🔹 8. Server Raiding / ataques organizados
+
+Sanción: permaban inmediato.
+
+También se reportará a Discord Trust & Safety y denuncia al usuario si es necesario.
+
+🔹 9. Amenazas directas o indirectas
+
+Leve (broma, sin intención real): 30 minutos de mute.
+
+Moderada (intimidación real): 12h a 3 días de aislamiento.
+
+Grave (DDoS, dox, violencia): permaban inmediato.
+
+🔹 10. Peleas o discusiones graves
+
+Primera falta: 2 horas de aislamiento.
+
+Reincidencia: 12h → 1 día.
+
+Si hay acoso o amenazas: 7 dias aislado seguido de permaban.
+
+🔹 11. Filtración de información personal (doxxing)
+
+Primera falta: 3 días de aislamiento.
+
+Reincidencia: ban de 7 días.
+
+Tercera falta: permaban.
+
+🔹 12. Ping innecesario a staff / everyone / here / Sirgio
+
+Ping leve: advertencia verbal.
+
+Reincidencia: 10–30 min de aislamiento.
+
+Ping masivo o reiterado: 1h → 6h.
+
+Ping malintencionado: 1 día de aislamiento.
+
+🔹 13. Farm de niveles o mensajes vacíos
+
+Primera falta: advertencia.
+
+Reincidencia: 10 min → 30 min de aislamiento.
+
+Si continúa: 1h de aislamiento + reset de XP.
+
+🔹 14. Falta de respeto al Staff
+
+Primera falta: 30 min de aislamiento.
+
+Reincidencia: 2h → 12h.
+
+Ofensa grave o insultos directos: ban de 3 días.
+
+🔹 15. Multicuentas
+
+Primera falta: aviso y kick de cuenta alterna.
+
+Reincidencia o uso para evadir sanción: permaban en ambas cuentas.
+
+🔹 16. Hacks, exploits o trampas
+
+Sanción: permaban inmediato.
+
+Especialmente si se usan en eventos, bots o sistemas del servidor.
+
+🔹 17. Incumplir privacidad en chats de voz (grabar, molestar, flood de sonido)
+
+Primera falta: 2h de aislamiento y kick del canal.
+
+Reincidencia: 1 día de aislamiento.
+
+Grave o reincidente: ban de 3 a 7 días.
+
+🔹 18. Impersonar a otro usuario o staff
+
+Primera falta: 1 día de aislamiento.
+
+Reincidencia: ban de 7 días.
+
+Si se hace con intención de engaño: permaban.
+
+🗒️ Notas para el Staff
+
+Registra todas las sanciones en el canal interno de moderación.
+
+Usa el comando /sanción con razón clara.
+
+Ante casos grises, prioriza el diálogo y advertencias antes del castigo.
+
+El permaban solo debe aplicarse con aprobación de un Admin.

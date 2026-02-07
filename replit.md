@@ -206,20 +206,28 @@ El bot usa **MongoDB** (compatible con MongoDB Atlas) para almacenar:
 
 ### Asistente IA de Moderación
 - Asistente IA integrado en el Staff Panel para ayudar con decisiones de moderación
-- Conoce las 10 reglas del servidor, categorías de sanciones, escalación de warns y jerarquía de roles
+- Conoce las 10 reglas del servidor + Guía de Sanciones completa (18 categorías con duraciones exactas)
 - Soporte dual de OpenAI: Replit AI Integrations (desarrollo) + API key manual (Render producción)
-- Chat con streaming de respuestas (SSE) y formato markdown
+- Respuestas completas en JSON (no streaming) para mayor confiabilidad
 - Botones de sugerencias rápidas para consultas comunes
 - Historial de conversación persistente en memoria por sesión
+- Pregunta si es primera falta o reincidencia para dar la sanción correcta
 - Página "Asistente IA" en la barra lateral
 - Archivo de reglas: `staff-panel/server-rules.json`
+- Guía de sanciones: `staff-panel/sanctions-guide.json`
 
 ## Última Actualización
+Febrero 2026 - Guía de Sanciones integrada al Asistente IA:
+- Añadida la Guía de Sanciones completa (18 reglas con duraciones específicas por primera falta, reincidencia y casos graves)
+- El asistente ahora recomienda sanciones EXACTAS con duraciones específicas
+- Cambiado de streaming SSE a respuestas JSON completas para evitar timeouts
+- Archivo: staff-panel/sanctions-guide.json
+
 Febrero 2026 - Asistente IA de Moderación:
 - Nuevo asistente IA con acceso a las 10 reglas del servidor y guías de sanción
 - Recomienda sanciones según las reglas, considerando el rol del staff que consulta
 - Soporte dual OpenAI: funciona en Replit (AI Integrations) y Render (OPENAI_API_KEY)
-- Chat UI con streaming, markdown, sugerencias rápidas y limpieza de conversación
+- Chat UI con markdown, sugerencias rápidas y limpieza de conversación
 
 Febrero 2026 - Persistencia de Mutes y Bans temporales en MongoDB:
 - Los mutes ahora se guardan en MongoDB y se restauran automáticamente tras reinicios del bot en Render

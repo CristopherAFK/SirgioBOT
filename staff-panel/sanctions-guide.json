@@ -1,0 +1,175 @@
+{
+  "title": "Guía de Sanciones - Reino del Lag",
+  "description": "Referencia para el equipo de moderación. Las sanciones pueden ajustarse según el contexto, la intención y el historial del usuario.",
+  "rules": [
+    {
+      "number": 1,
+      "title": "Falta de respeto hacia otros miembros",
+      "sanctions": {
+        "primera_falta": "20 minutos de aislamiento o mute",
+        "reincidencia": "30 min → 2h → 12h",
+        "grave": "Si incluye insultos graves o acoso: hasta ban de 3 días"
+      }
+    },
+    {
+      "number": 2,
+      "title": "Lenguaje inapropiado / ofensas leves",
+      "sanctions": {
+        "primera_falta": "10 minutos de mute o aislamiento",
+        "reincidencia": "30 min → 2h → 12h",
+        "grave": "Ofensas graves, racismo o discriminación: ban de 3 a 7 días"
+      }
+    },
+    {
+      "number": 3,
+      "title": "Spam, flood o walltext",
+      "sanctions": {
+        "primera_falta": "15 minutos de aislamiento",
+        "reincidencia": "30 min → 2h",
+        "grave": "Flood masivo o con links: Mute de 2h"
+      }
+    },
+    {
+      "number": 4,
+      "title": "Contenido NSFW o adulto",
+      "sanctions": {
+        "primera_falta": "1 día de aislamiento",
+        "reincidencia": "ban de 7 días",
+        "grave": "Tercera falta o contenido explícito severo: permaban inmediato"
+      }
+    },
+    {
+      "number": 5,
+      "title": "Bromas o contenido relacionado con CP",
+      "sanctions": {
+        "primera_falta": "1 hora aislado",
+        "reincidencia": "12 horas aislado",
+        "grave": "Casos graves: Ban de 30 días"
+      },
+      "nota": "No se toleran bromas, menciones ni insinuaciones sobre este tema"
+    },
+    {
+      "number": 6,
+      "title": "Publicidad o autopromoción sin permiso",
+      "sanctions": {
+        "primera_falta": "2 horas de aislamiento",
+        "reincidencia": "1 día → 3 días",
+        "grave": "Spam masivo o de servidores ajenos: ban de 7 días"
+      }
+    },
+    {
+      "number": 7,
+      "title": "Nombres o fotos de perfil inapropiados",
+      "sanctions": {
+        "primera_falta": "Advertencia + solicitud de cambio",
+        "reincidencia": "1h de aislamiento",
+        "grave": "Si es NSFW o racista: 1 día → ban de 3 días"
+      }
+    },
+    {
+      "number": 8,
+      "title": "Server Raiding / ataques organizados",
+      "sanctions": {
+        "unica": "Permaban inmediato"
+      },
+      "nota": "También se reportará a Discord Trust & Safety y denuncia al usuario si es necesario"
+    },
+    {
+      "number": 9,
+      "title": "Amenazas directas o indirectas",
+      "sanctions": {
+        "leve": "Broma sin intención real: 30 minutos de mute",
+        "moderada": "Intimidación real: 12h a 3 días de aislamiento",
+        "grave": "DDoS, dox, violencia: permaban inmediato"
+      }
+    },
+    {
+      "number": 10,
+      "title": "Peleas o discusiones graves",
+      "sanctions": {
+        "primera_falta": "2 horas de aislamiento",
+        "reincidencia": "12h → 1 día",
+        "grave": "Si hay acoso o amenazas: 7 días aislado seguido de permaban"
+      }
+    },
+    {
+      "number": 11,
+      "title": "Filtración de información personal (doxxing)",
+      "sanctions": {
+        "primera_falta": "3 días de aislamiento",
+        "reincidencia": "ban de 7 días",
+        "grave": "Tercera falta: permaban"
+      }
+    },
+    {
+      "number": 12,
+      "title": "Ping innecesario a staff / everyone / here / Sirgio",
+      "sanctions": {
+        "leve": "Advertencia verbal",
+        "reincidencia": "10–30 min de aislamiento",
+        "masivo": "1h → 6h",
+        "malintencionado": "1 día de aislamiento"
+      }
+    },
+    {
+      "number": 13,
+      "title": "Farm de niveles o mensajes vacíos",
+      "sanctions": {
+        "primera_falta": "Advertencia",
+        "reincidencia": "10 min → 30 min de aislamiento",
+        "grave": "1h de aislamiento + reset de XP"
+      }
+    },
+    {
+      "number": 14,
+      "title": "Falta de respeto al Staff",
+      "sanctions": {
+        "primera_falta": "30 min de aislamiento",
+        "reincidencia": "2h → 12h",
+        "grave": "Ofensa grave o insultos directos: ban de 3 días"
+      }
+    },
+    {
+      "number": 15,
+      "title": "Multicuentas",
+      "sanctions": {
+        "primera_falta": "Aviso y kick de cuenta alterna",
+        "grave": "Reincidencia o uso para evadir sanción: permaban en ambas cuentas"
+      }
+    },
+    {
+      "number": 16,
+      "title": "Hacks, exploits o trampas",
+      "sanctions": {
+        "unica": "Permaban inmediato"
+      },
+      "nota": "Especialmente si se usan en eventos, bots o sistemas del servidor"
+    },
+    {
+      "number": 17,
+      "title": "Incumplir privacidad en chats de voz",
+      "description": "Grabar, molestar, flood de sonido",
+      "sanctions": {
+        "primera_falta": "2h de aislamiento y kick del canal",
+        "reincidencia": "1 día de aislamiento",
+        "grave": "Ban de 3 a 7 días"
+      }
+    },
+    {
+      "number": 18,
+      "title": "Impersonar a otro usuario o staff",
+      "sanctions": {
+        "primera_falta": "1 día de aislamiento",
+        "reincidencia": "ban de 7 días",
+        "grave": "Si se hace con intención de engaño: permaban"
+      }
+    }
+  ],
+  "staffNotes": [
+    "Registra todas las sanciones en el canal interno de moderación",
+    "Usa el comando /sanción con razón clara",
+    "Ante casos grises, prioriza el diálogo y advertencias antes del castigo",
+    "El permaban solo debe aplicarse con aprobación de un Admin",
+    "En caso de duda, consulta con un Administrador antes de aplicar sanciones mayores (bans o expulsiones)"
+  ]
+}
