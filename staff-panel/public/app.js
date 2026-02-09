@@ -556,7 +556,7 @@ async function executeNukeChannel() {
   if (!confirm('ATENCION: Esto eliminara TODOS los mensajes del canal. Continuar?')) return;
   try {
     const r = await api('POST', '/action/nuke-channel', { channelId });
-    toast(`Canal #${r.channel} recreado exitosamente`, 'success');
+    toast(`Canal recreado: #${r.channel}`, 'success');
     closeModal();
     loadChannels();
   } catch (e) { toast(e.message, 'error'); }
@@ -564,7 +564,7 @@ async function executeNukeChannel() {
 
 async function executeClearMessages() {
   const channelId = document.getElementById('clear-channel').value;
-  const amount = document.getElementById('clear-amount').value;
+  const amount = parseInt(document.getElementById('clear-amount').value);
   if (!channelId) return toast('Selecciona un canal', 'error');
   try {
     const r = await api('POST', '/action/clear-messages', { channelId, amount });
@@ -580,8 +580,8 @@ async function executeSendEmbed() {
   const color = document.getElementById('embed-color').value;
   if (!channelId || !title || !description) return toast('Completa todos los campos', 'error');
   try {
-    const r = await api('POST', '/action/send-embed', { channelId, title, description, color });
-    toast(`Embed enviado a #${r.channel}`, 'success');
+    await api('POST', '/action/send-embed', { channelId, title, description, color });
+    toast('Embed enviado', 'success');
     closeModal();
   } catch (e) { toast(e.message, 'error'); }
 }
@@ -591,8 +591,8 @@ async function executeSendDM() {
   const message = document.getElementById('dm-message').value;
   if (!userId || !message) return toast('Completa todos los campos', 'error');
   try {
-    const r = await api('POST', '/action/send-dm', { userId, message });
-    toast(`DM enviado a ${r.user}`, 'success');
+    await api('POST', '/action/send-dm', { userId, message });
+    toast('DM enviado', 'success');
     closeModal();
   } catch (e) { toast(e.message, 'error'); }
 }
@@ -600,11 +600,11 @@ async function executeSendDM() {
 async function executeEditMessage() {
   const channelId = document.getElementById('edit-channel').value;
   const messageId = document.getElementById('edit-msgid').value;
-  const newContent = document.getElementById('edit-content').value;
-  if (!channelId || !messageId || !newContent) return toast('Completa todos los campos', 'error');
+  const content = document.getElementById('edit-content').value;
+  if (!channelId || !messageId || !content) return toast('Completa todos los campos', 'error');
   try {
-    const r = await api('POST', '/action/edit-message', { channelId, messageId, newContent });
-    toast(`Mensaje editado en #${r.channel}`, 'success');
+    await api('POST', '/action/edit-message', { channelId, messageId, content });
+    toast('Mensaje editado', 'success');
     closeModal();
   } catch (e) { toast(e.message, 'error'); }
 }
@@ -614,8 +614,8 @@ async function executeBlockLinks() {
   const enabled = document.getElementById('blocklinks-enabled').checked;
   if (!channelId) return toast('Selecciona un canal', 'error');
   try {
-    const r = await api('POST', '/action/block-links', { channelId, enabled });
-    toast(`Enlaces ${r.enabled ? 'bloqueados' : 'desbloqueados'}`, 'success');
+    await api('POST', '/action/block-links', { channelId, enabled });
+    toast(`Bloqueo de enlaces ${enabled ? 'activado' : 'desactivado'}`, 'success');
     closeModal();
   } catch (e) { toast(e.message, 'error'); }
 }
@@ -633,11 +633,11 @@ async function executeQuarantine() {
 
 async function executeReduceWarn() {
   const userId = document.getElementById('reducewarn-user_id').value;
-  const amount = document.getElementById('reducewarn-amount').value;
+  const amount = parseInt(document.getElementById('reducewarn-amount').value);
   if (!userId) return toast('Selecciona un usuario', 'error');
   try {
     const r = await api('POST', '/action/reduce-warn', { userId, amount });
-    toast(`${r.removed} warns removidos. Quedan: ${r.remaining}`, 'success');
+    toast(`Warns reducidos. Total actual: ${r.warnCount}`, 'success');
     closeModal();
   } catch (e) { toast(e.message, 'error'); }
 }
@@ -646,49 +646,43 @@ async function executeViewHistory() {
   const userId = document.getElementById('history-user_id').value;
   if (!userId) return toast('Selecciona un usuario', 'error');
   try {
-    const data = await api('GET', '/action/view-history/' + userId);
-    let html = `<h3 style="margin-bottom:16px">${data.userTag} - Historial</h3>`;
-    html += `<p style="margin-bottom:12px;color:var(--text-secondary)">Total Warns: <strong>${data.totalWarns}</strong></p>`;
-
-    html += '<div class="history-section"><h4>Advertencias</h4>';
-    if (data.warnings.length === 0) html += '<p style="color:var(--text-muted)">Sin advertencias</p>';
-    else data.warnings.forEach(w => {
-      html += `<div class="history-item"><strong>${w.reason}</strong><div class="date">${new Date(w.date).toLocaleString('es')}</div></div>`;
-    });
+    const r = await api('GET', '/action/history/' + userId);
+    let html = `<div style="max-height:400px;overflow-y:auto;">`;
+    html += `<p><strong>Usuario:</strong> ${r.user || userId}</p>`;
+    html += `<p><strong>Warns actuales:</strong> ${r.warnCount || 0}</p>`;
+    if (r.history && r.history.length > 0) {
+      html += r.history.map(h => {
+        const date = new Date(h.date).toLocaleString('es');
+        return `<div class="log-entry" style="margin:8px 0">
+          <span class="log-type ${getLogTypeClass(h.type)}">${h.type}</span>
+          <span class="log-time">${date}</span>
+          <span class="log-details">${h.reason || 'Sin razon'}</span>
+        </div>`;
+      }).join('');
+    } else {
+      html += '<p style="color:var(--text-muted)">Sin historial de sanciones</p>';
+    }
     html += '</div>';
-
-    html += '<div class="history-section"><h4>Sanciones</h4>';
-    if (data.sanctions.length === 0) html += '<p style="color:var(--text-muted)">Sin sanciones</p>';
-    else data.sanctions.forEach(s => {
-      html += `<div class="history-item"><span class="log-type ${getLogTypeClass(s.type)}" style="margin-right:8px">${s.type}</span> ${s.reason}${s.duration ? ' | ' + s.duration : ''}<div class="date">${new Date(s.date).toLocaleString('es')}</div></div>`;
-    });
-    html += '</div>';
-
     document.getElementById('modal-body').innerHTML = html;
-    document.getElementById('modal-footer').innerHTML = '<button class="btn btn-sm" style="background:var(--border)" onclick="closeModal()">Cerrar</button>';
+    document.getElementById('modal-footer').innerHTML = `<button class="btn btn-sm" style="background:var(--border)" onclick="closeModal()">Cerrar</button>`;
   } catch (e) { toast(e.message, 'error'); }
 }
 
 async function executeServerInfo() {
   try {
-    const data = await api('GET', '/info/server');
+    const r = await api('GET', '/guild/info');
     openModal('Server Info', `
-      <div style="text-align:center;margin-bottom:16px">
-        ${data.icon ? `<img src="${data.icon}" style="width:64px;height:64px;border-radius:50%;margin-bottom:8px">` : ''}
-        <h3>${data.name}</h3>
-        <p style="color:var(--text-muted);font-size:12px">ID: ${data.id}</p>
+      <div style="text-align:center;margin-bottom:16px;">
+        ${r.icon ? `<img src="${r.icon}" style="width:80px;height:80px;border-radius:50%;margin-bottom:8px;">` : ''}
+        <h3 style="margin:0">${r.name}</h3>
       </div>
       <div class="info-grid">
-        <div class="info-item"><div class="info-label">Owner</div><div class="info-value">${data.owner}</div></div>
-        <div class="info-item"><div class="info-label">Miembros</div><div class="info-value">${data.memberCount}</div></div>
-        <div class="info-item"><div class="info-label">Canales</div><div class="info-value">${data.channelCount}</div></div>
-        <div class="info-item"><div class="info-label">Roles</div><div class="info-value">${data.roleCount}</div></div>
-        <div class="info-item"><div class="info-label">Boost Level</div><div class="info-value">${data.boostLevel}</div></div>
-        <div class="info-item"><div class="info-label">Boosts</div><div class="info-value">${data.boostCount}</div></div>
-        <div class="info-item"><div class="info-label">Verificacion</div><div class="info-value">${data.verificationLevel}</div></div>
-        <div class="info-item"><div class="info-label">Creado</div><div class="info-value">${new Date(data.createdAt).toLocaleDateString('es')}</div></div>
+        <div class="info-item"><span class="info-label">Miembros</span><span class="info-value">${r.memberCount}</span></div>
+        <div class="info-item"><span class="info-label">Canales</span><span class="info-value">${r.channelCount}</span></div>
+        <div class="info-item"><span class="info-label">Roles</span><span class="info-value">${r.roleCount}</span></div>
+        <div class="info-item"><span class="info-label">Creado</span><span class="info-value">${new Date(r.createdAt).toLocaleDateString('es')}</span></div>
       </div>
-    `, '<button class="btn btn-sm" style="background:var(--border)" onclick="closeModal()">Cerrar</button>');
+    `, `<button class="btn btn-sm" style="background:var(--border)" onclick="closeModal()">Cerrar</button>`);
   } catch (e) { toast(e.message, 'error'); }
 }
 
@@ -696,28 +690,20 @@ async function executeUserInfo() {
   const userId = document.getElementById('userinfo-user_id').value;
   if (!userId) return toast('Selecciona un usuario', 'error');
   try {
-    const data = await api('GET', '/info/user/' + userId);
+    const r = await api('GET', '/guild/user/' + userId);
     document.getElementById('modal-body').innerHTML = `
-      <div style="text-align:center;margin-bottom:16px">
-        <img src="${data.avatar}" style="width:64px;height:64px;border-radius:50%;margin-bottom:8px">
-        <h3>${data.tag}</h3>
-        <p style="color:var(--text-muted);font-size:12px">ID: ${data.id}</p>
+      <div style="text-align:center;margin-bottom:16px;">
+        ${r.avatar ? `<img src="${r.avatar}" style="width:80px;height:80px;border-radius:50%;margin-bottom:8px;">` : ''}
+        <h3 style="margin:0">${r.tag}</h3>
+        <p style="color:var(--text-muted);font-size:12px">${r.id}</p>
       </div>
       <div class="info-grid">
-        <div class="info-item"><div class="info-label">Display Name</div><div class="info-value">${data.displayName}</div></div>
-        <div class="info-item"><div class="info-label">Bot</div><div class="info-value">${data.isBot ? 'Si' : 'No'}</div></div>
-        <div class="info-item"><div class="info-label">Se unio</div><div class="info-value">${new Date(data.joinedAt).toLocaleDateString('es')}</div></div>
-        <div class="info-item"><div class="info-label">Cuenta creada</div><div class="info-value">${new Date(data.createdAt).toLocaleDateString('es')}</div></div>
-        <div class="info-item"><div class="info-label">Warns</div><div class="info-value">${data.warnings}</div></div>
-        <div class="info-item"><div class="info-label">Sanciones</div><div class="info-value">${data.sanctions}</div></div>
-      </div>
-      <div style="margin-top:12px"><strong style="font-size:13px">Roles:</strong>
-        <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">
-          ${data.roles.map(r => `<span style="padding:2px 8px;border-radius:10px;font-size:11px;background:${r.color}22;color:${r.color};border:1px solid ${r.color}44">${r.name}</span>`).join('')}
-        </div>
+        <div class="info-item"><span class="info-label">Se unio</span><span class="info-value">${new Date(r.joinedAt).toLocaleDateString('es')}</span></div>
+        <div class="info-item"><span class="info-label">Cuenta creada</span><span class="info-value">${new Date(r.createdAt).toLocaleDateString('es')}</span></div>
+        <div class="info-item"><span class="info-label">Roles</span><span class="info-value">${r.roles ? r.roles.join(', ') : 'Ninguno'}</span></div>
       </div>
     `;
-    document.getElementById('modal-footer').innerHTML = '<button class="btn btn-sm" style="background:var(--border)" onclick="closeModal()">Cerrar</button>';
+    document.getElementById('modal-footer').innerHTML = `<button class="btn btn-sm" style="background:var(--border)" onclick="closeModal()">Cerrar</button>`;
   } catch (e) { toast(e.message, 'error'); }
 }
 
@@ -725,107 +711,43 @@ async function executeRoleInfo() {
   const roleId = document.getElementById('roleinfo-role').value;
   if (!roleId) return toast('Selecciona un rol', 'error');
   try {
-    const data = await api('GET', '/info/role/' + roleId);
-    openModal('Role Info - ' + data.name, `
-      <div style="text-align:center;margin-bottom:16px">
-        <div style="width:40px;height:40px;border-radius:50%;background:${data.color};margin:0 auto 8px"></div>
-        <h3>${data.name}</h3>
+    const r = await api('GET', '/guild/role/' + roleId);
+    document.getElementById('modal-body').innerHTML = `
+      <div style="text-align:center;margin-bottom:16px;">
+        <h3 style="margin:0;color:${r.color || 'var(--text-primary)'}">${r.name}</h3>
       </div>
       <div class="info-grid">
-        <div class="info-item"><div class="info-label">ID</div><div class="info-value" style="font-size:12px">${data.id}</div></div>
-        <div class="info-item"><div class="info-label">Color</div><div class="info-value">${data.color}</div></div>
-        <div class="info-item"><div class="info-label">Posicion</div><div class="info-value">${data.position}</div></div>
-        <div class="info-item"><div class="info-label">Miembros</div><div class="info-value">${data.members}</div></div>
-        <div class="info-item"><div class="info-label">Mencionable</div><div class="info-value">${data.mentionable ? 'Si' : 'No'}</div></div>
-        <div class="info-item"><div class="info-label">Separado</div><div class="info-value">${data.hoist ? 'Si' : 'No'}</div></div>
-        <div class="info-item"><div class="info-label">Creado</div><div class="info-value">${new Date(data.createdAt).toLocaleDateString('es')}</div></div>
+        <div class="info-item"><span class="info-label">ID</span><span class="info-value">${r.id}</span></div>
+        <div class="info-item"><span class="info-label">Miembros</span><span class="info-value">${r.memberCount || 0}</span></div>
+        <div class="info-item"><span class="info-label">Posicion</span><span class="info-value">${r.position}</span></div>
+        <div class="info-item"><span class="info-label">Mencionable</span><span class="info-value">${r.mentionable ? 'Si' : 'No'}</span></div>
       </div>
-      <div style="margin-top:12px"><strong style="font-size:13px">Permisos (${data.permissions.length}):</strong>
-        <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;max-height:120px;overflow-y:auto">
-          ${data.permissions.map(p => `<span style="padding:2px 8px;border-radius:4px;font-size:10px;background:var(--bg-input);color:var(--text-secondary)">${p}</span>`).join('')}
-        </div>
-      </div>
-    `, '<button class="btn btn-sm" style="background:var(--border)" onclick="closeModal()">Cerrar</button>');
+    `;
+    document.getElementById('modal-footer').innerHTML = `<button class="btn btn-sm" style="background:var(--border)" onclick="closeModal()">Cerrar</button>`;
   } catch (e) { toast(e.message, 'error'); }
 }
-
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') closeModal();
-});
 
 let aiConversationId = null;
 let aiIsStreaming = false;
 
-function escapeHTML(str) {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
-}
-
 function formatAIMarkdown(text) {
-  let safe = escapeHTML(text);
-  safe = safe.replace(/```(\w*)\n?([\s\S]*?)```/g, '<pre><code>$2</code></pre>');
-  safe = safe.replace(/`([^`]+)`/g, '<code>$1</code>');
-  safe = safe.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-  safe = safe.replace(/\*([^*]+)\*/g, '<em>$1</em>');
-  const lines = safe.split('\n');
-  let result = [];
-  let inList = false;
-  let listType = null;
-  for (const line of lines) {
-    const ulMatch = line.match(/^\s*[-*]\s+(.+)$/);
-    const olMatch = line.match(/^\s*(\d+)\.\s+(.+)$/);
-    if (ulMatch) {
-      if (!inList || listType !== 'ul') {
-        if (inList) result.push(`</${listType}>`);
-        result.push('<ul>');
-        inList = true;
-        listType = 'ul';
-      }
-      result.push(`<li>${ulMatch[1]}</li>`);
-    } else if (olMatch) {
-      if (!inList || listType !== 'ol') {
-        if (inList) result.push(`</${listType}>`);
-        result.push('<ol>');
-        inList = true;
-        listType = 'ol';
-      }
-      result.push(`<li>${olMatch[2]}</li>`);
-    } else {
-      if (inList) {
-        result.push(`</${listType}>`);
-        inList = false;
-        listType = null;
-      }
-      if (line.trim() === '') {
-        result.push('</p><p>');
-      } else {
-        result.push(line);
-      }
-    }
-  }
-  if (inList) result.push(`</${listType}>`);
-  let html = result.join('\n');
-  html = html.replace(/\n/g, '<br>');
-  html = html.replace(/<br><ul>/g, '<ul>');
-  html = html.replace(/<br><ol>/g, '<ol>');
-  html = html.replace(/<\/ul><br>/g, '</ul>');
-  html = html.replace(/<\/ol><br>/g, '</ol>');
-  html = html.replace(/<br><li>/g, '<li>');
-  html = html.replace(/<\/li><br>/g, '</li>');
-  if (!html.startsWith('<')) html = '<p>' + html;
-  if (!html.endsWith('>')) html += '</p>';
-  return html;
+  return text
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/^### (.+)$/gm, '<h4>$1</h4>')
+    .replace(/^## (.+)$/gm, '<h3>$1</h3>')
+    .replace(/^# (.+)$/gm, '<h2>$1</h2>')
+    .replace(/^- (.+)$/gm, '<li>$1</li>')
+    .replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>')
+    .replace(/<\/ul>\s*<ul>/g, '')
+    .replace(/\n/g, '<br>');
 }
 
 function addAIMessage(role, content) {
   const container = document.getElementById('ai-chat-messages');
-  const welcome = container.querySelector('.ai-welcome-message');
-  if (welcome) welcome.remove();
-
   const div = document.createElement('div');
   div.className = 'ai-message ' + role;
-
   const avatarEmoji = role === 'user' ? '&#128100;' : '&#129302;';
   const bubbleContent = role === 'user' ? content.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>') : formatAIMarkdown(content);
 
@@ -875,7 +797,18 @@ async function sendAIMessage() {
   sendBtn.disabled = true;
 
   try {
-    const data = await api('POST', '/ai/chat', { message, conversationId: aiConversationId });
+    const res = await fetch(AI_SERVICE_URL + '/api/ai/chat', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-API-Key': AI_SERVICE_API_KEY,
+        'X-Staff-Username': currentUsername || 'unknown',
+        'X-Staff-Role': currentRole || 'unknown'
+      },
+      body: JSON.stringify({ message, conversationId: aiConversationId })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Error desconocido');
     removeAITypingIndicator();
 
     if (data.conversationId) {
@@ -902,11 +835,11 @@ function sendAISuggestion(text) {
 async function clearAIChat() {
   if (aiConversationId) {
     try {
-      await fetch(API_BASE + '/ai/clear', {
+      await fetch(AI_SERVICE_URL + '/api/ai/clear', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Session-Token': sessionToken
+          'X-API-Key': AI_SERVICE_API_KEY
         },
         body: JSON.stringify({ conversationId: aiConversationId })
       });
@@ -1134,4 +1067,3 @@ async function deleteNote(noteId) {
     toast('Error: ' + e.message, 'error');
   }
 }
-
