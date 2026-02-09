@@ -198,7 +198,8 @@ function navigateTo(page) {
   if (page === 'dashboard') initApp();
   if (page === 'notes') loadNotesPage();
   if (page === 'settings') renderThemeSettings();
-  if (page === 'ai') loadAIUsage();
+  var aiChat = document.getElementById('ai-chat-messages');
+  if (aiChat && aiChat.offsetParent !== null) loadAIUsage();
 
   const sidebar = document.getElementById('sidebar');
   if (window.innerWidth <= 768) sidebar.classList.remove('open');
@@ -778,37 +779,44 @@ function removeAITypingIndicator() {
   if (typing) typing.remove();
 }
 
-function updateAIUsageBar(usagePercent) {
+function showAIUsageInChat(usagePercent) {
   const percent = Math.min(usagePercent, 100);
-  let color;
+  const remaining = (100 - percent).toFixed(1);
+  let color, barColor;
   if (percent >= 90) {
-    color = 'var(--danger, #e74c3c)';
+    color = '#e74c3c';
+    barColor = '#e74c3c';
   } else if (percent >= 70) {
-    color = 'var(--warning, #f39c12)';
+    color = '#f39c12';
+    barColor = '#f39c12';
   } else {
-    color = 'var(--success, #2ecc71)';
+    color = '#2ecc71';
+    barColor = '#2ecc71';
   }
 
-  let bar = document.getElementById('ai-usage-bar-container');
-  if (!bar) {
-    const chatMessages = document.getElementById('ai-chat-messages');
-    if (!chatMessages) return;
-    bar = document.createElement('div');
-    bar.id = 'ai-usage-bar-container';
-    bar.style.cssText = 'padding:10px 16px;background:var(--bg-card, #1e2a45);border-bottom:1px solid var(--border);flex-shrink:0;';
-    chatMessages.parentNode.insertBefore(bar, chatMessages);
-  }
+  const container = document.getElementById('ai-chat-messages');
+  if (!container) return;
 
-  bar.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
-      <span style="font-size:12px;color:var(--text-muted);">&#9889; Uso diario</span>
-      <span style="font-size:12px;font-weight:700;color:${color};">${percent.toFixed(1)}%</span>
+  let existing = document.getElementById('ai-usage-info');
+  if (existing) existing.remove();
+
+  const div = document.createElement('div');
+  div.id = 'ai-usage-info';
+  div.style.cssText = 'padding:8px 14px;margin:8px 16px;background:rgba(88,101,242,0.08);border:1px solid rgba(88,101,242,0.2);border-radius:10px;text-align:center;';
+  div.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:6px;">
+      <span style="font-size:13px;color:#8892b0;">Uso diario:</span>
+      <span style="font-size:14px;font-weight:700;color:${color};">${percent.toFixed(1)}%</span>
+      <span style="font-size:12px;color:#8892b0;">|</span>
+      <span style="font-size:12px;color:#8892b0;">Disponible: ${remaining}%</span>
     </div>
-    <div style="width:100%;height:8px;background:var(--border, #2d3a5c);border-radius:4px;overflow:hidden;">
-      <div style="width:${percent}%;height:100%;border-radius:4px;background:${color};transition:width 0.5s ease;"></div>
+    <div style="width:100%;height:6px;background:rgba(255,255,255,0.1);border-radius:3px;overflow:hidden;">
+      <div style="width:${percent}%;height:100%;border-radius:3px;background:${barColor};transition:width 0.5s ease;"></div>
     </div>
-    ${percent >= 90 ? '<div style="font-size:11px;color:var(--danger, #e74c3c);margin-top:4px;text-align:center;">&#9888; Estas cerca del limite diario</div>' : ''}
+    ${percent >= 90 ? '<div style="font-size:11px;color:#e74c3c;margin-top:5px;">Se reinicia a las 12:00 AM hora Venezuela</div>' : ''}
   `;
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
 }
 
 async function loadAIUsage() {
@@ -822,7 +830,7 @@ async function loadAIUsage() {
     });
     if (res.ok) {
       const data = await res.json();
-      updateAIUsageBar(data.usagePercent);
+      showAIUsageInChat(data.usagePercent);
     }
   } catch (e) {}
 }
@@ -859,7 +867,7 @@ async function sendAIMessage() {
 
     if (res.status === 429 && data.error === 'usage_limit_reached') {
       addAIMessage('assistant', data.message);
-      updateAIUsageBar(100);
+      showAIUsageInChat(100);
       return;
     }
 
@@ -872,7 +880,7 @@ async function sendAIMessage() {
     addAIMessage('assistant', data.response);
 
     if (data.usage) {
-      updateAIUsageBar(data.usage.currentPercent);
+      showAIUsageInChat(data.usage.currentPercent);
     }
   } catch (e) {
     removeAITypingIndicator();
