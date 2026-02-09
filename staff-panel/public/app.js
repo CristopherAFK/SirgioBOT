@@ -779,42 +779,36 @@ function removeAITypingIndicator() {
 }
 
 function updateAIUsageBar(usagePercent) {
+  const percent = Math.min(usagePercent, 100);
+  let color;
+  if (percent >= 90) {
+    color = 'var(--danger, #e74c3c)';
+  } else if (percent >= 70) {
+    color = 'var(--warning, #f39c12)';
+  } else {
+    color = 'var(--success, #2ecc71)';
+  }
+
   let bar = document.getElementById('ai-usage-bar-container');
   if (!bar) {
-    const chatHeader = document.querySelector('.ai-chat-header') || document.querySelector('#page-ai .card-header');
-    if (!chatHeader) return;
+    const chatMessages = document.getElementById('ai-chat-messages');
+    if (!chatMessages) return;
     bar = document.createElement('div');
     bar.id = 'ai-usage-bar-container';
-    bar.style.cssText = 'padding:8px 16px;background:var(--bg-secondary);border-bottom:1px solid var(--border);';
-    bar.innerHTML = `
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-        <span style="font-size:12px;color:var(--text-muted);">Uso diario del Asistente</span>
-        <span id="ai-usage-text" style="font-size:12px;font-weight:600;"></span>
-      </div>
-      <div style="width:100%;height:6px;background:var(--border);border-radius:3px;overflow:hidden;">
-        <div id="ai-usage-fill" style="height:100%;border-radius:3px;transition:width 0.5s ease, background 0.5s ease;"></div>
-      </div>
-    `;
-    chatHeader.parentNode.insertBefore(bar, chatHeader.nextSibling);
+    bar.style.cssText = 'padding:10px 16px;background:var(--bg-card, #1e2a45);border-bottom:1px solid var(--border);flex-shrink:0;';
+    chatMessages.parentNode.insertBefore(bar, chatMessages);
   }
 
-  const percent = Math.min(usagePercent, 100);
-  const fill = document.getElementById('ai-usage-fill');
-  const text = document.getElementById('ai-usage-text');
-
-  fill.style.width = percent + '%';
-  text.textContent = percent.toFixed(1) + '% usado';
-
-  if (percent >= 90) {
-    fill.style.background = 'var(--danger, #e74c3c)';
-    text.style.color = 'var(--danger, #e74c3c)';
-  } else if (percent >= 70) {
-    fill.style.background = 'var(--warning, #f39c12)';
-    text.style.color = 'var(--warning, #f39c12)';
-  } else {
-    fill.style.background = 'var(--success, #2ecc71)';
-    text.style.color = 'var(--success, #2ecc71)';
-  }
+  bar.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+      <span style="font-size:12px;color:var(--text-muted);">&#9889; Uso diario</span>
+      <span style="font-size:12px;font-weight:700;color:${color};">${percent.toFixed(1)}%</span>
+    </div>
+    <div style="width:100%;height:8px;background:var(--border, #2d3a5c);border-radius:4px;overflow:hidden;">
+      <div style="width:${percent}%;height:100%;border-radius:4px;background:${color};transition:width 0.5s ease;"></div>
+    </div>
+    ${percent >= 90 ? '<div style="font-size:11px;color:var(--danger, #e74c3c);margin-top:4px;text-align:center;">&#9888; Estas cerca del limite diario</div>' : ''}
+  `;
 }
 
 async function loadAIUsage() {
