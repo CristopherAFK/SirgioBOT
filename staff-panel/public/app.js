@@ -198,6 +198,7 @@ function navigateTo(page) {
   if (page === 'dashboard') initApp();
   if (page === 'notes') loadNotesPage();
   if (page === 'settings') renderThemeSettings();
+  if (page === 'ai') loadAIUsage();
 
   const sidebar = document.getElementById('sidebar');
   if (window.innerWidth <= 768) sidebar.classList.remove('open');
@@ -556,7 +557,7 @@ async function executeNukeChannel() {
   if (!confirm('ATENCION: Esto eliminara TODOS los mensajes del canal. Continuar?')) return;
   try {
     const r = await api('POST', '/action/nuke-channel', { channelId });
-    toast(`Canal recreado: #${r.channel}`, 'success');
+    toast(`Canal #${r.channel} recreado`, 'success');
     closeModal();
     loadChannels();
   } catch (e) { toast(e.message, 'error'); }
@@ -566,9 +567,10 @@ async function executeClearMessages() {
   const channelId = document.getElementById('clear-channel').value;
   const amount = parseInt(document.getElementById('clear-amount').value);
   if (!channelId) return toast('Selecciona un canal', 'error');
+  if (!amount || amount < 1 || amount > 100) return toast('Cantidad invalida (1-100)', 'error');
   try {
     const r = await api('POST', '/action/clear-messages', { channelId, amount });
-    toast(`${r.deleted} mensajes eliminados de #${r.channel}`, 'success');
+    toast(`${r.deleted} mensajes eliminados en #${r.channel}`, 'success');
     closeModal();
   } catch (e) { toast(e.message, 'error'); }
 }
@@ -578,7 +580,7 @@ async function executeSendEmbed() {
   const title = document.getElementById('embed-title').value;
   const description = document.getElementById('embed-desc').value;
   const color = document.getElementById('embed-color').value;
-  if (!channelId || !title || !description) return toast('Completa todos los campos', 'error');
+  if (!channelId || !title) return toast('Completa canal y titulo', 'error');
   try {
     await api('POST', '/action/send-embed', { channelId, title, description, color });
     toast('Embed enviado', 'success');
@@ -615,7 +617,7 @@ async function executeBlockLinks() {
   if (!channelId) return toast('Selecciona un canal', 'error');
   try {
     await api('POST', '/action/block-links', { channelId, enabled });
-    toast(`Bloqueo de enlaces ${enabled ? 'activado' : 'desactivado'}`, 'success');
+    toast(`Bloqueo de links ${enabled ? 'activado' : 'desactivado'}`, 'success');
     closeModal();
   } catch (e) { toast(e.message, 'error'); }
 }
@@ -637,7 +639,7 @@ async function executeReduceWarn() {
   if (!userId) return toast('Selecciona un usuario', 'error');
   try {
     const r = await api('POST', '/action/reduce-warn', { userId, amount });
-    toast(`Warns reducidos. Total actual: ${r.warnCount}`, 'success');
+    toast(`Warns reducidos. ${r.user} ahora tiene ${r.warnCount} warns`, 'success');
     closeModal();
   } catch (e) { toast(e.message, 'error'); }
 }
@@ -647,22 +649,20 @@ async function executeViewHistory() {
   if (!userId) return toast('Selecciona un usuario', 'error');
   try {
     const r = await api('GET', '/action/history/' + userId);
-    let html = `<div style="max-height:400px;overflow-y:auto;">`;
-    html += `<p><strong>Usuario:</strong> ${r.user || userId}</p>`;
-    html += `<p><strong>Warns actuales:</strong> ${r.warnCount || 0}</p>`;
-    if (r.history && r.history.length > 0) {
-      html += r.history.map(h => {
+    const history = r.history || [];
+    let html = `<h4 style="margin-bottom:12px">${r.user} - ${r.warnCount} warns activos</h4>`;
+    if (history.length === 0) {
+      html += '<p style="color:var(--text-muted)">No hay historial de sanciones</p>';
+    } else {
+      html += history.map(h => {
         const date = new Date(h.date).toLocaleString('es');
-        return `<div class="log-entry" style="margin:8px 0">
+        return `<div class="log-entry">
           <span class="log-type ${getLogTypeClass(h.type)}">${h.type}</span>
           <span class="log-time">${date}</span>
           <span class="log-details">${h.reason || 'Sin razon'}</span>
         </div>`;
       }).join('');
-    } else {
-      html += '<p style="color:var(--text-muted)">Sin historial de sanciones</p>';
     }
-    html += '</div>';
     document.getElementById('modal-body').innerHTML = html;
     document.getElementById('modal-footer').innerHTML = `<button class="btn btn-sm" style="background:var(--border)" onclick="closeModal()">Cerrar</button>`;
   } catch (e) { toast(e.message, 'error'); }
@@ -673,14 +673,14 @@ async function executeServerInfo() {
     const r = await api('GET', '/guild/info');
     openModal('Server Info', `
       <div style="text-align:center;margin-bottom:16px;">
-        ${r.icon ? `<img src="${r.icon}" style="width:80px;height:80px;border-radius:50%;margin-bottom:8px;">` : ''}
-        <h3 style="margin:0">${r.name}</h3>
+        ${r.icon ? `<img src="${r.icon}" style="width:64px;height:64px;border-radius:50%;margin-bottom:8px;">` : ''}
+        <h3>${r.name}</h3>
       </div>
-      <div class="info-grid">
-        <div class="info-item"><span class="info-label">Miembros</span><span class="info-value">${r.memberCount}</span></div>
-        <div class="info-item"><span class="info-label">Canales</span><span class="info-value">${r.channelCount}</span></div>
-        <div class="info-item"><span class="info-label">Roles</span><span class="info-value">${r.roleCount}</span></div>
-        <div class="info-item"><span class="info-label">Creado</span><span class="info-value">${new Date(r.createdAt).toLocaleDateString('es')}</span></div>
+      <div class="stats-grid" style="grid-template-columns:repeat(2,1fr);gap:8px;">
+        <div class="stat-card"><div class="stat-value">${r.memberCount}</div><div class="stat-label">Miembros</div></div>
+        <div class="stat-card"><div class="stat-value">${r.channelCount}</div><div class="stat-label">Canales</div></div>
+        <div class="stat-card"><div class="stat-value">${r.roleCount}</div><div class="stat-label">Roles</div></div>
+        <div class="stat-card"><div class="stat-value">${r.boostLevel}</div><div class="stat-label">Nivel Boost</div></div>
       </div>
     `, `<button class="btn btn-sm" style="background:var(--border)" onclick="closeModal()">Cerrar</button>`);
   } catch (e) { toast(e.message, 'error'); }
@@ -691,18 +691,18 @@ async function executeUserInfo() {
   if (!userId) return toast('Selecciona un usuario', 'error');
   try {
     const r = await api('GET', '/guild/user/' + userId);
-    document.getElementById('modal-body').innerHTML = `
-      <div style="text-align:center;margin-bottom:16px;">
-        ${r.avatar ? `<img src="${r.avatar}" style="width:80px;height:80px;border-radius:50%;margin-bottom:8px;">` : ''}
-        <h3 style="margin:0">${r.tag}</h3>
-        <p style="color:var(--text-muted);font-size:12px">${r.id}</p>
-      </div>
-      <div class="info-grid">
-        <div class="info-item"><span class="info-label">Se unio</span><span class="info-value">${new Date(r.joinedAt).toLocaleDateString('es')}</span></div>
-        <div class="info-item"><span class="info-label">Cuenta creada</span><span class="info-value">${new Date(r.createdAt).toLocaleDateString('es')}</span></div>
-        <div class="info-item"><span class="info-label">Roles</span><span class="info-value">${r.roles ? r.roles.join(', ') : 'Ninguno'}</span></div>
-      </div>
-    `;
+    let html = `<div style="text-align:center;margin-bottom:16px;">
+      ${r.avatar ? `<img src="${r.avatar}" style="width:64px;height:64px;border-radius:50%;margin-bottom:8px;">` : ''}
+      <h3>${r.tag}</h3>
+      <p style="color:var(--text-muted);font-size:13px;">ID: ${r.id}</p>
+    </div>
+    <div class="stats-grid" style="grid-template-columns:repeat(2,1fr);gap:8px;">
+      <div class="stat-card"><div class="stat-value">${new Date(r.joinedAt).toLocaleDateString('es')}</div><div class="stat-label">Se unio</div></div>
+      <div class="stat-card"><div class="stat-value">${new Date(r.createdAt).toLocaleDateString('es')}</div><div class="stat-label">Cuenta creada</div></div>
+      <div class="stat-card"><div class="stat-value">${r.roles?.length || 0}</div><div class="stat-label">Roles</div></div>
+      <div class="stat-card"><div class="stat-value">${r.bot ? 'Si' : 'No'}</div><div class="stat-label">Es Bot</div></div>
+    </div>`;
+    document.getElementById('modal-body').innerHTML = html;
     document.getElementById('modal-footer').innerHTML = `<button class="btn btn-sm" style="background:var(--border)" onclick="closeModal()">Cerrar</button>`;
   } catch (e) { toast(e.message, 'error'); }
 }
@@ -712,17 +712,14 @@ async function executeRoleInfo() {
   if (!roleId) return toast('Selecciona un rol', 'error');
   try {
     const r = await api('GET', '/guild/role/' + roleId);
-    document.getElementById('modal-body').innerHTML = `
-      <div style="text-align:center;margin-bottom:16px;">
-        <h3 style="margin:0;color:${r.color || 'var(--text-primary)'}">${r.name}</h3>
-      </div>
-      <div class="info-grid">
-        <div class="info-item"><span class="info-label">ID</span><span class="info-value">${r.id}</span></div>
-        <div class="info-item"><span class="info-label">Miembros</span><span class="info-value">${r.memberCount || 0}</span></div>
-        <div class="info-item"><span class="info-label">Posicion</span><span class="info-value">${r.position}</span></div>
-        <div class="info-item"><span class="info-label">Mencionable</span><span class="info-value">${r.mentionable ? 'Si' : 'No'}</span></div>
-      </div>
-    `;
+    let html = `<h3 style="color:${r.color || 'inherit'};margin-bottom:12px;">${r.name}</h3>
+    <div class="stats-grid" style="grid-template-columns:repeat(2,1fr);gap:8px;">
+      <div class="stat-card"><div class="stat-value">${r.memberCount}</div><div class="stat-label">Miembros</div></div>
+      <div class="stat-card"><div class="stat-value">${r.position}</div><div class="stat-label">Posicion</div></div>
+      <div class="stat-card"><div class="stat-value">${r.mentionable ? 'Si' : 'No'}</div><div class="stat-label">Mencionable</div></div>
+      <div class="stat-card"><div class="stat-value">${r.hoisted ? 'Si' : 'No'}</div><div class="stat-label">Separado</div></div>
+    </div>`;
+    document.getElementById('modal-body').innerHTML = html;
     document.getElementById('modal-footer').innerHTML = `<button class="btn btn-sm" style="background:var(--border)" onclick="closeModal()">Cerrar</button>`;
   } catch (e) { toast(e.message, 'error'); }
 }
@@ -781,6 +778,61 @@ function removeAITypingIndicator() {
   if (typing) typing.remove();
 }
 
+function updateAIUsageBar(usagePercent) {
+  let bar = document.getElementById('ai-usage-bar-container');
+  if (!bar) {
+    const chatHeader = document.querySelector('.ai-chat-header') || document.querySelector('#page-ai .card-header');
+    if (!chatHeader) return;
+    bar = document.createElement('div');
+    bar.id = 'ai-usage-bar-container';
+    bar.style.cssText = 'padding:8px 16px;background:var(--bg-secondary);border-bottom:1px solid var(--border);';
+    bar.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+        <span style="font-size:12px;color:var(--text-muted);">Uso diario del Asistente</span>
+        <span id="ai-usage-text" style="font-size:12px;font-weight:600;"></span>
+      </div>
+      <div style="width:100%;height:6px;background:var(--border);border-radius:3px;overflow:hidden;">
+        <div id="ai-usage-fill" style="height:100%;border-radius:3px;transition:width 0.5s ease, background 0.5s ease;"></div>
+      </div>
+    `;
+    chatHeader.parentNode.insertBefore(bar, chatHeader.nextSibling);
+  }
+
+  const percent = Math.min(usagePercent, 100);
+  const fill = document.getElementById('ai-usage-fill');
+  const text = document.getElementById('ai-usage-text');
+
+  fill.style.width = percent + '%';
+  text.textContent = percent.toFixed(1) + '% usado';
+
+  if (percent >= 90) {
+    fill.style.background = 'var(--danger, #e74c3c)';
+    text.style.color = 'var(--danger, #e74c3c)';
+  } else if (percent >= 70) {
+    fill.style.background = 'var(--warning, #f39c12)';
+    text.style.color = 'var(--warning, #f39c12)';
+  } else {
+    fill.style.background = 'var(--success, #2ecc71)';
+    text.style.color = 'var(--success, #2ecc71)';
+  }
+}
+
+async function loadAIUsage() {
+  try {
+    const res = await fetch(AI_SERVICE_URL + '/api/ai/usage', {
+      headers: {
+        'X-API-Key': AI_SERVICE_API_KEY,
+        'X-Staff-Username': currentUsername || 'unknown',
+        'X-Staff-Role': currentRole || 'unknown'
+      }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      updateAIUsageBar(data.usagePercent);
+    }
+  } catch (e) {}
+}
+
 async function sendAIMessage() {
   if (aiIsStreaming) return;
   const input = document.getElementById('ai-chat-input');
@@ -808,14 +860,26 @@ async function sendAIMessage() {
       body: JSON.stringify({ message, conversationId: aiConversationId })
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Error desconocido');
+
     removeAITypingIndicator();
+
+    if (res.status === 429 && data.error === 'usage_limit_reached') {
+      addAIMessage('assistant', data.message);
+      updateAIUsageBar(100);
+      return;
+    }
+
+    if (!res.ok) throw new Error(data.error || 'Error desconocido');
 
     if (data.conversationId) {
       aiConversationId = data.conversationId;
     }
 
     addAIMessage('assistant', data.response);
+
+    if (data.usage) {
+      updateAIUsageBar(data.usage.currentPercent);
+    }
   } catch (e) {
     removeAITypingIndicator();
     toast('Error del asistente: ' + e.message, 'error');
@@ -860,6 +924,7 @@ async function clearAIChat() {
       </div>
     </div>
   `;
+  loadAIUsage();
   toast('Conversacion limpiada', 'info');
 }
 
@@ -870,128 +935,105 @@ function handleAIChatKeydown(e) {
   }
 }
 
-function autoResizeTextarea(el) {
-  el.style.height = 'auto';
-  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
-}
-
-const THEMES = {
-  default: {
-    name: 'Default', preview: '#5865f2',
-    font: "'Segoe UI', system-ui, -apple-system, sans-serif",
-    vars: { '--bg-primary': '#1a1a2e', '--bg-secondary': '#16213e', '--bg-card': '#1e2746', '--bg-input': '#0f1629', '--accent': '#5865f2', '--accent-hover': '#4752c4', '--text-primary': '#ffffff', '--text-secondary': '#b9bbbe', '--text-muted': '#72767d', '--border': '#2c2f47' }
+const themes = {
+  dark: {
+    name: 'Oscuro',
+    vars: {
+      '--bg-primary': '#1a1a2e',
+      '--bg-secondary': '#16213e',
+      '--bg-card': '#1e2a45',
+      '--bg-input': '#0f1729',
+      '--text-primary': '#e0e0e0',
+      '--text-muted': '#8892b0',
+      '--border': '#2d3a5c',
+      '--accent': '#5865F2',
+      '--success': '#43b581',
+      '--danger': '#f04747',
+      '--warning': '#faa61a',
+      '--info': '#00b0f4'
+    }
   },
-  lofi: {
-    name: 'Lo-fi', preview: '#c4a882',
-    font: "Georgia, serif",
-    vars: { '--bg-primary': '#2d2a24', '--bg-secondary': '#262320', '--bg-card': '#35322b', '--bg-input': '#23201b', '--accent': '#c4a882', '--accent-hover': '#b09570', '--text-primary': '#f5f0e8', '--text-secondary': '#c9c0b1', '--text-muted': '#8a8070', '--border': '#4a4539' }
+  midnight: {
+    name: 'Medianoche',
+    vars: {
+      '--bg-primary': '#0d0d1a',
+      '--bg-secondary': '#12121f',
+      '--bg-card': '#181828',
+      '--bg-input': '#0a0a14',
+      '--text-primary': '#d4d4e8',
+      '--text-muted': '#6b6b8d',
+      '--border': '#252540',
+      '--accent': '#7c3aed',
+      '--success': '#10b981',
+      '--danger': '#ef4444',
+      '--warning': '#f59e0b',
+      '--info': '#3b82f6'
+    }
   },
-  anime: {
-    name: 'Anime', preview: '#ff6bcb',
-    font: "'Quicksand', sans-serif",
-    vars: { '--bg-primary': '#1a0a2e', '--bg-secondary': '#150826', '--bg-card': '#2d1b4e', '--bg-input': '#130720', '--accent': '#ff6bcb', '--accent-hover': '#e055b0', '--text-primary': '#f8f0ff', '--text-secondary': '#c8b0e0', '--text-muted': '#8a6aaa', '--border': '#3d2560' }
+  ocean: {
+    name: 'Oceano',
+    vars: {
+      '--bg-primary': '#0a192f',
+      '--bg-secondary': '#0d2137',
+      '--bg-card': '#112240',
+      '--bg-input': '#071525',
+      '--text-primary': '#ccd6f6',
+      '--text-muted': '#8892b0',
+      '--border': '#1d3557',
+      '--accent': '#64ffda',
+      '--success': '#64ffda',
+      '--danger': '#ff6b6b',
+      '--warning': '#ffd93d',
+      '--info': '#6ec6ff'
+    }
   },
-  cartoon: {
-    name: 'Cartoon', preview: '#ffd166',
-    font: "'Comic Sans MS', 'Chalkboard SE', cursive",
-    vars: { '--bg-primary': '#1e3a5f', '--bg-secondary': '#1a3050', '--bg-card': '#264b73', '--bg-input': '#152840', '--accent': '#ffd166', '--accent-hover': '#e6b84d', '--text-primary': '#ffffff', '--text-secondary': '#c0d8f0', '--text-muted': '#7a9ab8', '--border': '#345a80' }
-  },
-  simple: {
-    name: 'Simple', preview: '#4a90d9',
-    font: "'Inter', system-ui, sans-serif",
-    vars: { '--bg-primary': '#1e1e1e', '--bg-secondary': '#1a1a1a', '--bg-card': '#2d2d2d', '--bg-input': '#171717', '--accent': '#4a90d9', '--accent-hover': '#3a7bc0', '--text-primary': '#f0f0f0', '--text-secondary': '#b0b0b0', '--text-muted': '#707070', '--border': '#3a3a3a' }
-  },
-  videojuegos: {
-    name: 'Videojuegos', preview: '#00ff88',
-    font: "'Orbitron', monospace",
-    vars: { '--bg-primary': '#0a0e17', '--bg-secondary': '#080c14', '--bg-card': '#131a2a', '--bg-input': '#060a12', '--accent': '#00ff88', '--accent-hover': '#00cc6e', '--text-primary': '#e0ffe8', '--text-secondary': '#80c898', '--text-muted': '#40785a', '--border': '#1a2840' }
+  crimson: {
+    name: 'Carmesi',
+    vars: {
+      '--bg-primary': '#1a0a0a',
+      '--bg-secondary': '#2d1515',
+      '--bg-card': '#3a1c1c',
+      '--bg-input': '#120808',
+      '--text-primary': '#f0d0d0',
+      '--text-muted': '#a07070',
+      '--border': '#4a2525',
+      '--accent': '#dc3545',
+      '--success': '#28a745',
+      '--danger': '#ff4757',
+      '--warning': '#ffc107',
+      '--info': '#17a2b8'
+    }
   }
 };
 
-function applyTheme(themeName) {
-  const theme = THEMES[themeName];
+function applyTheme(themeKey) {
+  const theme = themes[themeKey];
   if (!theme) return;
   const root = document.documentElement;
-  Object.entries(theme.vars).forEach(([k, v]) => root.style.setProperty(k, v));
-  document.body.style.fontFamily = theme.font;
-  saveThemeToStorage({ theme: themeName });
-}
-
-function applyCustomColors(options) {
-  const root = document.documentElement;
-  if (options.font) document.body.style.fontFamily = options.font;
-  if (options.accent) {
-    root.style.setProperty('--accent', options.accent);
-    const r = parseInt(options.accent.slice(1,3),16), g = parseInt(options.accent.slice(3,5),16), b = parseInt(options.accent.slice(5,7),16);
-    root.style.setProperty('--accent-hover', `rgb(${Math.max(0,r-20)},${Math.max(0,g-20)},${Math.max(0,b-20)})`);
+  for (const [prop, val] of Object.entries(theme.vars)) {
+    root.style.setProperty(prop, val);
   }
-  if (options.bg) {
-    root.style.setProperty('--bg-primary', options.bg);
-    const r = parseInt(options.bg.slice(1,3),16), g = parseInt(options.bg.slice(3,5),16), b = parseInt(options.bg.slice(5,7),16);
-    root.style.setProperty('--bg-secondary', `rgb(${Math.max(0,r-4)},${Math.max(0,g-4)},${Math.max(0,b-4)})`);
-  }
-  if (options.text) root.style.setProperty('--text-primary', options.text);
-  saveThemeToStorage({ custom: options });
-}
-
-function applyCustomFromControls() {
-  const font = document.getElementById('custom-font').value;
-  const accent = document.getElementById('custom-accent').value;
-  const bg = document.getElementById('custom-bg').value;
-  const text = document.getElementById('custom-text').value;
-  document.getElementById('custom-accent-text').textContent = accent;
-  document.getElementById('custom-bg-text').textContent = bg;
-  document.getElementById('custom-text-text').textContent = text;
-  applyCustomColors({ font, accent, bg, text });
-}
-
-function resetTheme() {
-  applyTheme('default');
-  if (currentUsername) localStorage.removeItem('panelTheme_' + currentUsername);
-  toast('Tema restablecido', 'success');
-  renderThemeSettings();
-}
-
-function saveThemeToStorage(data) {
-  if (!currentUsername) return;
-  localStorage.setItem('panelTheme_' + currentUsername, JSON.stringify(data));
+  localStorage.setItem('selectedTheme', themeKey);
 }
 
 function loadSavedTheme() {
-  if (!currentUsername) return;
-  const saved = localStorage.getItem('panelTheme_' + currentUsername);
-  if (!saved) return;
-  try {
-    const data = JSON.parse(saved);
-    if (data.theme) applyTheme(data.theme);
-    if (data.custom) {
-      const root = document.documentElement;
-      if (data.custom.font) document.body.style.fontFamily = data.custom.font;
-      if (data.custom.accent) {
-        root.style.setProperty('--accent', data.custom.accent);
-        const r = parseInt(data.custom.accent.slice(1,3),16), g = parseInt(data.custom.accent.slice(3,5),16), b = parseInt(data.custom.accent.slice(5,7),16);
-        root.style.setProperty('--accent-hover', `rgb(${Math.max(0,r-20)},${Math.max(0,g-20)},${Math.max(0,b-20)})`);
-      }
-      if (data.custom.bg) {
-        root.style.setProperty('--bg-primary', data.custom.bg);
-        const r = parseInt(data.custom.bg.slice(1,3),16), g = parseInt(data.custom.bg.slice(3,5),16), b = parseInt(data.custom.bg.slice(5,7),16);
-        root.style.setProperty('--bg-secondary', `rgb(${Math.max(0,r-4)},${Math.max(0,g-4)},${Math.max(0,b-4)})`);
-      }
-      if (data.custom.text) root.style.setProperty('--text-primary', data.custom.text);
-    }
-  } catch (e) {}
+  const saved = localStorage.getItem('selectedTheme');
+  if (saved && themes[saved]) {
+    applyTheme(saved);
+  }
 }
 
 function renderThemeSettings() {
-  const grid = document.getElementById('themes-grid');
-  if (!grid) return;
-  grid.innerHTML = Object.entries(THEMES).map(([key, theme]) => `
-    <div class="theme-card" onclick="applyTheme('${key}')">
-      <div class="theme-preview" style="background:${theme.vars['--bg-primary']}">
-        <div class="theme-preview-accent" style="background:${theme.preview}"></div>
-        <div class="theme-preview-text" style="color:${theme.vars['--text-primary']};font-family:${theme.font}">Aa</div>
+  const container = document.getElementById('theme-options');
+  if (!container) return;
+  const currentTheme = localStorage.getItem('selectedTheme') || 'dark';
+  container.innerHTML = Object.entries(themes).map(([key, theme]) => `
+    <div class="theme-option ${key === currentTheme ? 'active' : ''}" onclick="applyTheme('${key}'); renderThemeSettings();">
+      <div class="theme-preview" style="background:${theme.vars['--bg-primary']};">
+        <div style="width:60%;height:6px;border-radius:3px;background:${theme.vars['--accent']};margin-bottom:4px;"></div>
+        <div style="width:40%;height:6px;border-radius:3px;background:${theme.vars['--text-muted']};"></div>
       </div>
-      <div class="theme-name">${theme.name}</div>
+      <span>${theme.name}</span>
     </div>
   `).join('');
 }
