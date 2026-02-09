@@ -779,19 +779,16 @@ function removeAITypingIndicator() {
   if (typing) typing.remove();
 }
 
-function showAIUsageInChat(usagePercent) {
+function showAIUsageInChat(usagePercent, costThisMessage) {
   const percent = Math.min(usagePercent, 100);
   const remaining = (100 - percent).toFixed(1);
-  let color, barColor;
+  let color;
   if (percent >= 90) {
     color = '#e74c3c';
-    barColor = '#e74c3c';
   } else if (percent >= 70) {
     color = '#f39c12';
-    barColor = '#f39c12';
   } else {
     color = '#2ecc71';
-    barColor = '#2ecc71';
   }
 
   const container = document.getElementById('ai-chat-messages');
@@ -800,21 +797,19 @@ function showAIUsageInChat(usagePercent) {
   let existing = document.getElementById('ai-usage-info');
   if (existing) existing.remove();
 
+  const costText = costThisMessage ? ' (-' + costThisMessage.toFixed(1) + '%)' : '';
+  const warningText = percent >= 90 ? '<br><span style="color:#e74c3c;">Se reinicia a medianoche hora Venezuela</span>' : '';
+
   const div = document.createElement('div');
   div.id = 'ai-usage-info';
-  div.style.cssText = 'padding:8px 14px;margin:8px 16px;background:rgba(88,101,242,0.08);border:1px solid rgba(88,101,242,0.2);border-radius:10px;text-align:center;';
-  div.innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:6px;">
-      <span style="font-size:13px;color:#8892b0;">Uso diario:</span>
-      <span style="font-size:14px;font-weight:700;color:${color};">${percent.toFixed(1)}%</span>
-      <span style="font-size:12px;color:#8892b0;">|</span>
-      <span style="font-size:12px;color:#8892b0;">Disponible: ${remaining}%</span>
-    </div>
-    <div style="width:100%;height:6px;background:rgba(255,255,255,0.1);border-radius:3px;overflow:hidden;">
-      <div style="width:${percent}%;height:100%;border-radius:3px;background:${barColor};transition:width 0.5s ease;"></div>
-    </div>
-    ${percent >= 90 ? '<div style="font-size:11px;color:#e74c3c;margin-top:5px;">Se reinicia a las 12:00 AM hora Venezuela</div>' : ''}
-  `;
+  div.style.cssText = 'text-align:center;padding:6px 12px;margin:4px auto;max-width:320px;';
+  div.innerHTML = '<div style="font-size:11px;color:#8892b0;">' +
+    '<span style="color:' + color + ';font-weight:700;">&#9889; ' + percent.toFixed(1) + '% usado</span>' + costText +
+    ' | Disponible: ' + remaining + '%' +
+    '<div style="width:100%;height:4px;background:rgba(255,255,255,0.1);border-radius:2px;overflow:hidden;margin-top:4px;">' +
+    '<div style="width:' + percent + '%;height:100%;border-radius:2px;background:' + color + ';"></div>' +
+    '</div>' + warningText + '</div>';
+
   container.appendChild(div);
   container.scrollTop = container.scrollHeight;
 }
@@ -880,7 +875,7 @@ async function sendAIMessage() {
     addAIMessage('assistant', data.response);
 
     if (data.usage) {
-      showAIUsageInChat(data.usage.currentPercent);
+      showAIUsageInChat(data.usage.currentPercent, data.usage.costThisMessage);
     }
   } catch (e) {
     removeAITypingIndicator();
