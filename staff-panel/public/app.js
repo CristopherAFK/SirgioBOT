@@ -872,11 +872,14 @@ async function sendAIMessage() {
       aiConversationId = data.conversationId;
     }
 
-    addAIMessage('assistant', data.response);
-
+    let responseText = data.response;
     if (data.usage) {
-      showAIUsageInChat(data.usage.currentPercent, data.usage.costThisMessage);
+      const pct = data.usage.currentPercent;
+      const cost = data.usage.costThisMessage;
+      const rem = data.usage.remaining;
+      responseText += '\n\n---\n*Uso diario: **' + pct + '%** usado (-' + cost + '%) | Disponible: ' + rem + '%*';
     }
+    addAIMessage('assistant', responseText);
   } catch (e) {
     removeAITypingIndicator();
     toast('Error del asistente: ' + e.message, 'error');
