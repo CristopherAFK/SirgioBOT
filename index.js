@@ -25,6 +25,10 @@ const client = new Client({
   partials: [Partials.Channel, Partials.Message, Partials.Reaction, Partials.User]
 });
 
+// Exportar cliente para que otros módulos lo usen si es necesario
+// o guardar la instancia de notificaciones
+let notificationSystem;
+
 setupStaffPanel(app, client);
 
 const MAX_RETRIES = 5;
@@ -108,7 +112,10 @@ client.once("ready", async () => {
 
   for (const modulePath of modules) {
     try {
-      require(modulePath)(client);
+      const moduleInstance = require(modulePath)(client);
+      if (modulePath === './notificaciones') {
+        client.notificationSystem = moduleInstance;
+      }
       console.log(`✅ Módulo cargado: ${modulePath}`);
     } catch (err) {
       console.error(`⚠️ Error cargando módulo ${modulePath}:`, err.message);

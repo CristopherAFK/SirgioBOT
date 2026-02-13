@@ -49,7 +49,20 @@ module.exports = (client) => {
         
         new SlashCommandBuilder()
           .setName('membercount')
-          .setDescription('Muestra el conteo de miembros del servidor')
+          .setDescription('Muestra el conteo de miembros del servidor'),
+        
+        new SlashCommandBuilder()
+          .setName('notif-manual')
+          .setDescription('Notifica manualmente un video reciente (Solo Staff)')
+          .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
+          .addStringOption(option =>
+            option.setName('canal')
+              .setDescription('Selecciona el canal')
+              .setRequired(true)
+              .addChoices(
+                { name: 'Sirgio_o', value: 'Sirgio_o' },
+                { name: 'Sirgiotv', value: 'Sirgiotv' }
+              ))
       ];
 
       for (const command of commands) {
@@ -217,6 +230,32 @@ module.exports = (client) => {
             .setTimestamp();
 
           return interaction.reply({ embeds: [embed] });
+        }
+
+        case 'notif-manual': {
+          if (!client.notificationSystem) {
+            return interaction.reply({ content: '❌ El sistema de notificaciones no está inicializado.', ephemeral: true });
+          }
+
+          const canalNombre = interaction.options.getString('canal');
+          const canal = client.notificationSystem.canalesConfigurados.find(c => c.nombre === canalNombre);
+
+          if (!canal) {
+            return interaction.reply({ content: '❌ Canal no configurado.', ephemeral: true });
+          }
+
+          await interaction.deferReply({ ephemeral: true });
+
+          const videos = await client.notificationSystem.getRecentVideos(canal);
+          if (videos.length === 0) {
+            return interaction.editReply({ content: '❌ No se encontraron videos recientes.' });
+          }
+
+          // Crear botones o un menú sería mejor, pero por simplicidad usaremos el más reciente de los 3
+          // o podrías elegir uno. Vamos a enviar el primero (más reciente).
+          await client.notificationSystem.sendNotification(videos[0]);
+
+          return interaction.editReply({ content: `✅ Notificación enviada manualmente para el video: **${videos[0].titulo}**` });
         }
       }
     } catch (error) {

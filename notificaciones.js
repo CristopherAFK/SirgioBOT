@@ -153,6 +153,31 @@ module.exports = (client) => {
     }
   }
 
+  // Nueva función para obtener los últimos 3 videos de un canal
+  async function getRecentVideos(canal) {
+    if (!canal.channelId) return [];
+
+    try {
+      const feedUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${canal.channelId}`;
+      const feed = await parser.parseURL(feedUrl);
+
+      if (feed.items && feed.items.length > 0) {
+        return feed.items.slice(0, 3).map(item => ({
+          canal: canal.nombre,
+          mensaje: canal.mensaje,
+          titulo: item.title,
+          url: item.link,
+          thumbnail: `https://i.ytimg.com/vi/${item.id.replace('yt:video:', '')}/maxresdefault.jpg`,
+          autor: item.author
+        }));
+      }
+      return [];
+    } catch (err) {
+      console.error(`Error obteniendo videos recientes para ${canal.nombre}:`, err.message);
+      return [];
+    }
+  }
+
   client.once('ready', () => {
     console.log('📢 Sistema de notificaciones de YouTube iniciado');
     console.log(`   Canal de notificaciones: ${NOTIFICATION_CHANNEL_ID}`);
@@ -166,6 +191,9 @@ module.exports = (client) => {
   });
 
   return {
-    checkAllChannels
+    checkAllChannels,
+    sendNotification,
+    getRecentVideos,
+    canalesConfigurados
   };
 };
