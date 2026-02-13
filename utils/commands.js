@@ -12,8 +12,13 @@ module.exports = (client) => {
 
     try {
       const guild = client.guilds.cache.get(GUILD_ID);
-      if (!guild) return;
+      if (!guild) {
+        console.error(`❌ No se encontró el servidor con ID: ${GUILD_ID}`);
+        return;
+      }
 
+      console.log('🔄 Sincronizando comandos con Discord...');
+      
       const commands = [
         new SlashCommandBuilder()
           .setName('userinfo')
@@ -65,14 +70,10 @@ module.exports = (client) => {
               ))
       ];
 
-      for (const command of commands) {
-        const existing = (await guild.commands.fetch()).find(c => c.name === command.name);
-        if (!existing) {
-          await guild.commands.create(command);
-        }
-      }
+      // Sincronización completa: elimina duplicados y comandos antiguos, y registra los nuevos
+      await guild.commands.set(commands);
       
-      console.log('🟢 Comandos de utilidad registrados');
+      console.log('🟢 Comandos de utilidad sincronizados y registrados correctamente');
     } catch (error) {
       console.error('Error registrando comandos de utilidad:', error);
     }
