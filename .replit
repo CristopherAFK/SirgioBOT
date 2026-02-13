@@ -43,3 +43,4 @@ externalPort = 80
 
 [userenv.shared]
 GIT_URL = "https://CristopherAFK:${GITHUB_TOKEN}@github.com/CristopherAFK/SirgioBOT.git"
+GUILD_ID = "1212886282645147768"

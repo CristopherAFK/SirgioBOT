@@ -4,7 +4,7 @@ const {
   PermissionFlagsBits
 } = require('discord.js');
 
-const GUILD_ID = '1212886282645147768';
+const GUILD_ID = process.env.GUILD_ID || '1212886282645147768';
 
 module.exports = (client) => {
     client.once('ready', async () => {
