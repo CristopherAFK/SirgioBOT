@@ -60,12 +60,18 @@ module.exports = (client) => {
 
     try {
       const feedUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${canal.channelId}`;
-      const feed = await parser.parseURL(feedUrl);
+      console.log(`📡 Consultando feed para ${canal.nombre}: ${feedUrl}`);
+      const feed = await parser.parseURL(feedUrl).catch(e => {
+        console.error(`❌ Error en parser.parseURL para ${canal.nombre}:`, e.message);
+        throw e;
+      });
 
       if (feed.items && feed.items.length > 0) {
         const latestVideo = feed.items[0];
         const videoId = latestVideo.id.replace('yt:video:', '');
         const canalKey = canal.nombre;
+
+        console.log(`🎬 Último video detectado para ${canal.nombre}: "${latestVideo.title}" (ID: ${videoId})`);
 
         if (!data.lastVideos[canalKey]) {
           data.lastVideos[canalKey] = videoId;
@@ -75,6 +81,7 @@ module.exports = (client) => {
         }
 
         if (data.lastVideos[canalKey] !== videoId) {
+          console.log(`🔔 ¡Nuevo video detectado! ${data.lastVideos[canalKey]} -> ${videoId}`);
           data.lastVideos[canalKey] = videoId;
           saveData();
 
@@ -86,21 +93,30 @@ module.exports = (client) => {
             thumbnail: `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`,
             autor: latestVideo.author
           };
+        } else {
+          console.log(`ℹ️ No hay videos nuevos para ${canal.nombre} (ID actual: ${videoId})`);
         }
+      } else {
+        console.warn(`⚠️ El feed de ${canal.nombre} no contiene items.`);
       }
 
       return null;
     } catch (err) {
-      console.error(`Error verificando YouTube para ${canal.nombre}:`, err.message);
+      console.error(`❌ Error crítico verificando YouTube para ${canal.nombre}:`, err.stack || err.message);
       return null;
     }
   }
 
   async function sendNotification(videoData) {
     try {
-      const channel = await client.channels.fetch(NOTIFICATION_CHANNEL_ID);
+      console.log(`📤 Intentando enviar notificación al canal ${NOTIFICATION_CHANNEL_ID}...`);
+      const channel = await client.channels.fetch(NOTIFICATION_CHANNEL_ID).catch(e => {
+        console.error(`❌ Error fetching channel ${NOTIFICATION_CHANNEL_ID}:`, e.message);
+        return null;
+      });
+
       if (!channel) {
-        console.error('Canal de notificaciones no encontrado:', NOTIFICATION_CHANNEL_ID);
+        console.error('❌ Canal de notificaciones no encontrado o sin acceso:', NOTIFICATION_CHANNEL_ID);
         return;
       }
 
@@ -114,12 +130,15 @@ module.exports = (client) => {
       await channel.send({ 
         content: `<@&${ROLE_TO_MENTION}>\n${videoData.mensaje}\n${videoData.url}`,
         embeds: [embed] 
+      }).catch(e => {
+        console.error(`❌ Error al enviar mensaje al canal:`, e.message);
+        throw e;
       });
       
-      console.log(`📢 Notificación enviada: ${videoData.canal} - ${videoData.titulo}`);
+      console.log(`✅ Notificación enviada con éxito: ${videoData.canal} - ${videoData.titulo}`);
 
     } catch (err) {
-      console.error('Error enviando notificación:', err);
+      console.error('❌ Error enviando notificación:', err.stack || err.message);
     }
   }
 
