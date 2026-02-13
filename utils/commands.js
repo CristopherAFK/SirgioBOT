@@ -19,6 +19,10 @@ module.exports = (client) => {
 
       console.log('🔄 Sincronizando comandos con Discord...');
       
+      // Eliminar comandos globales previos para evitar duplicados si el bot se movió de global a servidor
+      await client.application.commands.set([]);
+      console.log('🗑️ Comandos globales eliminados (para evitar duplicados)');
+
       const commands = [
         new SlashCommandBuilder()
           .setName('userinfo')
