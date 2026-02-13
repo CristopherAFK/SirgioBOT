@@ -7,21 +7,31 @@ const {
 const GUILD_ID = '1212886282645147768';
 
 module.exports = (client) => {
-  client.once('ready', async () => {
+    client.once('ready', async () => {
     console.log('✅ Comandos de utilidad cargados');
 
     try {
-      const guild = client.guilds.cache.get(GUILD_ID);
+      // Intentar obtener el servidor desde la caché o fetch
+      let guild = client.guilds.cache.get(GUILD_ID);
       if (!guild) {
-        console.error(`❌ No se encontró el servidor con ID: ${GUILD_ID}`);
+        console.log(`🔍 Servidor ${GUILD_ID} no encontrado en caché, intentando fetch...`);
+        guild = await client.guilds.fetch(GUILD_ID).catch(() => null);
+      }
+
+      if (!guild) {
+        console.error(`❌ No se encontró el servidor con ID: ${GUILD_ID}. Asegúrate de que el bot esté en el servidor y el ID sea correcto.`);
+        // Si no hay servidor específico, registrar como globales para asegurar que aparezcan
+        console.log('⚠️ Registrando comandos como GLOBALES ante la falta de servidor específico...');
+        await client.application.commands.set(commands_list);
+        console.log('🟢 Comandos registrados como GLOBALES');
         return;
       }
 
-      console.log('🔄 Sincronizando comandos con Discord...');
+      console.log(`🔄 Sincronizando comandos con el servidor: ${guild.name} (${GUILD_ID})...`);
       
-      // Eliminar comandos globales previos para evitar duplicados si el bot se movió de global a servidor
+      // Limpiar comandos globales para evitar duplicados
       await client.application.commands.set([]);
-      console.log('🗑️ Comandos globales eliminados (para evitar duplicados)');
+      console.log('🗑️ Comandos globales limpiados');
 
       const commands = [
         new SlashCommandBuilder()
@@ -77,11 +87,66 @@ module.exports = (client) => {
       // Sincronización completa: elimina duplicados y comandos antiguos, y registra los nuevos
       await guild.commands.set(commands);
       
+      // OPCIONAL: Registrar también como globales para mayor redundancia si el usuario lo prefiere
+      // await client.application.commands.set(commands);
+      
       console.log('🟢 Comandos de utilidad sincronizados y registrados correctamente');
     } catch (error) {
       console.error('Error registrando comandos de utilidad:', error);
     }
   });
+
+  // Definir la lista de comandos fuera para poder usarla en fallback global
+  const commands_list = [
+        new SlashCommandBuilder()
+          .setName('userinfo')
+          .setDescription('Muestra información de un usuario')
+          .addUserOption(option => 
+            option.setName('usuario')
+              .setDescription('Usuario a consultar (opcional)')
+              .setRequired(false)),
+        
+        new SlashCommandBuilder()
+          .setName('serverinfo')
+          .setDescription('Muestra información del servidor'),
+        
+        new SlashCommandBuilder()
+          .setName('avatar')
+          .setDescription('Muestra el avatar de un usuario')
+          .addUserOption(option => 
+            option.setName('usuario')
+              .setDescription('Usuario a consultar (opcional)')
+              .setRequired(false)),
+        
+        new SlashCommandBuilder()
+          .setName('banner')
+          .setDescription('Muestra el banner de un usuario')
+          .addUserOption(option => 
+            option.setName('usuario')
+              .setDescription('Usuario a consultar (opcional)')
+              .setRequired(false)),
+        
+        new SlashCommandBuilder()
+          .setName('ping')
+          .setDescription('Muestra la latencia del bot'),
+        
+        new SlashCommandBuilder()
+          .setName('membercount')
+          .setDescription('Muestra el conteo de miembros del servidor'),
+        
+        new SlashCommandBuilder()
+          .setName('notif-manual')
+          .setDescription('Notifica manualmente un video reciente (Solo Staff)')
+          .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
+          .addStringOption(option =>
+            option.setName('canal')
+              .setDescription('Selecciona el canal')
+              .setRequired(true)
+              .addChoices(
+                { name: 'Sirgio_o', value: 'Sirgio_o' },
+                { name: 'Sirgiotv', value: 'Sirgiotv' }
+              ))
+      ];
 
   client.on('interactionCreate', async (interaction) => {
     if (!interaction.isChatInputCommand()) return;
