@@ -24,12 +24,11 @@ name = "Discord Bot"
 author = "agent"
 
 [workflows.workflow.metadata]
-outputType = "webview"
+outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "node index.js"
-waitForPort = 5000
 
 [[ports]]
 localPort = 3000
