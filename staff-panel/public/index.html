@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Staff Panel - SirgioBOT</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600;700&family=Orbitron:wght@400;600;700&family=Inter:wght@400;600;700&family=Roboto:wght@400;600;700&family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+</head>
+<body>
+  <div id="login-page" class="login-container">
+    <div class="login-box">
+      <h1>Staff Panel</h1>
+      <p>SirgioBOT - Panel de Moderacion</p>
+      <div class="form-group">
+        <label>Usuario</label>
+        <input type="text" id="login-username" placeholder="Ingresa tu usuario" autocomplete="username">
+      </div>
+      <div class="form-group">
+        <label>Contraseña</label>
+        <input type="password" id="login-password" placeholder="Ingresa tu contraseña" autocomplete="current-password">
+      </div>
+      <button class="btn btn-primary btn-full" onclick="login()">Iniciar Sesion</button>
+      <script>
+        document.getElementById('login-password').addEventListener('keydown', function(e) { if (e.key === 'Enter') login(); });
+        document.getElementById('login-username').addEventListener('keydown', function(e) { if (e.key === 'Enter') document.getElementById('login-password').focus(); });
+      </script>
+    </div>
+  </div>
+
+  <div id="app-page" class="app-container" style="display:none">
+    <button class="mobile-toggle" onclick="toggleSidebar()">&#9776;</button>
+
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <h2>Staff Panel</h2>
+        <div class="bot-status" id="bot-status">Conectando...</div>
+      </div>
+      <nav class="sidebar-nav">
+        <div class="nav-category">
+          <div class="nav-category-title">General</div>
+          <div class="nav-item active" data-page="dashboard" onclick="navigateTo('dashboard')">
+            <span class="icon">&#128202;</span> Dashboard
+          </div>
+          <div class="nav-item" data-page="logs" onclick="navigateTo('logs')">
+            <span class="icon">&#128220;</span> Audit Logs
+          </div>
+          <div class="nav-item" data-page="notes" onclick="navigateTo('notes')">
+            <span class="icon">&#128221;</span> Notas Internas
+          </div>
+        </div>
+        <div class="nav-category">
+          <div class="nav-category-title">Moderacion</div>
+          <div class="nav-item" data-page="moderation" onclick="navigateTo('moderation')">
+            <span class="icon">&#128737;</span> Herramientas
+          </div>
+        </div>
+        <div class="nav-category">
+          <div class="nav-category-title">Canales</div>
+          <div class="nav-item" data-page="channels" onclick="navigateTo('channels')">
+            <span class="icon">&#127968;</span> Gestion de Canales
+          </div>
+        </div>
+        <div class="nav-category">
+          <div class="nav-category-title">Comunicacion</div>
+          <div class="nav-item" data-page="communication" onclick="navigateTo('communication')">
+            <span class="icon">&#128172;</span> Mensajes
+          </div>
+        </div>
+        <div class="nav-category">
+          <div class="nav-category-title">Administracion</div>
+          <div class="nav-item" data-page="admin" onclick="navigateTo('admin')">
+            <span class="icon">&#9881;</span> Admin Tools
+          </div>
+        </div>
+        <div class="nav-category">
+          <div class="nav-category-title">Informacion</div>
+          <div class="nav-item" data-page="info" onclick="navigateTo('info')">
+            <span class="icon">&#8505;</span> Consultas
+          </div>
+        </div>
+        <div class="nav-category">
+          <div class="nav-category-title">Asistente</div>
+          <div class="nav-item" data-page="ai-assistant" onclick="navigateTo('ai-assistant')">
+            <span class="icon">&#129302;</span> Asistente IA
+          </div>
+        </div>
+        <div class="nav-category">
+          <div class="nav-category-title">Ajustes</div>
+          <div class="nav-item" data-page="settings" onclick="navigateTo('settings')">
+            <span class="icon">&#127912;</span> Personalizar
+          </div>
+        </div>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="user-info">
+          <img id="user-avatar" class="user-avatar" src="" alt="" style="display:none">
+          <span class="username-display" id="username-display">-</span>
+          <span class="role-badge" id="role-badge">-</span>
+          <button class="btn btn-sm btn-danger" onclick="logout()">Salir</button>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <!-- Dashboard -->
+      <div id="page-dashboard" class="page active">
+        <div class="page-header">
+          <h1>Dashboard</h1>
+          <p>Vista general del servidor</p>
+        </div>
+        <div class="stats-grid" id="stats-grid"></div>
+        <div class="card">
+          <div class="card-header">&#128220; Actividad Reciente</div>
+          <div class="card-body" id="recent-logs"></div>
+        </div>
+      </div>
+
+      <!-- Moderation -->
+      <div id="page-moderation" class="page" style="display:none">
+        <div class="page-header">
+          <h1>Moderacion</h1>
+          <p>Herramientas de moderacion basica</p>
+        </div>
+        <div class="tools-grid">
+          <div class="tool-btn" data-action="warn" onclick="openTool('warn')">
+            <span class="tool-icon">&#9888;</span>
+            <span class="tool-name">Warn</span>
+            <span class="tool-desc">Advertir usuario</span>
+          </div>
+          <div class="tool-btn" data-action="mute" onclick="openTool('mute')">
+            <span class="tool-icon">&#128263;</span>
+            <span class="tool-name">Mute</span>
+            <span class="tool-desc">Silenciar usuario</span>
+          </div>
+          <div class="tool-btn" data-action="unmute" onclick="openTool('unmute')">
+            <span class="tool-icon">&#128266;</span>
+            <span class="tool-name">Unmute</span>
+            <span class="tool-desc">Quitar silencio</span>
+          </div>
+          <div class="tool-btn" data-action="ban" onclick="openTool('ban')">
+            <span class="tool-icon">&#128296;</span>
+            <span class="tool-name">Ban</span>
+            <span class="tool-desc">Banear usuario</span>
+          </div>
+          <div class="tool-btn" data-action="timeout" onclick="openTool('timeout')">
+            <span class="tool-icon">&#9203;</span>
+            <span class="tool-name">Timeout</span>
+            <span class="tool-desc">Timeout temporal</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Channels -->
+      <div id="page-channels" class="page" style="display:none">
+        <div class="page-header">
+          <h1>Gestion de Canales</h1>
+          <p>Administra los canales del servidor</p>
+        </div>
+        <div class="tools-grid">
+          <div class="tool-btn" data-action="lock_channel" onclick="openTool('lock_channel')">
+            <span class="tool-icon">&#128274;</span>
+            <span class="tool-name">Lock Channel</span>
+            <span class="tool-desc">Bloquear canal</span>
+          </div>
+          <div class="tool-btn" data-action="unlock_channel" onclick="openTool('unlock_channel')">
+            <span class="tool-icon">&#128275;</span>
+            <span class="tool-name">Unlock Channel</span>
+            <span class="tool-desc">Desbloquear canal</span>
+          </div>
+          <div class="tool-btn" data-action="nuke_channel" onclick="openTool('nuke_channel')">
+            <span class="tool-icon">&#128165;</span>
+            <span class="tool-name">Nuke Channel</span>
+            <span class="tool-desc">Recrear canal</span>
+          </div>
+          <div class="tool-btn" data-action="clear_messages" onclick="openTool('clear_messages')">
+            <span class="tool-icon">&#129529;</span>
+            <span class="tool-name">Clear Messages</span>
+            <span class="tool-desc">Borrar mensajes</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Communication -->
+      <div id="page-communication" class="page" style="display:none">
+        <div class="page-header">
+          <h1>Comunicacion</h1>
+          <p>Enviar mensajes y embeds</p>
+        </div>
+        <div class="tools-grid">
+          <div class="tool-btn" data-action="send_embed" onclick="openTool('send_embed')">
+            <span class="tool-icon">&#128226;</span>
+            <span class="tool-name">Send Embed</span>
+            <span class="tool-desc">Enviar embed</span>
+          </div>
+          <div class="tool-btn" data-action="send_dm" onclick="openTool('send_dm')">
+            <span class="tool-icon">&#128232;</span>
+            <span class="tool-name">Send DM</span>
+            <span class="tool-desc">Mensaje privado</span>
+          </div>
+          <div class="tool-btn" data-action="edit_message" onclick="openTool('edit_message')">
+            <span class="tool-icon">&#128221;</span>
+            <span class="tool-name">Edit Message</span>
+            <span class="tool-desc">Editar mensaje</span>
+          </div>
+          <div class="tool-btn" data-action="block_links" onclick="openTool('block_links')">
+            <span class="tool-icon">&#128279;</span>
+            <span class="tool-name">Block Links</span>
+            <span class="tool-desc">Bloquear enlaces</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Admin -->
+      <div id="page-admin" class="page" style="display:none">
+        <div class="page-header">
+          <h1>Administracion</h1>
+          <p>Herramientas avanzadas</p>
+        </div>
+        <div class="tools-grid">
+          <div class="tool-btn" data-action="quarantine" onclick="openTool('quarantine')">
+            <span class="tool-icon">&#127973;</span>
+            <span class="tool-name">Quarantine</span>
+            <span class="tool-desc">Aislar usuario</span>
+          </div>
+          <div class="tool-btn" data-action="reduce_warn" onclick="openTool('reduce_warn')">
+            <span class="tool-icon">&#10134;</span>
+            <span class="tool-name">Reduce Warn</span>
+            <span class="tool-desc">Reducir warns</span>
+          </div>
+          <div class="tool-btn" data-action="view_history" onclick="openTool('view_history')">
+            <span class="tool-icon">&#128202;</span>
+            <span class="tool-name">View History</span>
+            <span class="tool-desc">Historial de sanciones</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Info -->
+      <div id="page-info" class="page" style="display:none">
+        <div class="page-header">
+          <h1>Informacion</h1>
+          <p>Consultar datos del servidor</p>
+        </div>
+        <div class="tools-grid">
+          <div class="tool-btn" data-action="server_info" onclick="openTool('server_info')">
+            <span class="tool-icon">&#128203;</span>
+            <span class="tool-name">Server Info</span>
+            <span class="tool-desc">Info del servidor</span>
+          </div>
+          <div class="tool-btn" data-action="user_info" onclick="openTool('user_info')">
+            <span class="tool-icon">&#128100;</span>
+            <span class="tool-name">User Info</span>
+            <span class="tool-desc">Info de usuario</span>
+          </div>
+          <div class="tool-btn" data-action="role_info" onclick="openTool('role_info')">
+            <span class="tool-icon">&#127917;</span>
+            <span class="tool-name">Role Info</span>
+            <span class="tool-desc">Info de rol</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Logs -->
+      <div id="page-logs" class="page" style="display:none">
+        <div class="page-header">
+          <h1>Audit Logs</h1>
+          <p>Registro de todas las acciones</p>
+        </div>
+        <div class="card">
+          <div class="card-body" id="all-logs"></div>
+        </div>
+      </div>
+
+      <!-- Notes -->
+      <div id="page-notes" class="page" style="display:none">
+        <div class="page-header">
+          <h1>Notas Internas</h1>
+          <p>Notas privadas del staff sobre usuarios</p>
+        </div>
+        <div class="card">
+          <div class="card-body">
+            <div class="form-group search-input">
+              <input type="text" id="notes-user" placeholder="Buscar usuario..." oninput="searchUsers('notes-user')">
+              <input type="hidden" id="notes-user_id">
+              <input type="hidden" id="notes-user_tag">
+              <div class="search-results" id="notes-user_results"></div>
+            </div>
+            <button class="btn btn-primary" onclick="loadNotes()" style="margin-top:8px">Cargar Notas</button>
+          </div>
+        </div>
+        <div id="notes-container"></div>
+        <div id="notes-form" style="display:none">
+          <div class="card" style="margin-top:16px">
+            <div class="card-header">&#128221; Nueva Nota</div>
+            <div class="card-body">
+              <div class="form-group">
+                <label>Contenido</label>
+                <textarea id="note-content" placeholder="Escribe tu nota sobre este usuario..."></textarea>
+              </div>
+              <button class="btn btn-success" onclick="createNote()">Guardar Nota</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI Assistant -->
+      <div id="page-ai-assistant" class="page" style="display:none">
+        <div class="page-header">
+          <h1>Asistente IA</h1>
+          <p>Consulta sobre reglas, sanciones y moderacion</p>
+        </div>
+        <div class="ai-chat-container">
+          <div class="ai-chat-messages" id="ai-chat-messages">
+            <div class="ai-welcome-message">
+              <div class="ai-welcome-icon">&#129302;</div>
+              <h3>Hola, soy el Asistente de Moderacion</h3>
+              <p>Puedo ayudarte con:</p>
+              <div class="ai-suggestions">
+                <button class="ai-suggestion-btn" onclick="sendAISuggestion('Un usuario esta haciendo spam en el chat general, que hago?')">Un usuario hace spam</button>
+                <button class="ai-suggestion-btn" onclick="sendAISuggestion('Que sancion aplico si alguien envia contenido NSFW?')">Contenido NSFW</button>
+                <button class="ai-suggestion-btn" onclick="sendAISuggestion('Explicame la regla 7 sobre multicuentas')">Regla de multicuentas</button>
+                <button class="ai-suggestion-btn" onclick="sendAISuggestion('Un usuario tiene 5 warns, que deberia pasar?')">Escalacion de warns</button>
+              </div>
+            </div>
+          </div>
+          <div class="ai-chat-input-area">
+            <button class="ai-clear-btn" onclick="clearAIChat()" title="Nueva conversacion">&#128260;</button>
+            <div class="ai-input-wrapper">
+              <textarea id="ai-chat-input" placeholder="Describe la situacion o pregunta sobre las reglas..." rows="1" onkeydown="handleAIChatKeydown(event)" oninput="autoResizeTextarea(this)"></textarea>
+            </div>
+            <button class="ai-send-btn" id="ai-send-btn" onclick="sendAIMessage()">&#10148;</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Settings -->
+      <div id="page-settings" class="page" style="display:none">
+        <div class="page-header">
+          <h1>Personalizar</h1>
+          <p>Cambia la apariencia del panel</p>
+        </div>
+        <div class="card">
+          <div class="card-header">&#127912; Temas Predefinidos</div>
+          <div class="card-body">
+            <div class="themes-grid" id="themes-grid"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">&#9998; Personalizacion Avanzada</div>
+          <div class="card-body">
+            <div class="custom-theme-controls">
+              <div class="form-group">
+                <label>Fuente</label>
+                <select id="custom-font" onchange="applyCustomFromControls()" style="width:100%;padding:10px 14px;background:var(--bg-input);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);font-size:14px;">
+                  <option value="'Segoe UI', system-ui, -apple-system, sans-serif">Segoe UI</option>
+                  <option value="'Inter', system-ui, sans-serif">Inter</option>
+                  <option value="Georgia, serif">Georgia</option>
+                  <option value="'Quicksand', sans-serif">Quicksand</option>
+                  <option value="'Comic Sans MS', 'Chalkboard SE', cursive">Comic Sans MS</option>
+                  <option value="'Orbitron', monospace">Orbitron</option>
+                  <option value="'Roboto', sans-serif">Roboto</option>
+                  <option value="'Montserrat', sans-serif">Montserrat</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Color de Botones (Accent)</label>
+                <div class="color-picker-wrapper">
+                  <input type="color" id="custom-accent" value="#5865f2" onchange="applyCustomFromControls()">
+                  <span id="custom-accent-text">#5865f2</span>
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Color de Fondo</label>
+                <div class="color-picker-wrapper">
+                  <input type="color" id="custom-bg" value="#1a1a2e" onchange="applyCustomFromControls()">
+                  <span id="custom-bg-text">#1a1a2e</span>
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Color de Texto</label>
+                <div class="color-picker-wrapper">
+                  <input type="color" id="custom-text" value="#ffffff" onchange="applyCustomFromControls()">
+                  <span id="custom-text-text">#ffffff</span>
+                </div>
+              </div>
+            </div>
+            <button class="btn btn-warning" onclick="resetTheme()" style="margin-top:16px">Restablecer</button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div class="modal-overlay" id="modal-overlay">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="modal-title">Accion</h3>
+        <button class="modal-close" onclick="closeModal()">&times;</button>
+      </div>
+      <div class="modal-body" id="modal-body"></div>
+      <div class="modal-footer" id="modal-footer"></div>
+    </div>
+  </div>
+
+  <div class="toast-container" id="toast-container"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

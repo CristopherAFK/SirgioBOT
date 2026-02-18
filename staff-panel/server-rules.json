@@ -1,0 +1,165 @@
+{
+  "serverName": "LagSupport",
+  "rules": [
+    {
+      "number": 1,
+      "title": "Respeto ante todo",
+      "description": "Nada de insultos graves, acoso, amenazas o peleas. Bromea, pero no cruces la linea.",
+      "severity": "alta",
+      "sanctions": {
+        "first": "warn",
+        "second": "mute 30m",
+        "third": "mute 2h",
+        "severe": "ban"
+      }
+    },
+    {
+      "number": 2,
+      "title": "Lenguaje normal",
+      "description": "Las palabrotas leves pasan. Ofender fuerte o buscar bronca, no.",
+      "severity": "media",
+      "sanctions": {
+        "first": "warn",
+        "second": "mute 15m",
+        "third": "mute 1h"
+      }
+    },
+    {
+      "number": 3,
+      "title": "Cero contenido NSFW",
+      "description": "Nada sexual, porno ni cosas raras. Incluye bromas o referencias a CP. Eso es ban directo.",
+      "severity": "critica",
+      "sanctions": {
+        "first": "ban directo"
+      }
+    },
+    {
+      "number": 4,
+      "title": "No spam",
+      "description": "Nada de mensajes repetidos, flood, farm de niveles o sonidos molestos en llamadas.",
+      "severity": "media",
+      "sanctions": {
+        "first": "warn",
+        "second": "mute 15m",
+        "third": "mute 1h"
+      }
+    },
+    {
+      "number": 5,
+      "title": "Sin publicidad",
+      "description": "No promos externas ni links random. Solo en canales permitidos y con contexto.",
+      "severity": "media",
+      "sanctions": {
+        "first": "warn",
+        "second": "mute 30m",
+        "third": "ban"
+      }
+    },
+    {
+      "number": 6,
+      "title": "Privacidad y seguridad",
+      "description": "No dox, no amenazas, no grabar llamadas sin permiso, no filtrar datos personales.",
+      "severity": "critica",
+      "sanctions": {
+        "first": "ban directo"
+      }
+    },
+    {
+      "number": 7,
+      "title": "Nada de multicuentas o suplantacion",
+      "description": "Una cuenta por persona. No te hagas pasar por otros ni por staff.",
+      "severity": "alta",
+      "sanctions": {
+        "first": "ban de la cuenta extra",
+        "second": "ban de ambas cuentas"
+      }
+    },
+    {
+      "number": 8,
+      "title": "Usa bien los canales",
+      "description": "Cada cosa en su lugar. Memes en memes, comandos donde toca. Simple.",
+      "severity": "baja",
+      "sanctions": {
+        "first": "aviso verbal",
+        "second": "warn",
+        "third": "mute 10m"
+      }
+    },
+    {
+      "number": 9,
+      "title": "Menciones con cabeza",
+      "description": "No ping a everyone, here, staff ni a sirgio sin razon real.",
+      "severity": "baja",
+      "sanctions": {
+        "first": "aviso verbal",
+        "second": "warn",
+        "third": "mute 15m"
+      }
+    },
+    {
+      "number": 10,
+      "title": "Staff = personas",
+      "description": "Respeta al staff. Si hay un problema, se habla por tickets, no a gritos.",
+      "severity": "media",
+      "sanctions": {
+        "first": "warn",
+        "second": "mute 30m",
+        "third": "mute 2h"
+      }
+    }
+  ],
+  "sanctionCategories": [
+    { "value": "flood", "label": "Flood", "relatedRules": [4] },
+    { "value": "spam", "label": "Spam", "relatedRules": [4] },
+    { "value": "wall_of_text", "label": "Wall of Text", "relatedRules": [4] },
+    { "value": "bypass_automod", "label": "Bypass de AutoMod", "relatedRules": [2, 3] },
+    { "value": "vacio_legal", "label": "Vacio legal", "relatedRules": [] },
+    { "value": "romper_norma", "label": "Romper Norma", "relatedRules": [] },
+    { "value": "hacks_eventos", "label": "Hacks en eventos", "relatedRules": [] },
+    { "value": "bypass_palabras", "label": "Bypass de palabras prohibidas", "relatedRules": [2, 3] },
+    { "value": "canal_incorrecto", "label": "Uso de canales incorrecto", "relatedRules": [8] },
+    { "value": "mencion_cp", "label": "Mencion de CP", "relatedRules": [3] },
+    { "value": "publicidad", "label": "Hacer publicidad", "relatedRules": [5] },
+    { "value": "perfil_inapropiado", "label": "Perfil inapropiado/comprometido", "relatedRules": [3] },
+    { "value": "nsfw", "label": "Contenido NSFW", "relatedRules": [3] },
+    { "value": "amenazas", "label": "Amenazas", "relatedRules": [1, 6] },
+    { "value": "dox", "label": "Dox / Filtrar datos", "relatedRules": [6] },
+    { "value": "multicuenta", "label": "Multicuenta", "relatedRules": [7] },
+    { "value": "suplantacion", "label": "Suplantacion de identidad", "relatedRules": [7] }
+  ],
+  "escalationGuidelines": {
+    "warnThresholds": {
+      "3_warns": "Mute automatico de 10 minutos",
+      "5_warns": "Mute de 1 hora",
+      "7_warns": "Mute de 24 horas",
+      "10_warns": "Considerar ban temporal o permanente"
+    },
+    "generalPrinciples": [
+      "Siempre avisar antes de sancionar cuando sea posible (excepto casos criticos)",
+      "Documentar la razon de cada sancion",
+      "En caso de duda, consultar con un admin o el owner",
+      "Las infracciones criticas (NSFW, CP, dox) son ban directo sin advertencia previa",
+      "Los helpers solo pueden warn y mute, no ban",
+      "Los moderadores pueden warn, mute y ban",
+      "Admins y owner tienen acceso completo"
+    ]
+  },
+  "roleHierarchy": {
+    "helper": {
+      "canDo": ["warn", "mute", "unmute"],
+      "cantDo": ["ban", "timeout", "lock channels"]
+    },
+    "moderator": {
+      "canDo": ["warn", "mute", "unmute", "ban", "timeout"],
+      "cantDo": ["lock channels", "nuke channels"]
+    },
+    "admin": {
+      "canDo": ["todo"],
+      "cantDo": []
+    },
+    "owner": {
+      "canDo": ["todo"],
+      "cantDo": []
+    }
+  }
+}

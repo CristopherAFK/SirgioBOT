@@ -1,0 +1,97 @@
+📋 GUÍA COMPLETA DE HERRAMIENTAS DEL STAFF PANEL
+🛡️ MODERACIÓN BÁSICA
+⚠️ Warn
+Función: Dar advertencias a usuarios
+Uso: Clic → Modal → Seleccionar usuario y razón
+Resultado: Añade warn al historial del usuario + mensaje de advertencia
+🔇 Mute
+Función: Silenciar usuarios temporalmente
+Uso: Clic → Modal → Seleccionar usuario, duración y razón
+Resultado: Aplica rol de mute + registro en base de datos
+🔊 Unmute
+Función: Quitar silencio a usuarios
+Uso: Clic → Modal → Seleccionar usuario
+Resultado: Remueve rol de mute + actualiza registro
+🔨 Ban
+Función: Banear usuarios del servidor
+Uso: Clic → Modal → Seleccionar usuario y razón
+Resultado: Usuario baneado + registro de la acción
+⌛ Timeout
+Función: Timeout temporal de Discord
+Uso: Clic → Modal → Seleccionar usuario, duración y razón
+Resultado: Usuario en timeout por tiempo especificado
+🏠 GESTIÓN DE CANALES
+🔒 Lock Channel
+Función: Bloquear canal actual
+Uso: Clic → Confirmar
+Resultado: Canal bloqueado para @everyone
+🔓 Unlock Channel
+Función: Desbloquear canal actual
+Uso: Clic → Confirmar
+Resultado: Canal desbloqueado para @everyone
+💥 Nuke Channel
+Función: Recrear canal (borrar todos los mensajes)
+Uso: Clic → Confirmar
+Resultado: Canal completamente limpio
+🧹 Clear Messages
+Función: Borrar cantidad específica de mensajes
+Uso: Clic → Modal → Especificar cantidad
+Resultado: X mensajes eliminados del canal
+💬 COMUNICACIÓN
+📢 Send Embed
+Función: Enviar mensaje embed personalizado
+Uso: Clic → Modal → Título, descripción, color
+Resultado: Embed enviado al canal actual
+📨 Send DM
+Función: Enviar mensaje privado a usuario
+Uso: Clic → Modal → Usuario y mensaje
+Resultado: DM enviado al usuario especificado
+📝 Edit Message
+Función: Editar mensaje existente del bot
+Uso: Clic → Modal → ID del mensaje y nuevo contenido
+Resultado: Mensaje editado
+🔗 Block Links
+Función: Activar/desactivar bloqueo de enlaces en canal
+Uso: Clic → Confirmar
+Resultado: Enlaces bloqueados/desbloqueados
+⚙️ ADMINISTRACIÓN
+🏥 Quarantine
+Función: Aislar usuario problemático
+Uso: Clic → Modal → Seleccionar usuario
+Resultado: Usuario movido a canal de cuarentena
+➖ Reduce Warn
+Función: Reducir warns de un usuario
+Uso: Clic → Modal → Usuario y cantidad a reducir
+Resultado: Warns reducidos en el historial
+📊 View History
+Función: Ver historial de sanciones de usuario
+Uso: Clic → Modal → Seleccionar usuario
+Resultado: Lista completa de warns/sanciones
+ℹ️ INFORMACIÓN
+📋 Server Info
+Función: Mostrar información del servidor
+Uso: Clic directo
+Resultado: Embed con estadísticas del servidor
+👤 User Info
+Función: Mostrar información de usuario específico
+Uso: Clic → Modal → Seleccionar usuario
+Resultado: Embed con datos del usuario
+🎭 Role Info
+Función: Mostrar información de rol específico
+Uso: Clic → Modal → Seleccionar rol
+Resultado: Embed con datos del rol
+🔑 PERMISOS POR ROL
+Helper:
+⚠️ Warn, 🔇 Mute, 🔊 Unmute
+Moderador:
+Todo lo de Helper +
+🔨 Ban, ⌛ Timeout
+Toda la categoría 💬 Comunicación
+Admin/Owner:
+Acceso completo a todas las herramientas
+📝 NOTAS IMPORTANTES
+✅ Todas las acciones se registran en logs
+✅ Sistema integrado con base de datos de warns
+✅ Mensajes de confirmación para acciones críticas
+✅ Modales intuitivos para facilitar el uso
+✅ Compatible con sistema de roles existente

@@ -1,0 +1,93 @@
+Mejora muchisimo el automod, A parte de las funciones que ya tiene hazlo como el del servidor de SpreenDMC. Ademas, Añade un comando para mostrar un embed de un sistema para el staff, con botones para mandar advertencias a usuarios, mutear, enviar mensajes (o emeds) personalizados en canales, banear usuarios,  etc etc.
+que el comando para mandar el sistema sea /panelautomod y que solo lo pueda hacer el staff
+
+Mejora al que al momento de hacer /mute /ban /addwarn, Haciendo un solo comando que sea /sanción, que incluya las opciones de: 
+
+Warn (Solo advertencia)
+Mute (Mute a un usuario)
+Ban (Baneo de usuario)
+
+
+Flood, Spam, Wall of Text, Bypass de automod, aprovecharse de un vacio legal, Romper Norma (en este caso el usuario del staff tendria que detallar la norma rota), Hacks en eventos, Bypass de palabras prohibidas, Uso de canales incorrecto, Mención de CP, Hacer publicidad, Perfil inapropiado o comprometido, Amenaza, Intento de Raid, Ticket innecesario, seguridad, etc (añade mas categorias)
+
+Al momento de elegir la opcion deberia dar una razón del porque la warn, mute, ban etc
+
+Opcional, si el caso es fuerte podria añadir una prueba ya sea video, archivo o imagen de lo sucedido.
+
+Opcional, Veces que hizo la infracción
+
+Opcional, una o dos infracciones tambien cometidas seguidamente.
+
+Tiempo de la sancion, el usuario del staff tendria que establecer el tiempo de duración del mute o ban.
+
+Al momento de dar un Mute o ban apareceria el boton para apelar sanción, si es un warn no
+
+Haz que el bot siempre deje la información sobre las sanciones en el canal ya establecido.
+
+Que los usuarios helpers (1230949752733175888) solo puedan añadir warns y mutes, mas no bans
+
+Y los moderadores si puedan hacer bans (1229140504310972599)
+
+Haz que el bot detecte cuando alguien dice palabras similares a las ya establecidas o intenta pasarlas por alto.
+
+Añade el comando /matenimiento (staff) que funcionaria para poner todos los canales privados y cree uno visible para todos que se llame "Servidor en mantenimiento" (Comando con confirmación)
+
+Haz que el sistema de autoroles sea por reacciones y no por botones.
+
+Mejora el sistema de tickets mostrando un texto diferente al crear uno dependiendo de la categoria, Haciendo que solo a los moderadores les aparezca el boton "Atender ticket", y haz que al momento de la confirmación de crear un ticket por parte de un usuario tambien aparezca un boton de "ver preguntas frecuentes" y que al darle al boton aparezca lo siguente en embed
+
+¿Puedo comunicarme con Sirgio mediante Tickets? 
+
+R// No, Puedes comunicarte con el equipo de Sirgio los cuales te ayudaran en dado caso quieras comunicarte con el para una colaboración o promoción.
+
+¿Cuando abren las postulaciones? 
+
+R// No hay fecha definida, se avisara unos dias antes o el mismo dia de la apertura de postulaciones en el canal de anuncios.
+
+¿Que Rol necesito para mandar sugerencias?
+
+R// Necesitas ser Minimo Nivel 5.
+
+¿Que hago si un usuario me esta molestando o me ofendio?
+
+R// Crea un ticket con la categoria "Reportar usuario"
+
+¿Que dias Sirgio Hace Streams/Lives?
+
+R// Sirgio No tiene un horario fijo, siempre anuncia unos minutos antes de prender Live.
+
+¿Que recompensas obtengo por boostear el server? 
+
+R// Una tarjeta personalizada en el sistema de Niveles, Un 200% mas de XP en el sistema de Niveles, Acceso a canales exclusivos y a información como spoilers de actualizaciones futuras.
+
+¿Que Recompensas obtengo por ser VIP en tiktok o Twitcht?
+
+R// Acceso a canales exclusivos, Un 200% mas de XP en el sistema de niveles y una tarjeta personalizada en el mismo.
+
+¿Puedo postularme otra vez si me rechazaron cuando me postule?
+
+R// Si, pero debes esperar a la siguente ronda de postulaciones y cumplir los requisitos de tu area a postular.
+
+¿Cada cuando se reinicia el Leaderboard de niveles? 
+
+R// Cada inicio de mes
+
+¿Cada cuanto se reinicia el sistema de economia? 
+
+R// Cada 60 dias.
+
+¿Cada cuanto hay una actualización en el servidor?
+
+R// Cada 30 o 35 dias dependiendo el mes.
+
+¿Cuales son las recompensas por subir de nivel?
+
+R// puedes verlas haciendo /rewards list.
+
+Tambien haz que una vez terminado un ticket con !cerrar al usuario le llegue un DM para que pueda calificar la experiencia y al staff le llegue la calificacion al canal de logs.
+
+Haz que las sugerencias, tickets, mutes y todo en general sobreviva a reinicios con MongoDB
+
+El bot lo tengo desplegado en Render desde Github, no quiero añadir el token para correrlo aqui en Replit, quiero que me ayudes a subir los cambios a github, este es el repo: https://github.com/CristopherAFK/SirgioBOT.git
+
+Implementa los cambios siguendo la estructura ya hecha del bot.
