@@ -116,8 +116,17 @@ module.exports = (client) => {
     ];
 
     try {
+      const guild = client.guilds.cache.get(GUILD_ID) || await client.guilds.fetch(GUILD_ID).catch(() => null);
+      if (!guild) return;
+      const existing = await guild.commands.fetch().catch(() => new Map());
       for (const command of commands) {
-        await client.application.commands.create(command.toJSON(), GUILD_ID);
+        const name = command.name;
+        const existingCmd = existing.find(c => c.name === name);
+        if (existingCmd) {
+          await existingCmd.edit(command.toJSON()).catch(() => {});
+        } else {
+          await guild.commands.create(command.toJSON()).catch(err => console.error('Error creando', name, err.message));
+        }
       }
       console.log('🟢 Comandos de postulaciones registrados');
     } catch (error) {
