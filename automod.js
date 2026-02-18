@@ -524,9 +524,17 @@ module.exports = (client) => {
           .addStringOption(o => o.setName("mensaje").setDescription("Mensaje opcional").setRequired(false))
       ];
 
-      // Registro global de comandos (para que sean visibles para todos)
-      await guild.commands.set(commands);
-      console.log("🟢 Comandos de AutoMod registrados");
+      const existing = await guild.commands.fetch().catch(() => new Map());
+      for (const cmd of commands) {
+        const name = cmd.name;
+        const existingCmd = existing.find(c => c.name === name);
+        if (existingCmd) {
+          await existingCmd.edit(cmd.toJSON()).catch(() => {});
+        } else {
+          await guild.commands.create(cmd).catch(err => console.error(`Error creando comando ${name}:`, err.message));
+        }
+      }
+      console.log("🟢 Comandos de AutoMod registrados (sin borrar otros)");
     } catch (err) {
       console.error("Error registrando comandos:", err);
     }
