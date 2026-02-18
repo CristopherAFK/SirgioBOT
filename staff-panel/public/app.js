@@ -138,7 +138,8 @@ async function loadLogs(containerId, limit) {
   try {
     const logs = await api('GET', '/logs');
     const container = document.getElementById(containerId);
-    const items = limit ? logs.slice(0, limit) : logs;
+    const raw = limit ? logs.slice(0, limit) : logs;
+    const items = [...raw].reverse();
     if (items.length === 0) {
       container.innerHTML = '<div class="empty-state"><div class="empty-icon">&#128220;</div><p>No hay registros aun</p></div>';
       return;
