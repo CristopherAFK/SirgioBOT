@@ -20,7 +20,8 @@ const {
   SUGGESTER_ROLE_ID,
 } = require('./config');
 
-const SUGGESTION_ICON_URL = 'https://media.discordapp.net/attachments/1420914042251509990/1430698897927307347/79794618.png';
+const SUGGESTION_ICON_GIF = path.join(__dirname, 'suggestion_icon.gif');
+const SUGGESTION_ICON_URL = process.env.SUGGESTION_ICON_URL || null;
 
 const processedInteractions = new Set();
 
@@ -194,11 +195,14 @@ module.exports = (client) => {
             .setEmoji('💡');
           const publicRow = new ActionRowBuilder().addComponents(createSugBtn);
 
-          if (SUGGESTION_ICON_URL) publicEmbed.setThumbnail(SUGGESTION_ICON_URL);
-          publicMessage = await suggestionsChannel.send({
-            embeds: [publicEmbed],
-            components: [publicRow]
-          });
+          const sendOptions = { embeds: [publicEmbed], components: [publicRow] };
+          if (require('fs').existsSync(SUGGESTION_ICON_GIF)) {
+            publicEmbed.setThumbnail('attachment://suggestion_icon.gif');
+            sendOptions.files = [{ attachment: SUGGESTION_ICON_GIF, name: 'suggestion_icon.gif' }];
+          } else if (SUGGESTION_ICON_URL) {
+            publicEmbed.setThumbnail(SUGGESTION_ICON_URL);
+          }
+          publicMessage = await suggestionsChannel.send(sendOptions);
 
           await publicMessage.react('1465220343550578718').catch(() => publicMessage.react('✅').catch(() => {}));
           await publicMessage.react('1465219129291051150').catch(() => publicMessage.react('❌').catch(() => {}));
@@ -311,10 +315,6 @@ module.exports = (client) => {
             const publicRow = new ActionRowBuilder().addComponents(createSugBtn);
 
             const editOptions = { embeds: [updatedEmbed], components: [publicRow] };
-            if (SUGGESTION_ICON_URL) {
-              updatedEmbed.setThumbnail(SUGGESTION_ICON_URL);
-            }
-
             await publicMessage.edit(editOptions);
 
             const staffEmbed = EmbedBuilder.from(interaction.message.embeds[0])
