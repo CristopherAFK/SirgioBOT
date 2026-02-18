@@ -67,12 +67,12 @@ module.exports = (client) => {
           .setDescription('Muestra el conteo de miembros del servidor'),
         
         new SlashCommandBuilder()
-          .setName('notif-manual')
-          .setDescription('Notifica manualmente un video reciente (Solo Staff)')
+          .setName('notificar-video')
+          .setDescription('Envía notificación del video más reciente del canal de YouTube elegido (Staff)')
           .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
           .addStringOption(option =>
             option.setName('canal')
-              .setDescription('Selecciona el canal')
+              .setDescription('Canal de YouTube')
               .setRequired(true)
               .addChoices(
                 { name: 'Sirgio_o', value: 'Sirgio_o' },
@@ -81,6 +81,8 @@ module.exports = (client) => {
       ];
 
       const existing = await guild.commands.fetch();
+      const obsolete = existing.find(c => c.name === 'notif-manual');
+      if (obsolete) await obsolete.delete().catch(() => {});
       for (const cmd of commands) {
         const name = cmd.name;
         const existingCmd = existing.find(c => c.name === name);
@@ -135,12 +137,12 @@ module.exports = (client) => {
           .setDescription('Muestra el conteo de miembros del servidor'),
         
         new SlashCommandBuilder()
-          .setName('notif-manual')
-          .setDescription('Notifica manualmente un video reciente (Solo Staff)')
+          .setName('notificar-video')
+          .setDescription('Envía notificación del video más reciente del canal de YouTube elegido (Staff)')
           .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
           .addStringOption(option =>
             option.setName('canal')
-              .setDescription('Selecciona el canal')
+              .setDescription('Canal de YouTube')
               .setRequired(true)
               .addChoices(
                 { name: 'Sirgio_o', value: 'Sirgio_o' },
@@ -302,7 +304,7 @@ module.exports = (client) => {
           return interaction.reply({ embeds: [embed] });
         }
 
-        case 'notif-manual': {
+        case 'notificar-video': {
           if (!client.notificationSystem) {
             return interaction.reply({ content: '❌ El sistema de notificaciones no está inicializado.', ephemeral: true });
           }
