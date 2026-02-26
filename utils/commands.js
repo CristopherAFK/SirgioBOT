@@ -22,7 +22,7 @@ module.exports = (client) => {
         console.error(`❌ No se encontró el servidor con ID: ${GUILD_ID}. Asegúrate de que el bot esté en el servidor y el ID sea correcto.`);
         // Si no hay servidor específico, registrar como globales para asegurar que aparezcan
         console.log('⚠️ Registrando comandos como GLOBALES ante la falta de servidor específico...');
-        await client.application.commands.set(commands_list);
+        await client.application.commands.set(commands_list.map(c => c.toJSON()));
         console.log('🟢 Comandos registrados como GLOBALES');
         return;
       }

@@ -21,7 +21,7 @@ const {
 } = require('./config');
 
 const SUGGESTION_ICON_GIF = path.join(__dirname, 'suggestion_icon.gif');
-const SUGGESTION_ICON_URL = process.env.SUGGESTION_ICON_URL || null;
+const SUGGESTION_ICON_URL = process.env.SUGGESTION_ICON_URL || 'https://media.discordapp.net/attachments/1222966360263626865/1476426768947740742/suggestion_icon_1.gif?ex=69a11514&is=699fc394&hm=97e152d5827e6c33dac49fe33c6262b4f34ca84ffa54521e1709006c0d6174df&=&width=569&height=569';
 
 const processedInteractions = new Set();
 
@@ -196,11 +196,11 @@ module.exports = (client) => {
           const publicRow = new ActionRowBuilder().addComponents(createSugBtn);
 
           const sendOptions = { embeds: [publicEmbed], components: [publicRow] };
-          if (require('fs').existsSync(SUGGESTION_ICON_GIF)) {
+          if (SUGGESTION_ICON_URL) {
+            publicEmbed.setThumbnail(SUGGESTION_ICON_URL);
+          } else if (require('fs').existsSync(SUGGESTION_ICON_GIF)) {
             publicEmbed.setThumbnail('attachment://suggestion_icon.gif');
             sendOptions.files = [{ attachment: SUGGESTION_ICON_GIF, name: 'suggestion_icon.gif' }];
-          } else if (SUGGESTION_ICON_URL) {
-            publicEmbed.setThumbnail(SUGGESTION_ICON_URL);
           }
           publicMessage = await suggestionsChannel.send(sendOptions);
 

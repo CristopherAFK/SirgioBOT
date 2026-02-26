@@ -5,66 +5,72 @@ const path = require('path');
 const crypto = require('crypto');
 const { GUILD_ID: CONFIG_GUILD_ID, LOG_CHANNEL_ID } = require('../config');
 
-async function sendModLog(client, action, { userTag, userId, staffName, reason, duration, warnCount }) {
+function buildModLogEmbed(action, { userTag, userId, staffName, reason, duration, warnCount }) {
+  const staffLabel = staffName || 'Staff Panel';
+  let embed;
+  if (action === 'warn') {
+    embed = new EmbedBuilder()
+      .setColor(0xffff00)
+      .setTitle('⚠️ Advertencia emitida')
+      .addFields(
+        { name: 'Usuario', value: `${userTag} (${userId})`, inline: true },
+        { name: 'Staff', value: staffLabel, inline: true },
+        { name: 'Razón', value: reason || '-', inline: false },
+        { name: 'Warns totales', value: String(warnCount ?? 0), inline: true }
+      )
+      .setTimestamp();
+  } else if (action === 'mute') {
+    embed = new EmbedBuilder()
+      .setColor(0xff0000)
+      .setTitle('🔇 Mute aplicado')
+      .addFields(
+        { name: 'Usuario', value: `${userTag} (${userId})`, inline: true },
+        { name: 'Staff', value: staffLabel, inline: true },
+        { name: 'Razón', value: reason || '-', inline: false },
+        { name: 'Duración', value: duration || '-', inline: true }
+      )
+      .setTimestamp();
+  } else if (action === 'unmute') {
+    embed = new EmbedBuilder()
+      .setColor(0x00ff00)
+      .setTitle('🔊 Mute removido')
+      .addFields(
+        { name: 'Usuario', value: `${userTag} (${userId})`, inline: true },
+        { name: 'Staff', value: staffLabel, inline: true }
+      )
+      .setTimestamp();
+  } else if (action === 'ban') {
+    embed = new EmbedBuilder()
+      .setColor(0x000000)
+      .setTitle('🔨 Ban aplicado')
+      .addFields(
+        { name: 'Usuario', value: `${userTag} (${userId})`, inline: true },
+        { name: 'Staff', value: staffLabel, inline: true },
+        { name: 'Razón', value: reason || '-', inline: false }
+      )
+      .setTimestamp();
+  } else if (action === 'timeout') {
+    embed = new EmbedBuilder()
+      .setColor(0xff0000)
+      .setTitle('⏱️ Timeout aplicado')
+      .addFields(
+        { name: 'Usuario', value: `${userTag} (${userId})`, inline: true },
+        { name: 'Staff', value: staffLabel, inline: true },
+        { name: 'Razón', value: reason || '-', inline: false },
+        { name: 'Duración', value: duration || '-', inline: true }
+      )
+      .setTimestamp();
+  }
+  return embed || null;
+}
+
+async function sendModLog(client, action, data) {
   if (!client?.isReady() || !LOG_CHANNEL_ID) return;
+  const embed = buildModLogEmbed(action, data);
+  if (!embed) return;
   try {
     const channel = await client.channels.fetch(LOG_CHANNEL_ID).catch(() => null);
     if (!channel) return;
-    const staffLabel = staffName || 'Staff Panel';
-    let embed;
-    if (action === 'warn') {
-      embed = new EmbedBuilder()
-        .setColor(0xffff00)
-        .setTitle('⚠️ Advertencia emitida')
-        .addFields(
-          { name: 'Usuario', value: `${userTag} (${userId})`, inline: true },
-          { name: 'Staff', value: staffLabel, inline: true },
-          { name: 'Razón', value: reason || '-', inline: false },
-          { name: 'Warns totales', value: String(warnCount ?? 0), inline: true }
-        )
-        .setTimestamp();
-    } else if (action === 'mute') {
-      embed = new EmbedBuilder()
-        .setColor(0xff0000)
-        .setTitle('🔇 Mute aplicado')
-        .addFields(
-          { name: 'Usuario', value: `${userTag} (${userId})`, inline: true },
-          { name: 'Staff', value: staffLabel, inline: true },
-          { name: 'Razón', value: reason || '-', inline: false },
-          { name: 'Duración', value: duration || '-', inline: true }
-        )
-        .setTimestamp();
-    } else if (action === 'unmute') {
-      embed = new EmbedBuilder()
-        .setColor(0x00ff00)
-        .setTitle('🔊 Mute removido')
-        .addFields(
-          { name: 'Usuario', value: `${userTag} (${userId})`, inline: true },
-          { name: 'Staff', value: staffLabel, inline: true }
-        )
-        .setTimestamp();
-    } else if (action === 'ban') {
-      embed = new EmbedBuilder()
-        .setColor(0x000000)
-        .setTitle('🔨 Ban aplicado')
-        .addFields(
-          { name: 'Usuario', value: `${userTag} (${userId})`, inline: true },
-          { name: 'Staff', value: staffLabel, inline: true },
-          { name: 'Razón', value: reason || '-', inline: false }
-        )
-        .setTimestamp();
-    } else if (action === 'timeout') {
-      embed = new EmbedBuilder()
-        .setColor(0xff0000)
-        .setTitle('⏱️ Timeout aplicado')
-        .addFields(
-          { name: 'Usuario', value: `${userTag} (${userId})`, inline: true },
-          { name: 'Staff', value: staffLabel, inline: true },
-          { name: 'Razón', value: reason || '-', inline: false },
-          { name: 'Duración', value: duration || '-', inline: true }
-        )
-        .setTimestamp();
-    } else return;
     await channel.send({ embeds: [embed] });
   } catch (e) {
     console.error('[Staff Panel] Error enviando log a Discord:', e.message);
@@ -90,7 +96,6 @@ function setupStaffPanel(app, client) {
     'agustito': { password: hashPassword('maximo202430'), role: 'moderator', discordId: '1196639548877320202', displayName: 'Agustisito' },
     'gars': { password: hashPassword('garcia14052012'), role: 'admin', discordId: '1032482231677108224', displayName: 'Gars' },
     'sirgio': { password: hashPassword('SirgioTeam2026'), role: 'owner', discordId: '956700088103747625', displayName: 'Sirgio' },
-    'katherine_zero': { password: hashPassword('GOHA071020HQRRXLA0'), role: 'helper', discordId: '1307811551729946756', displayName: 'Katherine_Zero' },
     'mzingerkai': { password: hashPassword('Mzin531'), role: 'moderator', discordId: '926219678798454875', displayName: 'Mzingerkai' }
   };
 
@@ -219,9 +224,8 @@ function setupStaffPanel(app, client) {
       const warnCount = await db.getWarningCount(userId);
       await db.addAuditLog('WARN', null, userId, req.session.discordId, { reason, warnCount, staffName: req.session.username });
       sendModLog(client, 'warn', { userTag: member.user.tag, userId, staffName: req.session.username, reason, warnCount }).catch(() => {});
-      try {
-        await member.send(`⚠️ Has recibido una advertencia en **${guild.name}**\n📝 Razón: ${reason}\n📊 Total de warns: ${warnCount}`);
-      } catch (e) {}
+      const warnDmEmbed = buildModLogEmbed('warn', { userTag: member.user.tag, userId, staffName: req.session.username, reason, warnCount });
+      if (warnDmEmbed) await member.send({ embeds: [warnDmEmbed] }).catch(() => {});
       res.json({ success: true, warnCount, user: member.user.tag });
     } catch (err) {
       res.status(500).json({ error: err.message });
@@ -250,6 +254,8 @@ function setupStaffPanel(app, client) {
       await db.addSanction(userId, 'staff-panel', 'MUTE', reason, 'staff-panel', duration);
       await db.addAuditLog('MUTE', null, userId, req.session.discordId, { reason, duration, staffName: req.session.username });
       sendModLog(client, 'mute', { userTag: member.user.tag, userId, staffName: req.session.username, reason, duration }).catch(() => {});
+      const muteDmEmbed = buildModLogEmbed('mute', { userTag: member.user.tag, userId, staffName: req.session.username, reason, duration });
+      if (muteDmEmbed) await member.send({ embeds: [muteDmEmbed] }).catch(() => {});
       res.json({ success: true, user: member.user.tag, duration });
     } catch (err) {
       res.status(500).json({ error: err.message });
@@ -273,6 +279,8 @@ function setupStaffPanel(app, client) {
       await db.removeMute(userId);
       await db.addAuditLog('UNMUTE', null, userId, req.session.discordId, { staffName: req.session.username });
       sendModLog(client, 'unmute', { userTag: member.user.tag, userId, staffName: req.session.username }).catch(() => {});
+      const unmuteDmEmbed = buildModLogEmbed('unmute', { userTag: member.user.tag, userId, staffName: req.session.username });
+      if (unmuteDmEmbed) await member.send({ embeds: [unmuteDmEmbed] }).catch(() => {});
       res.json({ success: true, user: member.user.tag });
     } catch (err) {
       res.status(500).json({ error: err.message });
@@ -289,9 +297,8 @@ function setupStaffPanel(app, client) {
       const member = await guild.members.fetch(userId).catch(() => null);
       const userTag = member ? member.user.tag : userId;
       if (member) {
-        try {
-          await member.send(`🔨 Has sido baneado de **${guild.name}**\n📝 Razón: ${reason}`);
-        } catch (e) {}
+        const banDmEmbed = buildModLogEmbed('ban', { userTag: member.user.tag, userId, staffName: req.session.username, reason });
+        if (banDmEmbed) await member.send({ embeds: [banDmEmbed] }).catch(() => {});
       }
       await guild.members.ban(userId, { reason, deleteMessageSeconds: 0 });
       await db.addSanction(userId, 'staff-panel', 'BAN', reason, 'staff-panel');
@@ -318,6 +325,8 @@ function setupStaffPanel(app, client) {
       await db.addSanction(userId, 'staff-panel', 'TIMEOUT', reason, 'staff-panel', duration);
       await db.addAuditLog('TIMEOUT', null, userId, req.session.discordId, { reason, duration, staffName: req.session.username });
       sendModLog(client, 'timeout', { userTag: member.user.tag, userId, staffName: req.session.username, reason, duration }).catch(() => {});
+      const timeoutDmEmbed = buildModLogEmbed('timeout', { userTag: member.user.tag, userId, staffName: req.session.username, reason, duration });
+      if (timeoutDmEmbed) await member.send({ embeds: [timeoutDmEmbed] }).catch(() => {});
       res.json({ success: true, user: member.user.tag, duration });
     } catch (err) {
       res.status(500).json({ error: err.message });
@@ -403,8 +412,8 @@ function setupStaffPanel(app, client) {
 
   router.post('/action/send-embed', authenticate, async (req, res) => {
     if (!hasPermission(req, 'send_embed')) return res.status(403).json({ error: 'Sin permisos' });
-    const { channelId, title, description, color } = req.body;
-    if (!channelId || !title || !description) return res.status(400).json({ error: 'Faltan campos' });
+    const { channelId, title, description, color, footer, image, thumbnail, authorName, authorIconUrl, timestamp } = req.body;
+    if (!channelId || !title) return res.status(400).json({ error: 'Faltan canal y título' });
     try {
       const guild = getGuild();
       if (!guild) return res.status(503).json({ error: 'Bot no conectado' });
@@ -412,9 +421,13 @@ function setupStaffPanel(app, client) {
       if (!channel) return res.status(404).json({ error: 'Canal no encontrado' });
       const embed = new EmbedBuilder()
         .setTitle(title)
-        .setDescription(description)
-        .setColor(color ? parseInt(color.replace('#', ''), 16) : 0x5865F2)
-        .setTimestamp();
+        .setColor(color ? parseInt(String(color).replace('#', ''), 16) : 0x5865F2);
+      if (description) embed.setDescription(description);
+      if (footer) embed.setFooter({ text: footer });
+      if (image) embed.setImage(image);
+      if (thumbnail) embed.setThumbnail(thumbnail);
+      if (authorName) embed.setAuthor({ name: authorName, iconURL: authorIconUrl || undefined });
+      if (timestamp !== false) embed.setTimestamp();
       await channel.send({ embeds: [embed] });
       await db.addAuditLog('SEND_EMBED', null, channelId, req.session.discordId, { title, channelName: channel.name, staffName: req.session.username });
       res.json({ success: true, channel: channel.name });
@@ -425,13 +438,29 @@ function setupStaffPanel(app, client) {
 
   router.post('/action/send-dm', authenticate, async (req, res) => {
     if (!hasPermission(req, 'send_dm')) return res.status(403).json({ error: 'Sin permisos' });
-    const { userId, message } = req.body;
-    if (!userId || !message) return res.status(400).json({ error: 'Faltan campos' });
+    const { userId, message, useEmbed, embedTitle, embedDescription, embedColor, embedFooter, embedImage, embedThumbnail, embedAuthorName, embedAuthorIconUrl } = req.body;
+    if (!userId) return res.status(400).json({ error: 'Falta usuario' });
+    if (!useEmbed && !message) return res.status(400).json({ error: 'Indica mensaje de texto o activa envío como embed' });
+    if (useEmbed && !embedTitle) return res.status(400).json({ error: 'Para embed indica al menos el título' });
     try {
       const user = await client.users.fetch(userId).catch(() => null);
       if (!user) return res.status(404).json({ error: 'Usuario no encontrado' });
-      await user.send(message);
-      await db.addAuditLog('SEND_DM', null, userId, req.session.discordId, { messagePreview: message.substring(0, 100), staffName: req.session.username });
+      if (useEmbed) {
+        const dmEmbed = new EmbedBuilder()
+          .setTitle(embedTitle)
+          .setColor(embedColor ? parseInt(String(embedColor).replace('#', ''), 16) : 0x5865F2)
+          .setTimestamp();
+        if (embedDescription) dmEmbed.setDescription(embedDescription);
+        if (embedFooter) dmEmbed.setFooter({ text: embedFooter });
+        if (embedImage) dmEmbed.setImage(embedImage);
+        if (embedThumbnail) dmEmbed.setThumbnail(embedThumbnail);
+        if (embedAuthorName) dmEmbed.setAuthor({ name: embedAuthorName, iconURL: embedAuthorIconUrl || undefined });
+        await user.send({ content: message || undefined, embeds: [dmEmbed] });
+      } else {
+        await user.send(message);
+      }
+      const preview = message ? message.substring(0, 100) : (embedTitle || '');
+      await db.addAuditLog('SEND_DM', null, userId, req.session.discordId, { messagePreview: preview, staffName: req.session.username });
       res.json({ success: true, user: user.tag });
     } catch (err) {
       res.status(500).json({ error: err.message });

@@ -31,6 +31,38 @@ let notificationSystem;
 
 setupStaffPanel(app, client);
 
+// Cargar módulos ANTES de login para que sus client.once('ready') se registren y ejecuten al conectar
+const modules = [
+  './automod',
+  './welcome.js',
+  './postulaciones',
+  './embed',
+  './anuncio',
+  './autoroles.js',
+  './sugerencias.js',
+  './notificaciones',
+  './avisos',
+  './utils/commands',
+  './utils/stats',
+  './utils/reminders',
+  './utils/ratelimit',
+  './utils/backup',
+  './utils/audit',
+  './tickets/ticketSystem'
+];
+
+for (const modulePath of modules) {
+  try {
+    const moduleInstance = require(modulePath)(client);
+    if (modulePath === './notificaciones') {
+      client.notificationSystem = moduleInstance;
+    }
+    console.log(`✅ Módulo cargado: ${modulePath}`);
+  } catch (err) {
+    console.error(`⚠️ Error cargando módulo ${modulePath}:`, err.message);
+  }
+}
+
 const MAX_RETRIES = 5;
 const RETRY_DELAYS = [5000, 10000, 30000, 60000, 120000];
 
@@ -76,11 +108,10 @@ async function startBot(retryCount = 0) {
   }
 }
 
-// 3. Evento Ready - Cargar módulos DESPUÉS de conectar
+// Evento Ready - solo DB, actividad y tareas periódicas (los módulos ya están cargados y registran sus comandos en su propio ready)
 client.once("ready", async () => {
   console.log(`✅ ¡Bot listo! Conectado como ${client.user.tag}`);
-  
-  // Conectar a Base de Datos
+
   try {
     const dbConnected = await connectDB();
     if (!dbConnected) {
@@ -90,41 +121,8 @@ client.once("ready", async () => {
     console.error("❌ Error en base de datos:", err.message);
   }
 
-  // Cargar Módulos DESPUÉS de que el bot esté conectado
-  const modules = [
-    './automod',
-    './welcome.js',
-    './postulaciones',
-    './embed',
-    './anuncio',
-    './autoroles.js',
-    './sugerencias.js',
-    './notificaciones',
-    './avisos',
-    './utils/commands',
-    './utils/stats',
-    './utils/reminders',
-    './utils/ratelimit',
-    './utils/backup',
-    './utils/audit',
-    './tickets/ticketSystem'
-  ];
-
-  for (const modulePath of modules) {
-    try {
-      const moduleInstance = require(modulePath)(client);
-      if (modulePath === './notificaciones') {
-        client.notificationSystem = moduleInstance;
-      }
-      console.log(`✅ Módulo cargado: ${modulePath}`);
-    } catch (err) {
-      console.error(`⚠️ Error cargando módulo ${modulePath}:`, err.message);
-    }
-  }
-
   client.user.setActivity("LagSupport", { type: 3 });
 
-  // Tareas periódicas
   setInterval(async () => {
     try {
       await db.cleanupRateLimits();

@@ -410,6 +410,11 @@ function openTool(action) {
             <span id="embed-color-text">#5865F2</span>
           </div>
         </div>
+        <div class="form-group"><label>Pie de pagina (opcional)</label><input type="text" id="embed-footer" placeholder="Texto del pie"></div>
+        <div class="form-group"><label>URL imagen (opcional)</label><input type="url" id="embed-image" placeholder="https://..."></div>
+        <div class="form-group"><label>URL thumbnail / logo (opcional)</label><input type="url" id="embed-thumbnail" placeholder="https://..."></div>
+        <div class="form-group"><label>Autor - nombre (opcional)</label><input type="text" id="embed-author-name" placeholder="Nombre"></div>
+        <div class="form-group"><label>Autor - URL icono (opcional)</label><input type="url" id="embed-author-icon" placeholder="https://..."></div>
       `, `<button class="btn btn-primary" onclick="executeSendEmbed()">Enviar Embed</button>
          <button class="btn btn-sm" style="background:var(--border)" onclick="closeModal()">Cancelar</button>`);
       setTimeout(() => {
@@ -423,9 +428,43 @@ function openTool(action) {
     case 'send_dm':
       openModal('Send DM - Mensaje Privado', `
         <div class="form-group"><label>Usuario</label>${userSearchField('dm-user')}</div>
-        <div class="form-group"><label>Mensaje</label><textarea id="dm-message" placeholder="Escribe el mensaje..."></textarea></div>
+        <div class="form-group" style="display:flex;align-items:center;gap:12px;">
+          <label style="margin:0">Enviar como embed</label>
+          <label class="toggle-switch">
+            <input type="checkbox" id="dm-use-embed">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div id="dm-plain-section">
+          <div class="form-group"><label>Mensaje (texto plano)</label><textarea id="dm-message" placeholder="Escribe el mensaje..."></textarea></div>
+        </div>
+        <div id="dm-embed-section" style="display:none;">
+          <div class="form-group"><label>Mensaje adicional (opcional, encima del embed)</label><textarea id="dm-embed-message" placeholder="Texto opcional..."></textarea></div>
+          <div class="form-group"><label>Titulo del embed</label><input type="text" id="dm-embed-title" placeholder="Titulo"></div>
+          <div class="form-group"><label>Descripcion</label><textarea id="dm-embed-desc" placeholder="Descripcion..."></textarea></div>
+          <div class="form-group"><label>Color</label><div class="color-picker-wrapper"><input type="color" id="dm-embed-color" value="#5865F2"><span id="dm-embed-color-text">#5865F2</span></div></div>
+          <div class="form-group"><label>Pie de pagina</label><input type="text" id="dm-embed-footer" placeholder="Opcional"></div>
+          <div class="form-group"><label>URL imagen</label><input type="url" id="dm-embed-image" placeholder="Opcional"></div>
+          <div class="form-group"><label>URL thumbnail</label><input type="url" id="dm-embed-thumbnail" placeholder="Opcional"></div>
+          <div class="form-group"><label>Autor - nombre</label><input type="text" id="dm-embed-author-name" placeholder="Opcional"></div>
+          <div class="form-group"><label>Autor - URL icono</label><input type="url" id="dm-embed-author-icon" placeholder="Opcional"></div>
+        </div>
       `, `<button class="btn btn-primary" onclick="executeSendDM()">Enviar DM</button>
          <button class="btn btn-sm" style="background:var(--border)" onclick="closeModal()">Cancelar</button>`);
+      setTimeout(() => {
+        const dmEmbedCheck = document.getElementById('dm-use-embed');
+        const plainSec = document.getElementById('dm-plain-section');
+        const embedSec = document.getElementById('dm-embed-section');
+        if (dmEmbedCheck) dmEmbedCheck.addEventListener('change', function() {
+          if (plainSec) plainSec.style.display = this.checked ? 'none' : 'block';
+          if (embedSec) embedSec.style.display = this.checked ? 'block' : 'none';
+        });
+        const dmColorInput = document.getElementById('dm-embed-color');
+        if (dmColorInput) dmColorInput.addEventListener('input', e => {
+          const t = document.getElementById('dm-embed-color-text');
+          if (t) t.textContent = e.target.value;
+        });
+      }, 100);
       break;
 
     case 'edit_message':
@@ -600,9 +639,14 @@ async function executeSendEmbed() {
   const title = document.getElementById('embed-title').value;
   const description = document.getElementById('embed-desc').value;
   const color = document.getElementById('embed-color').value;
+  const footer = document.getElementById('embed-footer')?.value?.trim() || undefined;
+  const image = document.getElementById('embed-image')?.value?.trim() || undefined;
+  const thumbnail = document.getElementById('embed-thumbnail')?.value?.trim() || undefined;
+  const authorName = document.getElementById('embed-author-name')?.value?.trim() || undefined;
+  const authorIconUrl = document.getElementById('embed-author-icon')?.value?.trim() || undefined;
   if (!channelId || !title) return toast('Completa canal y titulo', 'error');
   try {
-    await api('POST', '/action/send-embed', { channelId, title, description, color });
+    await api('POST', '/action/send-embed', { channelId, title, description, color, footer, image, thumbnail, authorName, authorIconUrl });
     toast('Embed enviado', 'success');
     closeModal();
   } catch (e) { toast(e.message, 'error'); }
@@ -610,10 +654,32 @@ async function executeSendEmbed() {
 
 async function executeSendDM() {
   const userId = document.getElementById('dm-user_id').value;
-  const message = document.getElementById('dm-message').value;
-  if (!userId || !message) return toast('Completa todos los campos', 'error');
+  const useEmbed = document.getElementById('dm-use-embed').checked;
+  const message = document.getElementById('dm-message')?.value?.trim();
+  const embedMessage = document.getElementById('dm-embed-message')?.value?.trim();
+  if (!userId) return toast('Selecciona un usuario', 'error');
+  if (!useEmbed && !message) return toast('Escribe el mensaje o activa embed', 'error');
+  if (useEmbed) {
+    const embedTitle = document.getElementById('dm-embed-title')?.value?.trim();
+    if (!embedTitle) return toast('Indica el titulo del embed', 'error');
+  }
+  const body = {
+    userId,
+    message: useEmbed ? (embedMessage || '') : message,
+    useEmbed
+  };
+  if (useEmbed) {
+    body.embedTitle = document.getElementById('dm-embed-title')?.value?.trim();
+    body.embedDescription = document.getElementById('dm-embed-desc')?.value?.trim() || undefined;
+    body.embedColor = document.getElementById('dm-embed-color')?.value;
+    body.embedFooter = document.getElementById('dm-embed-footer')?.value?.trim() || undefined;
+    body.embedImage = document.getElementById('dm-embed-image')?.value?.trim() || undefined;
+    body.embedThumbnail = document.getElementById('dm-embed-thumbnail')?.value?.trim() || undefined;
+    body.embedAuthorName = document.getElementById('dm-embed-author-name')?.value?.trim() || undefined;
+    body.embedAuthorIconUrl = document.getElementById('dm-embed-author-icon')?.value?.trim() || undefined;
+  }
   try {
-    await api('POST', '/action/send-dm', { userId, message });
+    await api('POST', '/action/send-dm', body);
     toast('DM enviado', 'success');
     closeModal();
   } catch (e) { toast(e.message, 'error'); }
