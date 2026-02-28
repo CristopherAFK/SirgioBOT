@@ -22,7 +22,15 @@ const client = new Client({
     GatewayIntentBits.GuildMessageReactions,
     GatewayIntentBits.DirectMessages
   ],
-  partials: [Partials.Channel, Partials.Message, Partials.Reaction, Partials.User]
+  partials: [Partials.Channel, Partials.Message, Partials.Reaction, Partials.User],
+  ws: {
+    handshakeTimeout: 60000,
+    large_threshold: 50
+  },
+  rest: {
+    timeout: 30000,
+    retries: 3
+  }
 });
 client.setMaxListeners(20);
 
@@ -65,7 +73,7 @@ for (const modulePath of modules) {
 }
 
 const MAX_RETRIES = 5;
-const RETRY_DELAYS = [5000, 10000, 30000, 60000, 120000];
+const RETRY_DELAYS = [15000, 30000, 60000, 120000, 300000];
 
 async function startBot(retryCount = 0) {
   console.log("🚀 Iniciando SirgioBOT...");
@@ -105,6 +113,11 @@ async function startBot(retryCount = 0) {
           } else if (res.statusCode === 401) {
             reject(new Error('Token inválido (401 Unauthorized)'));
             return;
+          } else if (res.statusCode === 429) {
+            const retryAfter = parseFloat(res.headers['retry-after'] || '60');
+            console.warn(`⚠️ Rate limited (429). Retry-After: ${retryAfter}s. Esperando antes de conectar...`);
+            setTimeout(() => resolve(), retryAfter * 1000);
+            return;
           } else {
             console.warn(`⚠️ Discord API status: ${res.statusCode} - ${data.substring(0, 200)}`);
           }
@@ -117,10 +130,10 @@ async function startBot(retryCount = 0) {
     });
 
     console.log("🔌 Intentando conectar a Discord...");
-    // Login with 30-second timeout
+    // Login with 90-second timeout (allows for rate limit waits + 60s WS handshake)
     const loginPromise = client.login(token);
     const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Login timeout: Discord no respondió en 30 segundos')), 30000)
+      setTimeout(() => reject(new Error('Login timeout: Discord no respondió en 90 segundos')), 90000)
     );
     await Promise.race([loginPromise, timeoutPromise]);
     console.log("✅ Login exitoso, esperando evento ready...");
