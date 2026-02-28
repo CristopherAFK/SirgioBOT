@@ -70,7 +70,7 @@ const RETRY_DELAYS = [5000, 10000, 30000, 60000, 120000];
 async function startBot(retryCount = 0) {
   console.log("🚀 Iniciando SirgioBOT...");
 
-  const token = (process.env.DISCORD_TOKEN || process.env.TOKEN || "").trim();
+  const token = (process.env.DISCORD_TOKEN || process.env.TOKEN || "").replace(/[^\x20-\x7E]/g, '').trim();
   
   if (!token || token.length < 50) {
     console.error("❌ ERROR: Token no válido o no configurado en las variables de entorno.");
@@ -82,8 +82,47 @@ async function startBot(retryCount = 0) {
   console.log("✅ Token validado (longitud:", token.length, ")");
 
   try {
+    // Pre-flight: verify Discord API connectivity and token
+    console.log("🔍 Verificando conectividad con Discord API...");
+    const https = require('https');
+    await new Promise((resolve, reject) => {
+      const req = https.request({
+        hostname: 'discord.com',
+        path: '/api/v10/gateway/bot',
+        method: 'GET',
+        headers: { 'Authorization': `Bot ${token}` },
+        timeout: 10000
+      }, (res) => {
+        let data = '';
+        res.on('data', chunk => data += chunk);
+        res.on('end', () => {
+          console.log(`✅ Discord API respondió (status: ${res.statusCode})`);
+          if (res.statusCode === 200) {
+            try {
+              const info = JSON.parse(data);
+              console.log(`📡 Gateway URL: ${info.url}, Shards: ${info.shards}`);
+            } catch (e) {}
+          } else if (res.statusCode === 401) {
+            reject(new Error('Token inválido (401 Unauthorized)'));
+            return;
+          } else {
+            console.warn(`⚠️ Discord API status: ${res.statusCode} - ${data.substring(0, 200)}`);
+          }
+          resolve();
+        });
+      });
+      req.on('error', (err) => reject(new Error(`No se pudo conectar a Discord API: ${err.message}`)));
+      req.on('timeout', () => { req.destroy(); reject(new Error('Timeout conectando a Discord API (10s)')); });
+      req.end();
+    });
+
     console.log("🔌 Intentando conectar a Discord...");
-    await client.login(token);
+    // Login with 30-second timeout
+    const loginPromise = client.login(token);
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Login timeout: Discord no respondió en 30 segundos')), 30000)
+    );
+    await Promise.race([loginPromise, timeoutPromise]);
     console.log("✅ Login exitoso, esperando evento ready...");
   } catch (err) {
     console.error("❌ Fallo al iniciar sesión en Discord:", err.message);
