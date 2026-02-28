@@ -2,6 +2,7 @@
 const fs = require("fs");
 const path = require("path");
 const {
+  Collection,
   EmbedBuilder,
   SlashCommandBuilder,
   ActionRowBuilder,
@@ -524,7 +525,7 @@ module.exports = (client) => {
           .addStringOption(o => o.setName("mensaje").setDescription("Mensaje opcional").setRequired(false))
       ];
 
-      const existing = await guild.commands.fetch().catch(() => new Map());
+      const existing = await guild.commands.fetch().catch(() => new Collection());
       for (const cmd of commands) {
         const name = cmd.name;
         const existingCmd = existing.find(c => c.name === name);

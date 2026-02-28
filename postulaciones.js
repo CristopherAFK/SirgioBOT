@@ -1,7 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 const { 
-  SlashCommandBuilder, 
+  Collection,
+  SlashCommandBuilder,
   ModalBuilder, 
   TextInputBuilder, 
   TextInputStyle, 
@@ -118,7 +119,7 @@ module.exports = (client) => {
     try {
       const guild = client.guilds.cache.get(GUILD_ID) || await client.guilds.fetch(GUILD_ID).catch(() => null);
       if (!guild) return;
-      const existing = await guild.commands.fetch().catch(() => new Map());
+      const existing = await guild.commands.fetch().catch(() => new Collection());
       for (const command of commands) {
         const name = command.name;
         const existingCmd = existing.find(c => c.name === name);

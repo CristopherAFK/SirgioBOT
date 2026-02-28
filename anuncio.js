@@ -1,4 +1,5 @@
 const {
+  Collection,
   SlashCommandBuilder,
   PermissionFlagsBits,
   ModalBuilder,
@@ -12,7 +13,7 @@ const {
 const { GUILD_ID, STAFF_ROLE_ID } = require("./config");
 
 module.exports = (client) => {
-  client.on("ready", async () => {
+  client.once("ready", async () => {
     try {
       const guild = client.guilds.cache.get(GUILD_ID);
       if (!guild) return console.log("⚠️ No se encontró el servidor.");
@@ -29,7 +30,7 @@ module.exports = (client) => {
             .setRequired(true)
         );
 
-      const existing = await guild.commands.fetch().catch(() => new Map());
+      const existing = await guild.commands.fetch().catch(() => new Collection());
       if (!existing.find(c => c.name === "anuncio")) {
         await guild.commands.create(datos);
         console.log("✅ Comando /anuncio registrado en el servidor.");

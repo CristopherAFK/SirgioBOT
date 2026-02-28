@@ -1,4 +1,5 @@
 const {
+  Collection,
   SlashCommandBuilder,
   PermissionFlagsBits,
   ModalBuilder,
@@ -28,7 +29,7 @@ const colorNames = {
 const { GUILD_ID, STAFF_ROLE_ID } = require("./config");
 
 module.exports = (client) => {
-  client.on("ready", async () => {
+  client.once("ready", async () => {
     const guild = client.guilds.cache.get(GUILD_ID);
 
     const commandData = new SlashCommandBuilder()
@@ -49,7 +50,7 @@ module.exports = (client) => {
       .setDefaultMemberPermissions(PermissionFlagsBits.SendMessages);
 
     if (guild) {
-      const existing = await guild.commands.fetch().catch(() => new Map());
+      const existing = await guild.commands.fetch().catch(() => new Collection());
       if (!existing.find(c => c.name === "embed")) {
         await guild.commands.create(commandData);
         console.log("✅ Comando /embed registrado correctamente en el servidor.");

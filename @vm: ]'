@@ -1,0 +1,119 @@
+[1mdiff --git a/anuncio.js b/anuncio.js[m
+[1mindex 24b0e6d..71dd905 100644[m
+[1m--- a/anuncio.js[m
+[1m+++ b/anuncio.js[m
+[36m@@ -1,4 +1,5 @@[m
+ const {[m
+[32m+[m[32m  Collection,[m
+   SlashCommandBuilder,[m
+   PermissionFlagsBits,[m
+   ModalBuilder,[m
+[36m@@ -12,7 +13,7 @@[m [mconst {[m
+ const { GUILD_ID, STAFF_ROLE_ID } = require("./config");[m
+ [m
+ module.exports = (client) => {[m
+[31m-  client.on("ready", async () => {[m
+[32m+[m[32m  client.once("ready", async () => {[m
+     try {[m
+       const guild = client.guilds.cache.get(GUILD_ID);[m
+       if (!guild) return console.log("⚠️ No se encontró el servidor.");[m
+[36m@@ -29,7 +30,7 @@[m [mmodule.exports = (client) => {[m
+             .setRequired(true)[m
+         );[m
+ [m
+[31m-      const existing = await guild.commands.fetch().catch(() => new Map());[m
+[32m+[m[32m      const existing = await guild.commands.fetch().catch(() => new Collection());[m
+       if (!existing.find(c => c.name === "anuncio")) {[m
+         await guild.commands.create(datos);[m
+         console.log("✅ Comando /anuncio registrado en el servidor.");[m
+[1mdiff --git a/automod.js b/automod.js[m
+[1mindex f86a491..96773cc 100644[m
+[1m--- a/automod.js[m
+[1m+++ b/automod.js[m
+[36m@@ -2,6 +2,7 @@[m
+ const fs = require("fs");[m
+ const path = require("path");[m
+ const {[m
+[32m+[m[32m  Collection,[m
+   EmbedBuilder,[m
+   SlashCommandBuilder,[m
+   ActionRowBuilder,[m
+[36m@@ -524,7 +525,7 @@[m [mmodule.exports = (client) => {[m
+           .addStringOption(o => o.setName("mensaje").setDescription("Mensaje opcional").setRequired(false))[m
+       ];[m
+ [m
+[31m-      const existing = await guild.commands.fetch().catch(() => new Map());[m
+[32m+[m[32m      const existing = await guild.commands.fetch().catch(() => new Collection());[m
+       for (const cmd of commands) {[m
+         const name = cmd.name;[m
+         const existingCmd = existing.find(c => c.name === name);[m
+[1mdiff --git a/embed.js b/embed.js[m
+[1mindex ee9f91d..8c828cb 100644[m
+[1m--- a/embed.js[m
+[1m+++ b/embed.js[m
+[36m@@ -1,4 +1,5 @@[m
+ const {[m
+[32m+[m[32m  Collection,[m
+   SlashCommandBuilder,[m
+   PermissionFlagsBits,[m
+   ModalBuilder,[m
+[36m@@ -28,7 +29,7 @@[m [mconst colorNames = {[m
+ const { GUILD_ID, STAFF_ROLE_ID } = require("./config");[m
+ [m
+ module.exports = (client) => {[m
+[31m-  client.on("ready", async () => {[m
+[32m+[m[32m  client.once("ready", async () => {[m
+     const guild = client.guilds.cache.get(GUILD_ID);[m
+ [m
+     const commandData = new SlashCommandBuilder()[m
+[36m@@ -49,7 +50,7 @@[m [mmodule.exports = (client) => {[m
+       .setDefaultMemberPermissions(PermissionFlagsBits.SendMessages);[m
+ [m
+     if (guild) {[m
+[31m-      const existing = await guild.commands.fetch().catch(() => new Map());[m
+[32m+[m[32m      const existing = await guild.commands.fetch().catch(() => new Collection());[m
+       if (!existing.find(c => c.name === "embed")) {[m
+         await guild.commands.create(commandData);[m
+         console.log("✅ Comando /embed registrado correctamente en el servidor.");[m
+[36m@@ -176,4 +177,4 @@[m [mmodule.exports = (client) => {[m
+       } catch {}[m
+     }[m
+   });[m
+[31m-};[m
+\ No newline at end of file[m
+[32m+[m[32m};[m
+[1mdiff --git a/index.js b/index.js[m
+[1mindex e8157fb..a99ec3e 100644[m
+[1m--- a/index.js[m
+[1m+++ b/index.js[m
+[36m@@ -24,6 +24,7 @@[m [mconst client = new Client({[m
+   ],[m
+   partials: [Partials.Channel, Partials.Message, Partials.Reaction, Partials.User][m
+ });[m
+[32m+[m[32mclient.setMaxListeners(20);[m
+ [m
+ // Exportar cliente para que otros módulos lo usen si es necesario[m
+ // o guardar la instancia de notificaciones[m
+[1mdiff --git a/postulaciones.js b/postulaciones.js[m
+[1mindex 7072c6c..fa73f4e 100644[m
+[1m--- a/postulaciones.js[m
+[1m+++ b/postulaciones.js[m
+[36m@@ -1,7 +1,8 @@[m
+ const fs = require('fs');[m
+ const path = require('path');[m
+ const { [m
+[31m-  SlashCommandBuilder, [m
+[32m+[m[32m  Collection,[m
+[32m+[m[32m  SlashCommandBuilder,[m
+   ModalBuilder, [m
+   TextInputBuilder, [m
+   TextInputStyle, [m
+[36m@@ -118,7 +119,7 @@[m [mmodule.exports = (client) => {[m
+     try {[m
+       const guild = client.guilds.cache.get(GUILD_ID) || await client.guilds.fetch(GUILD_ID).catch(() => null);[m
+       if (!guild) return;[m
+[31m-      const existing = await guild.commands.fetch().catch(() => new Map());[m
+[32m+[m[32m      const existing = await guild.commands.fetch().catch(() => new Collection());[m
+       for (const command of commands) {[m
+         const name = command.name;[m
+         const existingCmd = existing.find(c => c.name === name);[m

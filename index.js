@@ -24,6 +24,7 @@ const client = new Client({
   ],
   partials: [Partials.Channel, Partials.Message, Partials.Reaction, Partials.User]
 });
+client.setMaxListeners(20);
 
 // Exportar cliente para que otros módulos lo usen si es necesario
 // o guardar la instancia de notificaciones
