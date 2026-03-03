@@ -703,11 +703,20 @@ function setupStaffPanel(app, client) {
   function getOpenAIClient() {
     const apiKey = "nex-h4xzje3z8iypm4vi3hpdatpo8z1zm8obmgrngywh5n8a910s";
     const baseUrl = "https://unifedapi.vercel.app/api/v1";
-    const { OpenAI } = require('openai');
-    return new OpenAI({
-      apiKey: apiKey,
-      baseURL: baseUrl
-    });
+    try {
+      const { OpenAI } = require('openai');
+      return new OpenAI({
+        apiKey: apiKey,
+        baseURL: baseUrl,
+        defaultHeaders: {
+          "HTTP-Referer": "https://replit.com",
+          "X-Title": "SirgioBOT"
+        }
+      });
+    } catch (e) {
+      console.error('[AI] Error creating OpenAI client:', e.message);
+      return null;
+    }
   }
 
   const AI_SYSTEM_PROMPT = `Eres el Asistente IA del Staff de ${serverRules.serverName}. Tu trabajo es ayudar a los moderadores a tomar decisiones correctas sobre sanciones y responder preguntas sobre las reglas del servidor.
