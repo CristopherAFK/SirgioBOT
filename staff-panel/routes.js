@@ -701,16 +701,13 @@ function setupStaffPanel(app, client) {
   const botCommands = require('./bot-commands.json');
 
   function getOpenAIClient() {
-    if (process.env.AI_INTEGRATIONS_OPENAI_BASE_URL && process.env.AI_INTEGRATIONS_OPENAI_API_KEY) {
-      return new OpenAI({
-        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-      });
-    }
-    if (process.env.OPENAI_API_KEY) {
-      return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    }
-    return null;
+    const apiKey = "nex-h4xzje3z8iypm4vi3hpdatpo8z1zm8obmgrngywh5n8a910s";
+    const baseUrl = "https://unifedapi.vercel.app/api/v1";
+    const { OpenAI } = require('openai');
+    return new OpenAI({
+      apiKey: apiKey,
+      baseURL: baseUrl
+    });
   }
 
   const AI_SYSTEM_PROMPT = `Eres el Asistente IA del Staff de ${serverRules.serverName}. Tu trabajo es ayudar a los moderadores a tomar decisiones correctas sobre sanciones y responder preguntas sobre las reglas del servidor.
@@ -820,7 +817,7 @@ INSTRUCCIONES:
       ];
 
       const completion = await openaiClient.chat.completions.create({
-        model: 'gpt-4o-mini',
+        model: 'deepseek-v3.1',
         messages,
         max_tokens: 2048,
       });
