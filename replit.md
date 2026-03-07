@@ -84,16 +84,27 @@ El bot usa **MongoDB** (compatible con MongoDB Atlas) para almacenar:
 
 ### Staff Panel Web
 - Panel web accesible en `/panel/` para gestión del servidor
-- Autenticación por clave (PANEL_KEY env var, default: "staff2024")
+- Autenticación por cuentas individuales (hardcoded en routes.js ACCOUNTS)
 - Roles: Helper, Moderador, Admin con permisos diferenciados
 - API REST en `/api/` que ejecuta acciones via Discord.js
 - Herramientas: Warn, Mute, Unmute, Ban, Timeout, Lock/Unlock/Nuke Channel, Clear Messages, Send Embed, Send DM, Edit Message, Block Links, Quarantine, Reduce Warn, View History, Server/User/Role Info
-- Audit logging para todas las acciones
 - Búsqueda de usuarios en tiempo real
+
+### Sistema de Auditoría Avanzado (Staff Panel)
+- Esquema extendido con campos `category` (USER/CHANNEL/MESSAGE/AUTOMOD/STAFF/SYSTEM) y `severity` (INFO/LOW/MEDIUM/HIGH/CRITICAL)
+- Índices compuestos para búsqueda eficiente
+- `auditEvents.js`: listeners para messageUpdate, messageDelete, guildMemberUpdate, channelCreate/Delete/Update, guildBanAdd/Remove
+- API endpoints: GET /api/logs (filtros+paginación), GET /api/logs/stats, GET /api/logs/action-types, GET/POST /api/user/:id/profile
+- Frontend con filtros avanzados (texto, categoría, severity, tipo, fechas, usuario), paginación, modo pantalla completa (fullscreen overlay z-index 5000), panel de detalle slide-in, modal de perfil de usuario
+- Auto-refresh cada 30 segundos, debounce en búsqueda, exportación de logs
+- Responsive: en móvil los filtros se apilan, tabla se convierte en cards
+- `cachedAuditLogs` para vista normal, `cachedAuditLogsFull` para vista fullscreen
+- Todas las llamadas a `db.addAuditLog()` en todo el codebase incluyen category y severity
 
 ## Estructura de Archivos
 ```
-├── index.js           # Archivo principal, sistema de tickets
+├── index.js           # Archivo principal, carga módulos y audit events
+├── auditEvents.js     # Listeners de eventos Discord para auditoría
 ├── database.js        # Conexión y funciones MongoDB
 ├── automod.js         # Sistema de moderación automática
 ├── autoroles.js       # Sistema de autoroles por reacciones
@@ -218,6 +229,14 @@ El bot usa **MongoDB** (compatible con MongoDB Atlas) para almacenar:
 - Comandos del bot: `staff-panel/bot-commands.json`
 
 ## Última Actualización
+Marzo 2026 - Sistema de Auditoría Avanzado:
+- Overhaul completo del sistema de audit logs en el Staff Panel
+- Nuevo archivo `auditEvents.js` con listeners para eventos de Discord (mensajes, canales, miembros, bans)
+- Esquema extendido con category y severity en todos los audit logs
+- Frontend con filtros, paginación, fullscreen, detalle de logs, perfiles de usuario
+- Responsive para móvil y desktop
+- Todas las llamadas existentes a addAuditLog actualizadas con category/severity
+
 Febrero 2026 - Guía de Sanciones integrada al Asistente IA:
 - Añadida la Guía de Sanciones completa (18 reglas con duraciones específicas por primera falta, reincidencia y casos graves)
 - El asistente ahora recomienda sanciones EXACTAS con duraciones específicas

@@ -131,15 +131,23 @@ function loadDashboard(status) {
     </div>
   `).join('');
 
-  loadLogs('recent-logs', 10);
+  loadRecentLogs('recent-logs', 10);
 }
 
-async function loadLogs(containerId, limit) {
+let auditCurrentPage = 1;
+let auditFullscreenPage = 1;
+let auditSearchTimer = null;
+let auditFSSearchTimer = null;
+let auditRefreshInterval = null;
+let cachedAuditLogs = [];
+let cachedAuditLogsFull = [];
+
+async function loadRecentLogs(containerId, limit) {
   try {
-    const logs = await api('GET', '/logs');
+    const result = await api('GET', '/logs?limit=' + (limit || 10));
+    const logs = result.logs || [];
     const container = document.getElementById(containerId);
-    const raw = limit ? logs.slice(0, limit) : logs;
-    const items = [...raw].reverse();
+    const items = [...logs].reverse();
     if (items.length === 0) {
       container.innerHTML = '<div class="empty-state"><div class="empty-icon">&#128220;</div><p>No hay registros aun</p></div>';
       return;
@@ -150,7 +158,7 @@ async function loadLogs(containerId, limit) {
       return `<div class="log-entry">
         <span class="log-type ${typeClass}">${log.actionType}</span>
         <span class="log-time">${date}</span>
-        <span class="log-details">${formatLogDetails(log)}</span>
+        <span class="log-details">${formatLogSummary(log)}</span>
       </div>`;
     }).join('');
   } catch (e) {
@@ -167,28 +175,434 @@ function getLogTypeClass(type) {
   return 'other';
 }
 
-function formatLogDetails(log) {
+function formatLogSummary(log) {
   const d = log.details || {};
   const parts = [];
-  if (log.targetId) parts.push(`Target: ${log.targetId}`);
-  if (log.staffId) parts.push(`Por: <@${log.staffId}>`);
+  if (d.userTag) parts.push(d.userTag);
+  else if (log.targetId) parts.push(log.targetId);
   if (d.staffName) parts.push(`Staff: ${d.staffName}`);
-  if (d.reason) { const r = String(d.reason); parts.push(`Razon: ${r.substring(0, 80)}${r.length > 80 ? '...' : ''}`); }
-  if (d.channelName) parts.push(`Canal: #${d.channelName}`);
-  if (d.duration) parts.push(`Duracion: ${d.duration}`);
-  if (d.count != null) parts.push(`Cantidad: ${d.count}`);
+  if (d.reason) { const r = String(d.reason); parts.push(`${r.substring(0, 60)}${r.length > 60 ? '...' : ''}`); }
+  if (d.channelName) parts.push(`#${d.channelName}`);
+  if (d.duration) parts.push(d.duration);
+  if (d.count != null) parts.push(`x${d.count}`);
   if (d.warnCount != null) parts.push(`Warns: ${d.warnCount}`);
-  if (d.removed != null) parts.push(`Quitados: ${d.removed}`);
-  if (d.remaining != null) parts.push(`Restantes: ${d.remaining}`);
-  if (d.title) parts.push(`Titulo: ${String(d.title).substring(0, 40)}`);
-  if (d.messagePreview) parts.push(`Mensaje: ${String(d.messagePreview).substring(0, 50)}...`);
-  if (d.enabled !== undefined) parts.push(d.enabled ? 'Activado' : 'Desactivado');
-  if (d.previousRolesCount != null) parts.push(`Roles previos: ${d.previousRolesCount}`);
-  if (d.previousRoles != null && Array.isArray(d.previousRoles)) parts.push(`Roles previos: ${d.previousRoles.length}`);
-  if (d.suggestionId) parts.push(`Sugerencia: ${d.suggestionId}`);
-  if (d.ticketNumber) parts.push(`Ticket #${d.ticketNumber}`);
-  if (d.status) parts.push(`Estado: ${d.status}`);
-  return parts.length ? parts.join(' | ') : 'Sin detalles';
+  if (d.oldContent && d.newContent) parts.push('Mensaje editado');
+  if (d.content && log.actionType === 'MESSAGE_DELETE') parts.push(d.content.substring(0, 40) + '...');
+  if (d.roles && Array.isArray(d.roles)) parts.push(d.roles.join(', '));
+  if (d.changes && Array.isArray(d.changes)) parts.push(d.changes.join(', '));
+  return parts.length ? escapeHtml(parts.join(' | ')) : 'Sin detalles';
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+async function loadAuditLogs(page) {
+  auditCurrentPage = page || 1;
+  const params = buildAuditParams('audit');
+  params.set('page', auditCurrentPage);
+  params.set('limit', 30);
+  try {
+    const result = await api('GET', '/logs?' + params.toString());
+    cachedAuditLogs = result.logs || [];
+    renderAuditTable(result.logs || [], 'audit-logs-list');
+    renderAuditPagination(result.page, result.totalPages, result.total, 'audit-pagination', loadAuditLogs);
+  } catch (e) {
+    document.getElementById('audit-logs-list').innerHTML = '<div class="empty-state"><p>Error cargando logs</p></div>';
+  }
+}
+
+async function loadAuditLogsFull(page) {
+  auditFullscreenPage = page || 1;
+  const params = buildAuditParams('audit-fs');
+  params.set('page', auditFullscreenPage);
+  params.set('limit', 50);
+  try {
+    const result = await api('GET', '/logs?' + params.toString());
+    cachedAuditLogsFull = result.logs || [];
+    renderAuditTable(cachedAuditLogsFull, 'audit-fullscreen-body');
+    renderAuditPagination(result.page, result.totalPages, result.total, 'audit-fullscreen-pagination', loadAuditLogsFull);
+  } catch (e) {
+    document.getElementById('audit-fullscreen-body').innerHTML = '<div class="empty-state"><p>Error cargando logs</p></div>';
+  }
+}
+
+function buildAuditParams(prefix) {
+  const params = new URLSearchParams();
+  const search = document.getElementById(prefix + '-search');
+  const category = document.getElementById(prefix + '-category');
+  const severity = document.getElementById(prefix + '-severity');
+  const actionType = document.getElementById(prefix + '-action-type');
+  const dateFrom = document.getElementById(prefix + '-date-from');
+  const dateTo = document.getElementById(prefix + '-date-to');
+
+  if (search && search.value) params.set('search', search.value);
+  if (category && category.value) params.set('category', category.value);
+  if (severity && severity.value) params.set('severity', severity.value);
+  if (actionType && actionType.value) params.set('actionType', actionType.value);
+  if (dateFrom && dateFrom.value) params.set('dateFrom', dateFrom.value);
+  if (dateTo && dateTo.value) params.set('dateTo', dateTo.value + 'T23:59:59');
+
+  const userIdField = document.getElementById(prefix.replace('-fs', '') + '-user-search_id');
+  if (userIdField && userIdField.value) params.set('userId', userIdField.value);
+
+  return params;
+}
+
+function renderAuditTable(logs, containerId) {
+  const container = document.getElementById(containerId);
+  if (!logs || logs.length === 0) {
+    container.innerHTML = '<div class="empty-state"><div class="empty-icon">&#128220;</div><p>No se encontraron registros</p></div>';
+    return;
+  }
+  const items = [...logs].reverse();
+  container.innerHTML = items.map((log, i) => {
+    const date = new Date(log.createdAt);
+    const timeStr = date.toLocaleString('es', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+    const cat = log.category || 'SYSTEM';
+    const sev = log.severity || 'INFO';
+    const summary = formatLogSummary(log);
+    const idx = logs.length - 1 - i;
+    return `<div class="audit-log-item" onclick="showAuditDetail(${idx}, '${containerId}')">
+      <span class="audit-log-time">${timeStr}</span>
+      <span class="audit-log-type category-${cat}">${log.actionType.replace(/_/g, ' ')}</span>
+      <span class="audit-log-severity severity-${sev}">${sev}</span>
+      <span class="audit-log-summary">${summary}</span>
+      <span class="audit-log-category category-${cat}">${cat}</span>
+    </div>`;
+  }).join('');
+}
+
+function renderAuditPagination(currentPage, totalPages, total, containerId, loadFn) {
+  const container = document.getElementById(containerId);
+  if (!totalPages || totalPages <= 1) {
+    container.innerHTML = total ? `<span class="audit-page-info">${total} registros</span>` : '';
+    return;
+  }
+  let html = `<button ${currentPage <= 1 ? 'disabled' : ''} onclick="${loadFn.name}(${currentPage - 1})">&#9664;</button>`;
+  const maxVisible = 7;
+  let start = Math.max(1, currentPage - Math.floor(maxVisible / 2));
+  let end = Math.min(totalPages, start + maxVisible - 1);
+  if (end - start < maxVisible - 1) start = Math.max(1, end - maxVisible + 1);
+  if (start > 1) {
+    html += `<button onclick="${loadFn.name}(1)">1</button>`;
+    if (start > 2) html += '<span class="audit-page-info">...</span>';
+  }
+  for (let p = start; p <= end; p++) {
+    html += `<button class="${p === currentPage ? 'active' : ''}" onclick="${loadFn.name}(${p})">${p}</button>`;
+  }
+  if (end < totalPages) {
+    if (end < totalPages - 1) html += '<span class="audit-page-info">...</span>';
+    html += `<button onclick="${loadFn.name}(${totalPages})">${totalPages}</button>`;
+  }
+  html += `<button ${currentPage >= totalPages ? 'disabled' : ''} onclick="${loadFn.name}(${currentPage + 1})">&#9654;</button>`;
+  html += `<span class="audit-page-info">${total} registros</span>`;
+  container.innerHTML = html;
+}
+
+async function loadAuditStats() {
+  try {
+    const stats = await api('GET', '/logs/stats');
+    const row = document.getElementById('audit-stats-row');
+    const catLabels = { USER: 'Usuarios', CHANNEL: 'Canales', MESSAGE: 'Mensajes', AUTOMOD: 'AutoMod', STAFF: 'Staff', SYSTEM: 'Sistema' };
+    const sevColors = { INFO: 'var(--info)', LOW: 'var(--success)', MEDIUM: 'var(--warning)', HIGH: 'var(--danger)', CRITICAL: '#ff4040' };
+    let html = `<div class="audit-stat-card"><div class="audit-stat-value">${stats.total}</div><div class="audit-stat-label">Total</div></div>`;
+    html += `<div class="audit-stat-card"><div class="audit-stat-value">${stats.today}</div><div class="audit-stat-label">Hoy</div></div>`;
+    Object.entries(stats.byCategory || {}).forEach(([cat, count]) => {
+      html += `<div class="audit-stat-card"><div class="audit-stat-value">${count}</div><div class="audit-stat-label">${catLabels[cat] || cat}</div></div>`;
+    });
+    row.innerHTML = html;
+  } catch (e) {
+    document.getElementById('audit-stats-row').innerHTML = '';
+  }
+}
+
+async function loadAuditActionTypes() {
+  try {
+    const types = await api('GET', '/logs/action-types');
+    ['audit-action-type', 'audit-fs-action-type'].forEach(id => {
+      const sel = document.getElementById(id);
+      if (!sel) return;
+      const current = sel.value;
+      sel.innerHTML = '<option value="">Todos</option>' + types.map(t => `<option value="${t}" ${t === current ? 'selected' : ''}>${t.replace(/_/g, ' ')}</option>`).join('');
+    });
+  } catch (e) {}
+}
+
+function debounceAuditSearch() {
+  clearTimeout(auditSearchTimer);
+  auditSearchTimer = setTimeout(() => loadAuditLogs(1), 400);
+}
+
+function debounceAuditFSSearch() {
+  clearTimeout(auditFSSearchTimer);
+  auditFSSearchTimer = setTimeout(() => loadAuditLogsFull(1), 400);
+}
+
+function applyAuditUserFilter() {
+  loadAuditLogs(1);
+}
+
+function clearAuditFilters() {
+  ['audit-search', 'audit-category', 'audit-severity', 'audit-action-type', 'audit-date-from', 'audit-date-to', 'audit-user-search', 'audit-user-search_id'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  loadAuditLogs(1);
+}
+
+function toggleAuditFullscreen() {
+  const overlay = document.getElementById('audit-fullscreen-overlay');
+  const isActive = overlay.classList.contains('active');
+  if (isActive) {
+    overlay.classList.remove('active');
+    document.body.style.overflow = '';
+  } else {
+    overlay.classList.add('active');
+    document.body.style.overflow = 'hidden';
+    loadAuditActionTypes();
+    loadAuditLogsFull(1);
+  }
+}
+
+function showAuditDetail(idx, containerId) {
+  const logs = containerId === 'audit-logs-list' ? cachedAuditLogs : cachedAuditLogsFull;
+  const log = logs[idx];
+  if (!log) return;
+  const panel = document.getElementById('audit-detail-panel');
+  const backdrop = document.getElementById('audit-detail-backdrop');
+  const body = document.getElementById('audit-detail-body');
+
+  const date = new Date(log.createdAt).toLocaleString('es', { dateStyle: 'full', timeStyle: 'medium' });
+  const d = log.details || {};
+
+  let detailsHtml = '';
+  Object.entries(d).forEach(([key, val]) => {
+    if (val === null || val === undefined) return;
+    let displayVal = val;
+    if (Array.isArray(val)) displayVal = val.join(', ');
+    else if (typeof val === 'object') displayVal = JSON.stringify(val, null, 2);
+    else displayVal = String(val);
+    const label = key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase());
+    detailsHtml += `<div class="audit-detail-field"><div class="detail-label">${escapeHtml(label)}</div><div class="detail-value">${escapeHtml(displayVal)}</div></div>`;
+  });
+
+  const targetClickable = log.targetId ? `<span class="detail-value clickable" onclick="openUserProfile('${log.targetId}')">${escapeHtml(d.userTag || log.targetId)}</span>` : '<span class="detail-value">-</span>';
+
+  body.innerHTML = `
+    <div class="audit-detail-field">
+      <div class="detail-label">Fecha y Hora</div>
+      <div class="detail-value">${date}</div>
+    </div>
+    <div class="audit-detail-field">
+      <div class="detail-label">Tipo de Accion</div>
+      <div class="detail-value"><span class="audit-log-type category-${log.category || 'SYSTEM'}">${log.actionType}</span></div>
+    </div>
+    <div class="audit-detail-field">
+      <div class="detail-label">Categoria</div>
+      <div class="detail-value"><span class="audit-log-category category-${log.category || 'SYSTEM'}">${log.category || 'SYSTEM'}</span></div>
+    </div>
+    <div class="audit-detail-field">
+      <div class="detail-label">Gravedad</div>
+      <div class="detail-value"><span class="audit-log-severity severity-${log.severity || 'INFO'}">${log.severity || 'INFO'}</span></div>
+    </div>
+    <div class="audit-detail-field">
+      <div class="detail-label">Objetivo</div>
+      ${targetClickable}
+    </div>
+    <div class="audit-detail-field">
+      <div class="detail-label">Staff</div>
+      <div class="detail-value">${escapeHtml(d.staffName || log.staffId || '-')}</div>
+    </div>
+    <hr style="border-color:var(--border);margin:12px 0">
+    <h4 style="font-size:13px;color:var(--text-muted);text-transform:uppercase;margin-bottom:10px">Detalles</h4>
+    ${detailsHtml || '<p style="color:var(--text-muted)">Sin detalles adicionales</p>'}
+  `;
+
+  panel.classList.add('active');
+  backdrop.classList.add('active');
+}
+
+function closeAuditDetail() {
+  document.getElementById('audit-detail-panel').classList.remove('active');
+  document.getElementById('audit-detail-backdrop').classList.remove('active');
+}
+
+async function openUserProfile(userId) {
+  closeAuditDetail();
+  const overlay = document.getElementById('user-profile-overlay');
+  const body = document.getElementById('user-profile-body');
+  body.innerHTML = '<div class="empty-state"><div class="loading"></div><p>Cargando perfil...</p></div>';
+  overlay.classList.add('active');
+
+  try {
+    const profile = await api('GET', '/user/' + userId + '/profile');
+    const joinDate = new Date(profile.joinedAt).toLocaleDateString('es');
+    const createDate = new Date(profile.createdAt).toLocaleDateString('es');
+    const statusColors = { online: 'var(--success)', idle: 'var(--warning)', dnd: 'var(--danger)', offline: 'var(--text-muted)' };
+    const statusLabels = { online: 'En linea', idle: 'Ausente', dnd: 'No molestar', offline: 'Desconectado' };
+
+    let sanctionsHtml = '';
+    if (profile.sanctions && profile.sanctions.length > 0) {
+      sanctionsHtml = profile.sanctions.slice(0, 10).map(s => {
+        const sDate = new Date(s.date).toLocaleDateString('es');
+        return `<div class="user-profile-sanction-item">
+          <span class="sanction-type" style="color:${s.type === 'BAN' ? 'var(--danger)' : s.type === 'MUTE' ? 'var(--info)' : 'var(--warning)'}">${s.type}</span>
+          - ${escapeHtml(s.reason || '-')} ${s.duration ? '(' + s.duration + ')' : ''}
+          <div class="sanction-date">${sDate}</div>
+        </div>`;
+      }).join('');
+    } else {
+      sanctionsHtml = '<p style="color:var(--text-muted);font-size:13px">Sin sanciones registradas</p>';
+    }
+
+    let warningsHtml = '';
+    if (profile.warnings && profile.warnings.length > 0) {
+      warningsHtml = profile.warnings.slice(0, 10).map(w => {
+        const wDate = new Date(w.date).toLocaleDateString('es');
+        return `<div class="user-profile-sanction-item">
+          <span class="sanction-type" style="color:var(--warning)">WARN</span>
+          - ${escapeHtml(w.reason || '-')}
+          <div class="sanction-date">${wDate}</div>
+        </div>`;
+      }).join('');
+    } else {
+      warningsHtml = '<p style="color:var(--text-muted);font-size:13px">Sin advertencias</p>';
+    }
+
+    const rolesHtml = profile.roles.map(r => `<span class="user-profile-role"><span class="role-dot" style="background:${r.color}"></span>${escapeHtml(r.name)}</span>`).join('');
+
+    const isAdmin = ['admin', 'owner'].includes(currentRole);
+    let editSection = '';
+    if (isAdmin) {
+      const roleOptions = rolesCache.map(r => {
+        const hasRole = profile.roles.some(pr => pr.id === r.id);
+        return `<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-secondary);cursor:pointer">
+          <input type="checkbox" class="profile-role-check" value="${r.id}" ${hasRole ? 'checked' : ''} data-was="${hasRole}">${escapeHtml(r.name)}
+        </label>`;
+      }).join('');
+      editSection = `
+        <div class="user-profile-edit-section">
+          <h4 style="font-size:13px;color:var(--text-muted);text-transform:uppercase;margin-bottom:8px">Modificar Usuario</h4>
+          <div class="form-group" style="margin-bottom:10px">
+            <label style="font-size:11px">Apodo</label>
+            <input type="text" id="profile-edit-nickname" value="${escapeHtml(profile.displayName)}" placeholder="Nuevo apodo...">
+          </div>
+          <div class="form-group" style="margin-bottom:10px;max-height:150px;overflow-y:auto">
+            <label style="font-size:11px">Roles</label>
+            <div style="display:flex;flex-direction:column;gap:4px;margin-top:4px">${roleOptions}</div>
+          </div>
+          <button class="btn btn-sm btn-primary" onclick="saveUserProfile('${profile.id}')">Guardar Cambios</button>
+        </div>`;
+    }
+
+    let actionsHtml = '';
+    if (permissions.includes('warn')) actionsHtml += `<button class="btn btn-sm btn-warning" onclick="closeUserProfile();openTool('warn');setTimeout(()=>{selectUser('warn-user','${profile.id}','${escapeHtml(profile.tag)}')},200)">Warn</button>`;
+    if (permissions.includes('mute')) actionsHtml += `<button class="btn btn-sm btn-info" onclick="closeUserProfile();openTool('mute');setTimeout(()=>{selectUser('mute-user','${profile.id}','${escapeHtml(profile.tag)}')},200)">Mute</button>`;
+    if (permissions.includes('ban')) actionsHtml += `<button class="btn btn-sm btn-danger" onclick="closeUserProfile();openTool('ban');setTimeout(()=>{selectUser('ban-user','${profile.id}','${escapeHtml(profile.tag)}')},200)">Ban</button>`;
+    if (permissions.includes('send_dm')) actionsHtml += `<button class="btn btn-sm btn-primary" onclick="closeUserProfile();openTool('send_dm');setTimeout(()=>{selectUser('dm-user','${profile.id}','${escapeHtml(profile.tag)}')},200)">DM</button>`;
+
+    body.innerHTML = `
+      <div class="user-profile-top">
+        <img src="${profile.avatar}" class="user-profile-avatar" alt="">
+        <div class="user-profile-info">
+          <h3>${escapeHtml(profile.displayName)}</h3>
+          <div style="font-size:13px;color:var(--text-secondary)">${escapeHtml(profile.tag)}</div>
+          <div class="user-profile-id">${profile.id}</div>
+          <div class="user-profile-status" style="color:${statusColors[profile.status] || 'var(--text-muted)'}">${statusLabels[profile.status] || profile.status}</div>
+        </div>
+      </div>
+      <div class="user-profile-section">
+        <h4>Informacion</h4>
+        <div class="info-grid">
+          <div class="info-item"><div class="info-label">Se unio</div><div class="info-value">${joinDate}</div></div>
+          <div class="info-item"><div class="info-label">Cuenta creada</div><div class="info-value">${createDate}</div></div>
+          <div class="info-item"><div class="info-label">Warns activos</div><div class="info-value" style="color:var(--warning)">${profile.totalWarns}</div></div>
+          <div class="info-item"><div class="info-label">Sanciones</div><div class="info-value" style="color:var(--danger)">${profile.totalSanctions}</div></div>
+        </div>
+      </div>
+      <div class="user-profile-section">
+        <h4>Roles (${profile.roles.length})</h4>
+        <div class="user-profile-roles">${rolesHtml || '<span style="color:var(--text-muted);font-size:13px">Sin roles</span>'}</div>
+      </div>
+      <div class="user-profile-section">
+        <h4>Advertencias</h4>
+        <div class="user-profile-sanctions-list">${warningsHtml}</div>
+      </div>
+      <div class="user-profile-section">
+        <h4>Sanciones</h4>
+        <div class="user-profile-sanctions-list">${sanctionsHtml}</div>
+      </div>
+      ${actionsHtml ? '<div class="user-profile-actions">' + actionsHtml + '</div>' : ''}
+      ${editSection}
+    `;
+  } catch (e) {
+    body.innerHTML = `<div class="empty-state"><p style="color:var(--danger)">Error: ${escapeHtml(e.message)}</p></div>`;
+  }
+}
+
+function closeUserProfile() {
+  document.getElementById('user-profile-overlay').classList.remove('active');
+}
+
+async function saveUserProfile(userId) {
+  const nickname = document.getElementById('profile-edit-nickname').value;
+  const checks = document.querySelectorAll('.profile-role-check');
+  const addRoles = [];
+  const removeRoles = [];
+  checks.forEach(ch => {
+    const was = ch.dataset.was === 'true';
+    if (ch.checked && !was) addRoles.push(ch.value);
+    if (!ch.checked && was) removeRoles.push(ch.value);
+  });
+  try {
+    const result = await api('POST', '/user/' + userId + '/update', { nickname, addRoles, removeRoles });
+    toast('Perfil actualizado: ' + (result.changes || []).join(', '), 'success');
+    openUserProfile(userId);
+  } catch (e) {
+    toast('Error: ' + e.message, 'error');
+  }
+}
+
+async function exportAuditLogs() {
+  const params = buildAuditParams('audit');
+  params.set('limit', 1000);
+  try {
+    const result = await api('GET', '/logs?' + params.toString());
+    const logs = result.logs || [];
+    if (logs.length === 0) return toast('No hay logs para exportar', 'warning');
+    const lines = logs.map(l => {
+      const d = l.details || {};
+      return `${new Date(l.createdAt).toISOString()}\t${l.actionType}\t${l.category || ''}\t${l.severity || ''}\t${l.targetId || ''}\t${l.staffId || ''}\t${d.staffName || ''}\t${d.reason || ''}\t${d.userTag || ''}`;
+    });
+    const header = 'Fecha\tTipo\tCategoria\tGravedad\tTarget\tStaff ID\tStaff\tRazon\tUsuario';
+    const csv = header + '\n' + lines.join('\n');
+    const blob = new Blob([csv], { type: 'text/tab-separated-values' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'audit_logs_' + new Date().toISOString().split('T')[0] + '.tsv';
+    a.click();
+    URL.revokeObjectURL(url);
+    toast('Logs exportados', 'success');
+  } catch (e) {
+    toast('Error exportando: ' + e.message, 'error');
+  }
+}
+
+function initAuditPage() {
+  loadAuditStats();
+  loadAuditActionTypes();
+  loadAuditLogs(1);
+  if (auditRefreshInterval) clearInterval(auditRefreshInterval);
+  auditRefreshInterval = setInterval(() => {
+    const logsPage = document.getElementById('page-logs');
+    if (logsPage && logsPage.style.display !== 'none') {
+      loadAuditStats();
+    }
+  }, 30000);
 }
 
 async function loadChannels() {
@@ -213,7 +627,7 @@ function navigateTo(page) {
   document.getElementById('page-' + page).style.display = 'block';
   document.querySelector(`.nav-item[data-page="${page}"]`).classList.add('active');
 
-  if (page === 'logs') loadLogs('all-logs');
+  if (page === 'logs') initAuditPage();
   if (page === 'dashboard') initApp();
   if (page === 'notes') loadNotesPage();
   if (page === 'settings') renderThemeSettings();

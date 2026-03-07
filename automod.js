@@ -730,7 +730,7 @@ module.exports = (client) => {
             channelId: channel.id,
             ticketNumber: number,
             category: 'apelacion'
-          });
+          }, 'SYSTEM', 'INFO');
 
           const claimBtn = new ButtonBuilder().setCustomId(`claim_ticket_${channel.id}`).setLabel("🧑‍💼 Atender ticket").setStyle(ButtonStyle.Primary);
           const ticketRow = new ActionRowBuilder().addComponents(claimBtn);

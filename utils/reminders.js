@@ -62,7 +62,7 @@ async function checkInactiveTickets(client) {
           channelId: ticket.channelId,
           ticketNumber: ticket.ticketNumber,
           reason: 'Ticket sin atender por más de 1 hora'
-        });
+        }, 'SYSTEM', 'LOW');
 
       } catch (err) {
         console.error('Error enviando recordatorio:', err);

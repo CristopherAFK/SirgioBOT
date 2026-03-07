@@ -75,12 +75,18 @@ const ticketStatsSchema = new mongoose.Schema({
 
 const auditLogSchema = new mongoose.Schema({
   actionType: { type: String, required: true, index: true },
+  category: { type: String, default: 'SYSTEM', index: true, enum: ['USER', 'CHANNEL', 'MESSAGE', 'AUTOMOD', 'STAFF', 'SYSTEM'] },
+  severity: { type: String, default: 'INFO', index: true, enum: ['INFO', 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] },
   odId: { type: String, default: null, index: true },
-  targetId: { type: String, default: null },
-  staffId: { type: String, default: null },
+  targetId: { type: String, default: null, index: true },
+  staffId: { type: String, default: null, index: true },
   details: { type: mongoose.Schema.Types.Mixed, default: {} },
-  createdAt: { type: Date, default: Date.now }
+  createdAt: { type: Date, default: Date.now, index: true }
 });
+auditLogSchema.index({ category: 1, createdAt: -1 });
+auditLogSchema.index({ severity: 1, createdAt: -1 });
+auditLogSchema.index({ targetId: 1, createdAt: -1 });
+auditLogSchema.index({ staffId: 1, createdAt: -1 });
 
 const configSchema = new mongoose.Schema({
   key: { type: String, required: true, unique: true },
@@ -340,8 +346,8 @@ const db = {
     };
   },
 
-  async addAuditLog(actionType, odId = null, targetId = null, staffId = null, details = {}) {
-    const log = new AuditLog({ actionType, odId, targetId, staffId, details });
+  async addAuditLog(actionType, odId = null, targetId = null, staffId = null, details = {}, category = 'SYSTEM', severity = 'INFO') {
+    const log = new AuditLog({ actionType, odId, targetId, staffId, details, category, severity });
     return await log.save();
   },
 
@@ -349,8 +355,53 @@ const db = {
     const query = {};
     if (options.odId) query.odId = options.odId;
     if (options.actionType) query.actionType = new RegExp(options.actionType, 'i');
-    
-    return await AuditLog.find(query).sort({ createdAt: -1 }).limit(options.limit || 50);
+    if (options.category) query.category = options.category;
+    if (options.severity) query.severity = options.severity;
+    if (options.targetId) query.targetId = options.targetId;
+    if (options.staffId) query.staffId = options.staffId;
+    if (options.dateFrom || options.dateTo) {
+      query.createdAt = {};
+      if (options.dateFrom) query.createdAt.$gte = new Date(options.dateFrom);
+      if (options.dateTo) query.createdAt.$lte = new Date(options.dateTo);
+    }
+    if (options.search) {
+      query.$or = [
+        { actionType: new RegExp(options.search, 'i') },
+        { 'details.staffName': new RegExp(options.search, 'i') },
+        { 'details.reason': new RegExp(options.search, 'i') },
+        { 'details.channelName': new RegExp(options.search, 'i') },
+        { targetId: new RegExp(options.search, 'i') },
+        { staffId: new RegExp(options.search, 'i') }
+      ];
+    }
+
+    const page = parseInt(options.page) || 1;
+    const limit = parseInt(options.limit) || 50;
+    const skip = (page - 1) * limit;
+    const total = await AuditLog.countDocuments(query);
+    const logs = await AuditLog.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit);
+
+    return { logs, total, page, limit, totalPages: Math.ceil(total / limit) };
+  },
+
+  async getAuditLogStats() {
+    const [byCategory, bySeverity, total, todayCount] = await Promise.all([
+      AuditLog.aggregate([{ $group: { _id: '$category', count: { $sum: 1 } } }]),
+      AuditLog.aggregate([{ $group: { _id: '$severity', count: { $sum: 1 } } }]),
+      AuditLog.countDocuments(),
+      AuditLog.countDocuments({ createdAt: { $gte: new Date(new Date().setHours(0, 0, 0, 0)) } })
+    ]);
+    return {
+      total,
+      today: todayCount,
+      byCategory: Object.fromEntries(byCategory.map(c => [c._id || 'SYSTEM', c.count])),
+      bySeverity: Object.fromEntries(bySeverity.map(s => [s._id || 'INFO', s.count]))
+    };
+  },
+
+  async getAuditLogActionTypes() {
+    const types = await AuditLog.distinct('actionType');
+    return types.sort();
   },
 
   async getConfig(key) {

@@ -250,8 +250,9 @@ module.exports = (client) => {
           await db.addAuditLog('SUGGESTION_CREATE', interaction.user.id, null, null, {
             suggestionId,
             title,
-            messageId: publicMessage.id
-          });
+            messageId: publicMessage.id,
+            userTag: interaction.user.tag
+          }, 'SYSTEM', 'INFO');
 
           await interaction.editReply({
             content: `✅ Tu sugerencia ha sido enviada correctamente. Puedes verla en <#${SUGGESTIONS_CHANNEL_ID}>`
@@ -335,7 +336,7 @@ module.exports = (client) => {
               suggestionId,
               status: dbStatus,
               reason
-            });
+            }, 'STAFF', 'LOW');
 
             await interaction.editReply({ content: `✅ Sugerencia marcada como **${statusText}**.` });
           } catch (error) {

@@ -222,7 +222,7 @@ function setupStaffPanel(app, client) {
       if (!member) return res.status(404).json({ error: 'Usuario no encontrado' });
       await db.addWarning(userId, 'staff-panel', reason, 'staff-panel');
       const warnCount = await db.getWarningCount(userId);
-      await db.addAuditLog('WARN', null, userId, req.session.discordId, { reason, warnCount, staffName: req.session.username });
+      await db.addAuditLog('WARN', null, userId, req.session.discordId, { reason, warnCount, staffName: req.session.username, userTag: member.user.tag }, 'STAFF', 'MEDIUM');
       sendModLog(client, 'warn', { userTag: member.user.tag, userId, staffName: req.session.username, reason, warnCount }).catch(() => {});
       const warnDmEmbed = buildModLogEmbed('warn', { userTag: member.user.tag, userId, staffName: req.session.username, reason, warnCount });
       if (warnDmEmbed) await member.send({ embeds: [warnDmEmbed] }).catch(() => {});
@@ -252,7 +252,7 @@ function setupStaffPanel(app, client) {
       }
       await db.addMute(userId, 'staff-panel', reason, expiresAt);
       await db.addSanction(userId, 'staff-panel', 'MUTE', reason, 'staff-panel', duration);
-      await db.addAuditLog('MUTE', null, userId, req.session.discordId, { reason, duration, staffName: req.session.username });
+      await db.addAuditLog('MUTE', null, userId, req.session.discordId, { reason, duration, staffName: req.session.username, userTag: member.user.tag }, 'STAFF', 'MEDIUM');
       sendModLog(client, 'mute', { userTag: member.user.tag, userId, staffName: req.session.username, reason, duration }).catch(() => {});
       const muteDmEmbed = buildModLogEmbed('mute', { userTag: member.user.tag, userId, staffName: req.session.username, reason, duration });
       if (muteDmEmbed) await member.send({ embeds: [muteDmEmbed] }).catch(() => {});
@@ -277,7 +277,7 @@ function setupStaffPanel(app, client) {
       }
       await member.timeout(null);
       await db.removeMute(userId);
-      await db.addAuditLog('UNMUTE', null, userId, req.session.discordId, { staffName: req.session.username });
+      await db.addAuditLog('UNMUTE', null, userId, req.session.discordId, { staffName: req.session.username, userTag: member.user.tag }, 'STAFF', 'MEDIUM');
       sendModLog(client, 'unmute', { userTag: member.user.tag, userId, staffName: req.session.username }).catch(() => {});
       const unmuteDmEmbed = buildModLogEmbed('unmute', { userTag: member.user.tag, userId, staffName: req.session.username });
       if (unmuteDmEmbed) await member.send({ embeds: [unmuteDmEmbed] }).catch(() => {});
@@ -302,7 +302,7 @@ function setupStaffPanel(app, client) {
       }
       await guild.members.ban(userId, { reason, deleteMessageSeconds: 0 });
       await db.addSanction(userId, 'staff-panel', 'BAN', reason, 'staff-panel');
-      await db.addAuditLog('BAN', null, userId, req.session.discordId, { reason, staffName: req.session.username });
+      await db.addAuditLog('BAN', null, userId, req.session.discordId, { reason, staffName: req.session.username, userTag: userTag }, 'STAFF', 'HIGH');
       sendModLog(client, 'ban', { userTag: userTag, userId, staffName: req.session.username, reason }).catch(() => {});
       res.json({ success: true, user: userTag });
     } catch (err) {
@@ -323,7 +323,7 @@ function setupStaffPanel(app, client) {
       if (!ms) return res.status(400).json({ error: 'Duración inválida' });
       await member.timeout(ms, reason);
       await db.addSanction(userId, 'staff-panel', 'TIMEOUT', reason, 'staff-panel', duration);
-      await db.addAuditLog('TIMEOUT', null, userId, req.session.discordId, { reason, duration, staffName: req.session.username });
+      await db.addAuditLog('TIMEOUT', null, userId, req.session.discordId, { reason, duration, staffName: req.session.username, userTag: member.user.tag }, 'STAFF', 'MEDIUM');
       sendModLog(client, 'timeout', { userTag: member.user.tag, userId, staffName: req.session.username, reason, duration }).catch(() => {});
       const timeoutDmEmbed = buildModLogEmbed('timeout', { userTag: member.user.tag, userId, staffName: req.session.username, reason, duration });
       if (timeoutDmEmbed) await member.send({ embeds: [timeoutDmEmbed] }).catch(() => {});
@@ -345,7 +345,7 @@ function setupStaffPanel(app, client) {
       const channel = guild.channels.cache.get(channelId);
       if (!channel) return res.status(404).json({ error: 'Canal no encontrado' });
       await channel.permissionOverwrites.edit(guild.id, { SendMessages: false });
-      await db.addAuditLog('LOCK_CHANNEL', null, channelId, req.session.discordId, { channelName: channel.name, channelId, staffName: req.session.username });
+      await db.addAuditLog('LOCK_CHANNEL', null, channelId, req.session.discordId, { channelName: channel.name, channelId, staffName: req.session.username }, 'CHANNEL', 'LOW');
       res.json({ success: true, channel: channel.name });
     } catch (err) {
       res.status(500).json({ error: err.message });
@@ -362,7 +362,7 @@ function setupStaffPanel(app, client) {
       const channel = guild.channels.cache.get(channelId);
       if (!channel) return res.status(404).json({ error: 'Canal no encontrado' });
       await channel.permissionOverwrites.edit(guild.id, { SendMessages: null });
-      await db.addAuditLog('UNLOCK_CHANNEL', null, channelId, req.session.discordId, { channelName: channel.name, channelId, staffName: req.session.username });
+      await db.addAuditLog('UNLOCK_CHANNEL', null, channelId, req.session.discordId, { channelName: channel.name, channelId, staffName: req.session.username }, 'CHANNEL', 'LOW');
       res.json({ success: true, channel: channel.name });
     } catch (err) {
       res.status(500).json({ error: err.message });
@@ -382,7 +382,7 @@ function setupStaffPanel(app, client) {
       if (channel.parent) await newChannel.setParent(channel.parent.id);
       await newChannel.setPosition(channel.position);
       await channel.delete('Nuke - Staff Panel');
-      await db.addAuditLog('NUKE_CHANNEL', null, channelId, req.session.discordId, { channelName: channel.name, channelId, staffName: req.session.username });
+      await db.addAuditLog('NUKE_CHANNEL', null, channelId, req.session.discordId, { channelName: channel.name, channelId, staffName: req.session.username }, 'CHANNEL', 'HIGH');
       res.json({ success: true, channel: newChannel.name, newChannelId: newChannel.id });
     } catch (err) {
       res.status(500).json({ error: err.message });
@@ -401,7 +401,7 @@ function setupStaffPanel(app, client) {
       const channel = guild.channels.cache.get(channelId);
       if (!channel) return res.status(404).json({ error: 'Canal no encontrado' });
       const deleted = await channel.bulkDelete(count, true);
-      await db.addAuditLog('CLEAR_MESSAGES', null, channelId, req.session.discordId, { channelName: channel.name, channelId, count: deleted.size, staffName: req.session.username });
+      await db.addAuditLog('CLEAR_MESSAGES', null, channelId, req.session.discordId, { channelName: channel.name, channelId, count: deleted.size, staffName: req.session.username }, 'CHANNEL', 'MEDIUM');
       res.json({ success: true, channel: channel.name, deleted: deleted.size });
     } catch (err) {
       res.status(500).json({ error: err.message });
@@ -429,7 +429,7 @@ function setupStaffPanel(app, client) {
       if (authorName) embed.setAuthor({ name: authorName, iconURL: authorIconUrl || undefined });
       if (timestamp !== false) embed.setTimestamp();
       await channel.send({ embeds: [embed] });
-      await db.addAuditLog('SEND_EMBED', null, channelId, req.session.discordId, { title, channelName: channel.name, staffName: req.session.username });
+      await db.addAuditLog('SEND_EMBED', null, channelId, req.session.discordId, { title, channelName: channel.name, staffName: req.session.username }, 'STAFF', 'INFO');
       res.json({ success: true, channel: channel.name });
     } catch (err) {
       res.status(500).json({ error: err.message });
@@ -460,7 +460,7 @@ function setupStaffPanel(app, client) {
         await user.send(message);
       }
       const preview = message ? message.substring(0, 100) : (embedTitle || '');
-      await db.addAuditLog('SEND_DM', null, userId, req.session.discordId, { messagePreview: preview, staffName: req.session.username });
+      await db.addAuditLog('SEND_DM', null, userId, req.session.discordId, { messagePreview: preview, staffName: req.session.username, userTag: user.tag }, 'STAFF', 'INFO');
       res.json({ success: true, user: user.tag });
     } catch (err) {
       res.status(500).json({ error: err.message });
@@ -480,7 +480,7 @@ function setupStaffPanel(app, client) {
       if (!message) return res.status(404).json({ error: 'Mensaje no encontrado' });
       if (message.author.id !== client.user.id) return res.status(400).json({ error: 'Solo se pueden editar mensajes del bot' });
       await message.edit(newContent);
-      await db.addAuditLog('EDIT_MESSAGE', null, messageId, req.session.discordId, { channelName: channel.name, channelId, staffName: req.session.username });
+      await db.addAuditLog('EDIT_MESSAGE', null, messageId, req.session.discordId, { channelName: channel.name, channelId, staffName: req.session.username }, 'MESSAGE', 'LOW');
       res.json({ success: true, channel: channel.name });
     } catch (err) {
       res.status(500).json({ error: err.message });
@@ -493,7 +493,7 @@ function setupStaffPanel(app, client) {
     if (!channelId) return res.status(400).json({ error: 'Faltan campos' });
     try {
       await db.setConfig(`block_links_${channelId}`, !!enabled);
-      await db.addAuditLog('BLOCK_LINKS', null, channelId, req.session.discordId, { enabled: !!enabled, channelId, staffName: req.session.username });
+      await db.addAuditLog('BLOCK_LINKS', null, channelId, req.session.discordId, { enabled: !!enabled, channelId, staffName: req.session.username }, 'AUTOMOD', 'LOW');
       res.json({ success: true, enabled: !!enabled });
     } catch (err) {
       res.status(500).json({ error: err.message });
@@ -517,7 +517,7 @@ function setupStaffPanel(app, client) {
       await db.setConfig(`quarantine_roles_${userId}`, currentRoles);
       await member.roles.set([quarantineRole.id]);
       await db.addSanction(userId, 'staff-panel', 'QUARANTINE', 'Aislado via Staff Panel', 'staff-panel');
-      await db.addAuditLog('QUARANTINE', null, userId, req.session.discordId, { previousRolesCount: currentRoles.length, staffName: req.session.username });
+      await db.addAuditLog('QUARANTINE', null, userId, req.session.discordId, { previousRolesCount: currentRoles.length, staffName: req.session.username, userTag: member.user.tag }, 'STAFF', 'CRITICAL');
       res.json({ success: true, user: member.user.tag });
     } catch (err) {
       res.status(500).json({ error: err.message });
@@ -537,7 +537,7 @@ function setupStaffPanel(app, client) {
         else break;
       }
       const remaining = await db.getWarningCount(userId);
-      await db.addAuditLog('REDUCE_WARN', null, userId, req.session.discordId, { removed, remaining, staffName: req.session.username });
+      await db.addAuditLog('REDUCE_WARN', null, userId, req.session.discordId, { removed, remaining, staffName: req.session.username }, 'STAFF', 'LOW');
       res.json({ success: true, removed, remaining });
     } catch (err) {
       res.status(500).json({ error: err.message });
@@ -870,8 +870,113 @@ INSTRUCCIONES:
 
   router.get('/logs', authenticate, async (req, res) => {
     try {
-      const logs = await db.getAuditLogs({ limit: 100 });
-      res.json(logs);
+      const options = {
+        page: req.query.page,
+        limit: req.query.limit || 50,
+        category: req.query.category,
+        severity: req.query.severity,
+        actionType: req.query.actionType,
+        targetId: req.query.userId || req.query.targetId,
+        staffId: req.query.staffId,
+        dateFrom: req.query.dateFrom,
+        dateTo: req.query.dateTo,
+        search: req.query.search
+      };
+      Object.keys(options).forEach(k => { if (!options[k]) delete options[k]; });
+      const result = await db.getAuditLogs(options);
+      res.json(result);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.get('/logs/stats', authenticate, async (req, res) => {
+    try {
+      const stats = await db.getAuditLogStats();
+      res.json(stats);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.get('/logs/action-types', authenticate, async (req, res) => {
+    try {
+      const types = await db.getAuditLogActionTypes();
+      res.json(types);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.get('/user/:userId/profile', authenticate, async (req, res) => {
+    try {
+      const guild = getGuild();
+      if (!guild) return res.status(503).json({ error: 'Bot no conectado' });
+      const member = await guild.members.fetch(req.params.userId).catch(() => null);
+      if (!member) return res.status(404).json({ error: 'Usuario no encontrado' });
+      const [warnings, sanctions, auditResult] = await Promise.all([
+        db.getWarnings(req.params.userId),
+        db.getSanctions(req.params.userId),
+        db.getAuditLogs({ targetId: req.params.userId, limit: 20 })
+      ]);
+      res.json({
+        id: member.id,
+        tag: member.user.tag,
+        displayName: member.displayName,
+        avatar: member.user.displayAvatarURL({ size: 256 }),
+        banner: member.user.bannerURL({ size: 512 }) || null,
+        joinedAt: member.joinedAt,
+        createdAt: member.user.createdAt,
+        roles: member.roles.cache.filter(r => r.id !== guild.id).map(r => ({ id: r.id, name: r.name, color: r.hexColor, position: r.position })).sort((a, b) => b.position - a.position),
+        isBot: member.user.bot,
+        status: member.presence?.status || 'offline',
+        warnings,
+        sanctions,
+        recentLogs: auditResult.logs || [],
+        totalWarns: warnings.length,
+        totalSanctions: sanctions.length
+      });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.post('/user/:userId/update', authenticate, async (req, res) => {
+    if (!['admin', 'owner'].includes(req.session.role)) return res.status(403).json({ error: 'Solo admins pueden modificar usuarios' });
+    const { nickname, addRoles, removeRoles } = req.body;
+    try {
+      const guild = getGuild();
+      if (!guild) return res.status(503).json({ error: 'Bot no conectado' });
+      const member = await guild.members.fetch(req.params.userId).catch(() => null);
+      if (!member) return res.status(404).json({ error: 'Usuario no encontrado' });
+      const changes = [];
+      if (nickname !== undefined) {
+        const oldNick = member.displayName;
+        await member.setNickname(nickname || null);
+        changes.push(`Apodo: ${oldNick} -> ${nickname || member.user.username}`);
+        await db.addAuditLog('USER_NICKNAME_CHANGE', null, req.params.userId, req.session.discordId, { oldNickname: oldNick, newNickname: nickname || member.user.username, staffName: req.session.username, userTag: member.user.tag }, 'USER', 'LOW');
+      }
+      if (addRoles && addRoles.length > 0) {
+        for (const roleId of addRoles) {
+          const role = guild.roles.cache.get(roleId);
+          if (role) {
+            await member.roles.add(role);
+            changes.push(`+Rol: ${role.name}`);
+          }
+        }
+        await db.addAuditLog('USER_ROLES_ADD', null, req.params.userId, req.session.discordId, { rolesAdded: addRoles.length, staffName: req.session.username, userTag: member.user.tag }, 'USER', 'MEDIUM');
+      }
+      if (removeRoles && removeRoles.length > 0) {
+        for (const roleId of removeRoles) {
+          const role = guild.roles.cache.get(roleId);
+          if (role) {
+            await member.roles.remove(role);
+            changes.push(`-Rol: ${role.name}`);
+          }
+        }
+        await db.addAuditLog('USER_ROLES_REMOVE', null, req.params.userId, req.session.discordId, { rolesRemoved: removeRoles.length, staffName: req.session.username, userTag: member.user.tag }, 'USER', 'MEDIUM');
+      }
+      res.json({ success: true, changes });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }

@@ -252,7 +252,7 @@ module.exports = (client) => {
             channelId: channel.id,
             ticketNumber: number,
             category: chosen
-          });
+          }, 'SYSTEM', 'INFO');
 
           const claimBtn = new ButtonBuilder().setCustomId(`claim_ticket_${channel.id}`).setLabel("🧑‍💼 Atender ticket").setStyle(ButtonStyle.Primary);
           const row = new ActionRowBuilder().addComponents(claimBtn);
@@ -309,7 +309,7 @@ module.exports = (client) => {
           await db.addAuditLog('TICKET_CLAIM', ticket.ownerId, null, interaction.user.id, {
             channelId,
             ticketNumber: ticket.ticketNumber
-          });
+          }, 'SYSTEM', 'INFO');
 
           const ownerId = ticket.ownerId;
           await interaction.channel.send({ content: `💬 Hola <@${ownerId}>, gracias por comunicarte con el staff. <@${interaction.user.id}> atenderá tu ticket.` });
@@ -364,7 +364,7 @@ module.exports = (client) => {
               ticketNumber,
               rating,
               comment
-            });
+            }, 'SYSTEM', 'INFO');
           }
 
           const guild = interaction.guild || client.guilds.cache.get(GUILD_ID) || await client.guilds.fetch(GUILD_ID).catch(() => null);
@@ -499,7 +499,7 @@ module.exports = (client) => {
       await db.addAuditLog('TICKET_CLOSE', ticket.ownerId, null, message.author.id, {
         ticketNumber: ticket.ticketNumber,
         category: ticket.category
-      });
+      }, 'SYSTEM', 'INFO');
 
       await message.reply("⏳ El ticket se cerrará en 5 segundos...");
       setTimeout(() => channel.delete().catch(() => {}), 5000);

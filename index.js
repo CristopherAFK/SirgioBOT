@@ -20,7 +20,8 @@ const client = new Client({
     GatewayIntentBits.MessageContent,
     GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildMessageReactions,
-    GatewayIntentBits.DirectMessages
+    GatewayIntentBits.DirectMessages,
+    GatewayIntentBits.GuildModeration
   ],
   partials: [Partials.Channel, Partials.Message, Partials.Reaction, Partials.User],
   ws: {
@@ -39,6 +40,9 @@ client.setMaxListeners(20);
 let notificationSystem;
 
 setupStaffPanel(app, client);
+
+const { setupAuditEvents } = require('./auditEvents');
+setupAuditEvents(client);
 
 // Cargar módulos ANTES de login para que sus client.once('ready') se registren y ejecuten al conectar
 const modules = [
