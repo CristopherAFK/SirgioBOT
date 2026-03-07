@@ -186,8 +186,14 @@ function formatLogSummary(log) {
   if (d.duration) parts.push(d.duration);
   if (d.count != null) parts.push(`x${d.count}`);
   if (d.warnCount != null) parts.push(`Warns: ${d.warnCount}`);
-  if (d.oldContent && d.newContent) parts.push('Mensaje editado');
-  if (d.content && log.actionType === 'MESSAGE_DELETE') parts.push(d.content.substring(0, 40) + '...');
+  if (d.oldContent && d.newContent) {
+    const old = String(d.oldContent).substring(0, 50);
+    const nw = String(d.newContent).substring(0, 50);
+    parts.push(`${old} → ${nw}`);
+  }
+  if (d.content && log.actionType === 'MESSAGE_DELETE') {
+    parts.push(String(d.content).substring(0, 80));
+  }
   if (d.roles && Array.isArray(d.roles)) parts.push(d.roles.join(', '));
   if (d.changes && Array.isArray(d.changes)) parts.push(d.changes.join(', '));
   return parts.length ? escapeHtml(parts.join(' | ')) : 'Sin detalles';
@@ -209,6 +215,8 @@ async function loadAuditLogs(page) {
     cachedAuditLogs = result.logs || [];
     renderAuditTable(result.logs || [], 'audit-logs-list');
     renderAuditPagination(result.page, result.totalPages, result.total, 'audit-pagination', loadAuditLogs);
+    const logsContainer = document.getElementById('audit-logs-container');
+    if (logsContainer) setTimeout(() => { logsContainer.scrollTop = logsContainer.scrollHeight; }, 50);
   } catch (e) {
     document.getElementById('audit-logs-list').innerHTML = '<div class="empty-state"><p>Error cargando logs</p></div>';
   }
@@ -224,6 +232,8 @@ async function loadAuditLogsFull(page) {
     cachedAuditLogsFull = result.logs || [];
     renderAuditTable(cachedAuditLogsFull, 'audit-fullscreen-body');
     renderAuditPagination(result.page, result.totalPages, result.total, 'audit-fullscreen-pagination', loadAuditLogsFull);
+    const fsBody = document.getElementById('audit-fullscreen-body');
+    if (fsBody) setTimeout(() => { fsBody.scrollTop = fsBody.scrollHeight; }, 50);
   } catch (e) {
     document.getElementById('audit-fullscreen-body').innerHTML = '<div class="empty-state"><p>Error cargando logs</p></div>';
   }
@@ -265,12 +275,20 @@ function renderAuditTable(logs, containerId) {
     const sev = log.severity || 'INFO';
     const summary = formatLogSummary(log);
     const idx = logs.length - 1 - i;
-    return `<div class="audit-log-item" onclick="showAuditDetail(${idx}, '${containerId}')">
+    const d = log.details || {};
+    let msgPreview = '';
+    if (log.actionType === 'MESSAGE_EDIT' && d.oldContent && d.newContent) {
+      msgPreview = `<div class="audit-msg-preview audit-msg-edit"><span class="msg-label">Antes:</span> <span class="msg-old">${escapeHtml(String(d.oldContent).substring(0, 120))}</span><br><span class="msg-label">Despues:</span> <span class="msg-new">${escapeHtml(String(d.newContent).substring(0, 120))}</span></div>`;
+    } else if (log.actionType === 'MESSAGE_DELETE' && d.content) {
+      msgPreview = `<div class="audit-msg-preview audit-msg-delete"><span class="msg-label">Mensaje:</span> ${escapeHtml(String(d.content).substring(0, 200))}</div>`;
+    }
+    return `<div class="audit-log-item ${msgPreview ? 'has-preview' : ''}" onclick="showAuditDetail(${idx}, '${containerId}')">
       <span class="audit-log-time">${timeStr}</span>
       <span class="audit-log-type category-${cat}">${log.actionType.replace(/_/g, ' ')}</span>
       <span class="audit-log-severity severity-${sev}">${sev}</span>
       <span class="audit-log-summary">${summary}</span>
       <span class="audit-log-category category-${cat}">${cat}</span>
+      ${msgPreview}
     </div>`;
   }).join('');
 }
