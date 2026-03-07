@@ -215,8 +215,10 @@ async function loadAuditLogs(page) {
     cachedAuditLogs = result.logs || [];
     renderAuditTable(result.logs || [], 'audit-logs-list');
     renderAuditPagination(result.page, result.totalPages, result.total, 'audit-pagination', loadAuditLogs);
-    const logsContainer = document.getElementById('audit-logs-container');
-    if (logsContainer) setTimeout(() => { logsContainer.scrollTop = logsContainer.scrollHeight; }, 50);
+    requestAnimationFrame(() => {
+      const logsContainer = document.getElementById('audit-logs-container');
+      if (logsContainer) logsContainer.scrollTop = logsContainer.scrollHeight;
+    });
   } catch (e) {
     document.getElementById('audit-logs-list').innerHTML = '<div class="empty-state"><p>Error cargando logs</p></div>';
   }
@@ -232,8 +234,10 @@ async function loadAuditLogsFull(page) {
     cachedAuditLogsFull = result.logs || [];
     renderAuditTable(cachedAuditLogsFull, 'audit-fullscreen-body');
     renderAuditPagination(result.page, result.totalPages, result.total, 'audit-fullscreen-pagination', loadAuditLogsFull);
-    const fsBody = document.getElementById('audit-fullscreen-body');
-    if (fsBody) setTimeout(() => { fsBody.scrollTop = fsBody.scrollHeight; }, 50);
+    requestAnimationFrame(() => {
+      const fsBody = document.getElementById('audit-fullscreen-body');
+      if (fsBody) fsBody.scrollTop = fsBody.scrollHeight;
+    });
   } catch (e) {
     document.getElementById('audit-fullscreen-body').innerHTML = '<div class="empty-state"><p>Error cargando logs</p></div>';
   }
@@ -396,6 +400,19 @@ function showAuditDetail(idx, containerId) {
   const date = new Date(log.createdAt).toLocaleString('es', { dateStyle: 'full', timeStyle: 'medium' });
   const d = log.details || {};
 
+  const fieldLabels = {
+    userTag: 'Usuario', staffName: 'Staff', reason: 'Razon', channelName: 'Canal', channelId: 'ID del Canal',
+    duration: 'Duracion', count: 'Cantidad', warnCount: 'Advertencias', oldContent: 'Contenido Anterior',
+    newContent: 'Contenido Nuevo', content: 'Contenido', roles: 'Roles', changes: 'Cambios',
+    messageId: 'ID del Mensaje', authorTag: 'Autor', authorId: 'ID del Autor', oldNick: 'Apodo Anterior',
+    newNick: 'Apodo Nuevo', added: 'Agregados', removed: 'Removidos', channelType: 'Tipo de Canal',
+    oldName: 'Nombre Anterior', newName: 'Nombre Nuevo', oldTopic: 'Tema Anterior', newTopic: 'Tema Nuevo',
+    ticketNumber: 'Numero de Ticket', category: 'Categoria', suggestionId: 'ID de Sugerencia',
+    title: 'Titulo', status: 'Estado', rating: 'Calificacion', comment: 'Comentario',
+    filename: 'Archivo', collections: 'Colecciones', timestamp: 'Fecha', ip: 'IP',
+    targetId: 'ID del Objetivo', staffId: 'ID del Staff', guildId: 'ID del Servidor'
+  };
+
   let detailsHtml = '';
   Object.entries(d).forEach(([key, val]) => {
     if (val === null || val === undefined) return;
@@ -403,7 +420,7 @@ function showAuditDetail(idx, containerId) {
     if (Array.isArray(val)) displayVal = val.join(', ');
     else if (typeof val === 'object') displayVal = JSON.stringify(val, null, 2);
     else displayVal = String(val);
-    const label = key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase());
+    const label = fieldLabels[key] || key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase());
     detailsHtml += `<div class="audit-detail-field"><div class="detail-label">${escapeHtml(label)}</div><div class="detail-value">${escapeHtml(displayVal)}</div></div>`;
   });
 

@@ -41,10 +41,10 @@
         <div class="nav-category">
           <div class="nav-category-title">General</div>
           <div class="nav-item active" data-page="dashboard" onclick="navigateTo('dashboard')">
-            <span class="icon">&#128202;</span> Dashboard
+            <span class="icon">&#128202;</span> Inicio
           </div>
           <div class="nav-item" data-page="logs" onclick="navigateTo('logs')">
-            <span class="icon">&#128220;</span> Audit Logs
+            <span class="icon">&#128220;</span> Registros
           </div>
           <div class="nav-item" data-page="notes" onclick="navigateTo('notes')">
             <span class="icon">&#128221;</span> Notas Internas
@@ -71,7 +71,7 @@
         <div class="nav-category">
           <div class="nav-category-title">Administracion</div>
           <div class="nav-item" data-page="admin" onclick="navigateTo('admin')">
-            <span class="icon">&#9881;</span> Admin Tools
+            <span class="icon">&#9881;</span> Administracion
           </div>
         </div>
         <div class="nav-category">
@@ -107,7 +107,7 @@
       <!-- Dashboard -->
       <div id="page-dashboard" class="page active">
         <div class="page-header">
-          <h1>Dashboard</h1>
+          <h1>Inicio</h1>
           <p>Vista general del servidor</p>
         </div>
         <div class="stats-grid" id="stats-grid"></div>
@@ -136,7 +136,7 @@
           </div>
           <div class="tool-btn" data-action="unmute" onclick="openTool('unmute')">
             <span class="tool-icon">&#128266;</span>
-            <span class="tool-name">Unmute</span>
+            <span class="tool-name">Quitar Mute</span>
             <span class="tool-desc">Quitar silencio</span>
           </div>
           <div class="tool-btn" data-action="ban" onclick="openTool('ban')">
@@ -161,22 +161,22 @@
         <div class="tools-grid">
           <div class="tool-btn" data-action="lock_channel" onclick="openTool('lock_channel')">
             <span class="tool-icon">&#128274;</span>
-            <span class="tool-name">Lock Channel</span>
+            <span class="tool-name">Bloquear Canal</span>
             <span class="tool-desc">Bloquear canal</span>
           </div>
           <div class="tool-btn" data-action="unlock_channel" onclick="openTool('unlock_channel')">
             <span class="tool-icon">&#128275;</span>
-            <span class="tool-name">Unlock Channel</span>
+            <span class="tool-name">Desbloquear Canal</span>
             <span class="tool-desc">Desbloquear canal</span>
           </div>
           <div class="tool-btn" data-action="nuke_channel" onclick="openTool('nuke_channel')">
             <span class="tool-icon">&#128165;</span>
-            <span class="tool-name">Nuke Channel</span>
+            <span class="tool-name">Recrear Canal</span>
             <span class="tool-desc">Recrear canal</span>
           </div>
           <div class="tool-btn" data-action="clear_messages" onclick="openTool('clear_messages')">
             <span class="tool-icon">&#129529;</span>
-            <span class="tool-name">Clear Messages</span>
+            <span class="tool-name">Borrar Mensajes</span>
             <span class="tool-desc">Borrar mensajes</span>
           </div>
         </div>
@@ -191,22 +191,22 @@
         <div class="tools-grid">
           <div class="tool-btn" data-action="send_embed" onclick="openTool('send_embed')">
             <span class="tool-icon">&#128226;</span>
-            <span class="tool-name">Send Embed</span>
+            <span class="tool-name">Enviar Embed</span>
             <span class="tool-desc">Enviar embed</span>
           </div>
           <div class="tool-btn" data-action="send_dm" onclick="openTool('send_dm')">
             <span class="tool-icon">&#128232;</span>
-            <span class="tool-name">Send DM</span>
+            <span class="tool-name">Mensaje Privado</span>
             <span class="tool-desc">Mensaje privado</span>
           </div>
           <div class="tool-btn" data-action="edit_message" onclick="openTool('edit_message')">
             <span class="tool-icon">&#128221;</span>
-            <span class="tool-name">Edit Message</span>
+            <span class="tool-name">Editar Mensaje</span>
             <span class="tool-desc">Editar mensaje</span>
           </div>
           <div class="tool-btn" data-action="block_links" onclick="openTool('block_links')">
             <span class="tool-icon">&#128279;</span>
-            <span class="tool-name">Block Links</span>
+            <span class="tool-name">Bloquear Links</span>
             <span class="tool-desc">Bloquear enlaces</span>
           </div>
         </div>
@@ -221,17 +221,17 @@
         <div class="tools-grid">
           <div class="tool-btn" data-action="quarantine" onclick="openTool('quarantine')">
             <span class="tool-icon">&#127973;</span>
-            <span class="tool-name">Quarantine</span>
+            <span class="tool-name">Cuarentena</span>
             <span class="tool-desc">Aislar usuario</span>
           </div>
           <div class="tool-btn" data-action="reduce_warn" onclick="openTool('reduce_warn')">
             <span class="tool-icon">&#10134;</span>
-            <span class="tool-name">Reduce Warn</span>
+            <span class="tool-name">Reducir Warn</span>
             <span class="tool-desc">Reducir warns</span>
           </div>
           <div class="tool-btn" data-action="view_history" onclick="openTool('view_history')">
             <span class="tool-icon">&#128202;</span>
-            <span class="tool-name">View History</span>
+            <span class="tool-name">Ver Historial</span>
             <span class="tool-desc">Historial de sanciones</span>
           </div>
         </div>
@@ -246,17 +246,17 @@
         <div class="tools-grid">
           <div class="tool-btn" data-action="server_info" onclick="openTool('server_info')">
             <span class="tool-icon">&#128203;</span>
-            <span class="tool-name">Server Info</span>
+            <span class="tool-name">Info del Servidor</span>
             <span class="tool-desc">Info del servidor</span>
           </div>
           <div class="tool-btn" data-action="user_info" onclick="openTool('user_info')">
             <span class="tool-icon">&#128100;</span>
-            <span class="tool-name">User Info</span>
+            <span class="tool-name">Info de Usuario</span>
             <span class="tool-desc">Info de usuario</span>
           </div>
           <div class="tool-btn" data-action="role_info" onclick="openTool('role_info')">
             <span class="tool-icon">&#127917;</span>
-            <span class="tool-name">Role Info</span>
+            <span class="tool-name">Info de Roles</span>
             <span class="tool-desc">Info de rol</span>
           </div>
         </div>
