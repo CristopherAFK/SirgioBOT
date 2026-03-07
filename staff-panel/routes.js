@@ -700,21 +700,23 @@ function setupStaffPanel(app, client) {
   const sanctionsGuide = require('./sanctions-guide.json');
   const botCommands = require('./bot-commands.json');
 
-  function getOpenAIClient() {
-    const apiKey = "nex-h4xzje3z8iypm4vi3hpdatpo8z1zm8obmgrngywh5n8a910s";
-    const baseUrl = "https://unifedapi.vercel.app/api/v1";
+  async function getOpenAIClient() {
     try {
       const { OpenAI } = require('openai');
-      return new OpenAI({
-        apiKey: apiKey,
-        baseURL: baseUrl,
-        defaultHeaders: {
-          "HTTP-Referer": "https://replit.com",
-          "X-Title": "SirgioBOT"
-        }
-      });
+      // Usar la integración de Replit si está disponible, de lo contrario usar la API Key de las variables de entorno
+      if (process.env.REPLIT_AI_API_KEY) {
+        return new OpenAI({
+          apiKey: process.env.REPLIT_AI_API_KEY,
+        });
+      }
+      if (process.env.OPENAI_API_KEY) {
+        return new OpenAI({
+          apiKey: process.env.OPENAI_API_KEY,
+        });
+      }
+      return null;
     } catch (e) {
-      console.error('[AI] Error creating OpenAI client:', e.message);
+      console.error('[AI] Error creando el cliente de OpenAI:', e.message);
       return null;
     }
   }
@@ -797,9 +799,9 @@ INSTRUCCIONES:
   const aiChatHistories = new Map();
 
   router.post('/ai/chat', authenticate, async (req, res) => {
-    const openaiClient = getOpenAIClient();
+    const openaiClient = await getOpenAIClient();
     if (!openaiClient) {
-      return res.status(503).json({ error: 'Asistente IA no configurado. Configura OPENAI_API_KEY en las variables de entorno.' });
+      return res.status(503).json({ error: 'Asistente IA no configurado. Asegúrate de tener la integración de OpenAI activa en Replit o la variable OPENAI_API_KEY configurada.' });
     }
 
     const { message, conversationId } = req.body;
@@ -826,7 +828,7 @@ INSTRUCCIONES:
       ];
 
       const completion = await openaiClient.chat.completions.create({
-        model: 'deepseek-v3.1',
+        model: 'gpt-4o',
         messages,
         max_tokens: 2048,
       });

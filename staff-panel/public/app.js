@@ -1,5 +1,5 @@
 const API_BASE = '/api';
-const AI_SERVICE_URL = 'https://sirgio-bot.replit.app';
+const AI_SERVICE_URL = 'https://sirgiobot.onrender.com';
 const AI_SERVICE_API_KEY = 'ff7e5970a7019e9b4c435a0b760177c598f1bd8bb8614a1a87af528e3838bffc';
 let sessionToken = null;
 let currentRole = null;
