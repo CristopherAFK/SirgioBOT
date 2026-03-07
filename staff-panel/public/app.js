@@ -1,6 +1,4 @@
 const API_BASE = '/api';
-const AI_SERVICE_URL = 'https://sirgiobot.onrender.com';
-const AI_SERVICE_API_KEY = 'ff7e5970a7019e9b4c435a0b760177c598f1bd8bb8614a1a87af528e3838bffc';
 let sessionToken = null;
 let currentRole = null;
 let currentUsername = null;
@@ -215,10 +213,12 @@ async function loadAuditLogs(page) {
     cachedAuditLogs = result.logs || [];
     renderAuditTable(result.logs || [], 'audit-logs-list');
     renderAuditPagination(result.page, result.totalPages, result.total, 'audit-pagination', loadAuditLogs);
-    requestAnimationFrame(() => {
+    setTimeout(() => {
       const logsContainer = document.getElementById('audit-logs-container');
-      if (logsContainer) logsContainer.scrollTop = logsContainer.scrollHeight;
-    });
+      if (logsContainer) {
+        logsContainer.scrollTo({ top: logsContainer.scrollHeight, behavior: 'smooth' });
+      }
+    }, 150);
   } catch (e) {
     document.getElementById('audit-logs-list').innerHTML = '<div class="empty-state"><p>Error cargando logs</p></div>';
   }
@@ -234,10 +234,12 @@ async function loadAuditLogsFull(page) {
     cachedAuditLogsFull = result.logs || [];
     renderAuditTable(cachedAuditLogsFull, 'audit-fullscreen-body');
     renderAuditPagination(result.page, result.totalPages, result.total, 'audit-fullscreen-pagination', loadAuditLogsFull);
-    requestAnimationFrame(() => {
+    setTimeout(() => {
       const fsBody = document.getElementById('audit-fullscreen-body');
-      if (fsBody) fsBody.scrollTop = fsBody.scrollHeight;
-    });
+      if (fsBody) {
+        fsBody.scrollTo({ top: fsBody.scrollHeight, behavior: 'smooth' });
+      }
+    }, 150);
   } catch (e) {
     document.getElementById('audit-fullscreen-body').innerHTML = '<div class="empty-state"><p>Error cargando logs</p></div>';
   }
@@ -666,9 +668,6 @@ function navigateTo(page) {
   if (page === 'dashboard') initApp();
   if (page === 'notes') loadNotesPage();
   if (page === 'settings') renderThemeSettings();
-  var aiChat = document.getElementById('ai-chat-messages');
-  if (aiChat && aiChat.offsetParent !== null) loadAIUsage();
-
   const sidebar = document.getElementById('sidebar');
   if (window.innerWidth <= 768) sidebar.classList.remove('open');
 }
@@ -1257,216 +1256,6 @@ async function executeRoleInfo() {
     document.getElementById('modal-body').innerHTML = html;
     document.getElementById('modal-footer').innerHTML = `<button class="btn btn-sm" style="background:var(--border)" onclick="closeModal()">Cerrar</button>`;
   } catch (e) { toast(e.message, 'error'); }
-}
-
-let aiConversationId = null;
-let aiIsStreaming = false;
-
-function formatAIMarkdown(text) {
-  return text
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.+?)\*/g, '<em>$1</em>')
-    .replace(/`([^`]+)`/g, '<code>$1</code>')
-    .replace(/^### (.+)$/gm, '<h4>$1</h4>')
-    .replace(/^## (.+)$/gm, '<h3>$1</h3>')
-    .replace(/^# (.+)$/gm, '<h2>$1</h2>')
-    .replace(/^- (.+)$/gm, '<li>$1</li>')
-    .replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>')
-    .replace(/<\/ul>\s*<ul>/g, '')
-    .replace(/\n/g, '<br>');
-}
-
-function addAIMessage(role, content) {
-  const container = document.getElementById('ai-chat-messages');
-  const div = document.createElement('div');
-  div.className = 'ai-message ' + role;
-  const avatarEmoji = role === 'user' ? '&#128100;' : '&#129302;';
-  const bubbleContent = role === 'user' ? content.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>') : formatAIMarkdown(content);
-
-  div.innerHTML = `
-    <div class="ai-message-avatar">${avatarEmoji}</div>
-    <div class="ai-message-bubble">${bubbleContent}</div>
-  `;
-
-  container.appendChild(div);
-  container.scrollTop = container.scrollHeight;
-  return div;
-}
-
-function addAITypingIndicator() {
-  const container = document.getElementById('ai-chat-messages');
-  const div = document.createElement('div');
-  div.className = 'ai-message assistant';
-  div.id = 'ai-typing';
-  div.innerHTML = `
-    <div class="ai-message-avatar">&#129302;</div>
-    <div class="ai-message-bubble">
-      <div class="ai-typing-indicator"><span></span><span></span><span></span></div>
-    </div>
-  `;
-  container.appendChild(div);
-  container.scrollTop = container.scrollHeight;
-}
-
-function removeAITypingIndicator() {
-  const typing = document.getElementById('ai-typing');
-  if (typing) typing.remove();
-}
-
-function showAIUsageInChat(usagePercent, costThisMessage) {
-  const percent = Math.min(usagePercent, 100);
-  const remaining = (100 - percent).toFixed(1);
-  let color;
-  if (percent >= 90) {
-    color = '#e74c3c';
-  } else if (percent >= 70) {
-    color = '#f39c12';
-  } else {
-    color = '#2ecc71';
-  }
-
-  const container = document.getElementById('ai-chat-messages');
-  if (!container) return;
-
-  let existing = document.getElementById('ai-usage-info');
-  if (existing) existing.remove();
-
-  const costText = costThisMessage ? ' (-' + costThisMessage.toFixed(1) + '%)' : '';
-  const warningText = percent >= 90 ? '<br><span style="color:#e74c3c;">Se reinicia a medianoche hora Venezuela</span>' : '';
-
-  const div = document.createElement('div');
-  div.id = 'ai-usage-info';
-  div.style.cssText = 'text-align:center;padding:6px 12px;margin:4px auto;max-width:320px;';
-  div.innerHTML = '<div style="font-size:11px;color:#8892b0;">' +
-    '<span style="color:' + color + ';font-weight:700;">&#9889; ' + percent.toFixed(1) + '% usado</span>' + costText +
-    ' | Disponible: ' + remaining + '%' +
-    '<div style="width:100%;height:4px;background:rgba(255,255,255,0.1);border-radius:2px;overflow:hidden;margin-top:4px;">' +
-    '<div style="width:' + percent + '%;height:100%;border-radius:2px;background:' + color + ';"></div>' +
-    '</div>' + warningText + '</div>';
-
-  container.appendChild(div);
-  container.scrollTop = container.scrollHeight;
-}
-
-async function loadAIUsage() {
-  try {
-    const res = await fetch(AI_SERVICE_URL + '/api/ai/usage', {
-      headers: {
-        'X-API-Key': AI_SERVICE_API_KEY,
-        'X-Staff-Username': currentUsername || 'unknown',
-        'X-Staff-Role': currentRole || 'unknown'
-      }
-    });
-    if (res.ok) {
-      const data = await res.json();
-      showAIUsageInChat(data.usagePercent);
-    }
-  } catch (e) {}
-}
-
-async function sendAIMessage() {
-  if (aiIsStreaming) return;
-  const input = document.getElementById('ai-chat-input');
-  const message = input.value.trim();
-  if (!message) return;
-
-  input.value = '';
-  input.style.height = 'auto';
-  addAIMessage('user', message);
-  addAITypingIndicator();
-
-  aiIsStreaming = true;
-  const sendBtn = document.getElementById('ai-send-btn');
-  sendBtn.disabled = true;
-
-  try {
-    const res = await fetch(AI_SERVICE_URL + '/api/ai/chat', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-API-Key': AI_SERVICE_API_KEY,
-        'X-Staff-Username': currentUsername || 'unknown',
-        'X-Staff-Role': currentRole || 'unknown'
-      },
-      body: JSON.stringify({ message, conversationId: aiConversationId })
-    });
-    const data = await res.json();
-
-    removeAITypingIndicator();
-
-    if (res.status === 429 && data.error === 'usage_limit_reached') {
-      addAIMessage('assistant', data.message);
-      showAIUsageInChat(100);
-      return;
-    }
-
-    if (!res.ok) throw new Error(data.error || 'Error desconocido');
-
-    if (data.conversationId) {
-      aiConversationId = data.conversationId;
-    }
-
-    let responseText = data.response;
-    if (data.usage) {
-      const pct = data.usage.currentPercent;
-      const cost = data.usage.costThisMessage;
-      const rem = data.usage.remaining;
-      responseText += '\n\n---\n*Uso diario: **' + pct + '%** usado (-' + cost + '%) | Disponible: ' + rem + '%*';
-    }
-    addAIMessage('assistant', responseText);
-  } catch (e) {
-    removeAITypingIndicator();
-    toast('Error del asistente: ' + e.message, 'error');
-    addAIMessage('assistant', 'Lo siento, hubo un error al procesar tu consulta. Intenta de nuevo.');
-  } finally {
-    aiIsStreaming = false;
-    sendBtn.disabled = false;
-    input.focus();
-  }
-}
-
-function sendAISuggestion(text) {
-  document.getElementById('ai-chat-input').value = text;
-  sendAIMessage();
-}
-
-async function clearAIChat() {
-  if (aiConversationId) {
-    try {
-      await fetch(AI_SERVICE_URL + '/api/ai/clear', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-API-Key': AI_SERVICE_API_KEY
-        },
-        body: JSON.stringify({ conversationId: aiConversationId })
-      });
-    } catch (e) {}
-  }
-  aiConversationId = null;
-  const container = document.getElementById('ai-chat-messages');
-  container.innerHTML = `
-    <div class="ai-welcome-message">
-      <div class="ai-welcome-icon">&#129302;</div>
-      <h3>Hola, soy el Asistente de Moderacion</h3>
-      <p>Puedo ayudarte con:</p>
-      <div class="ai-suggestions">
-        <button class="ai-suggestion-btn" onclick="sendAISuggestion('Un usuario esta haciendo spam en el chat general, que hago?')">Un usuario hace spam</button>
-        <button class="ai-suggestion-btn" onclick="sendAISuggestion('Que sancion aplico si alguien envia contenido NSFW?')">Contenido NSFW</button>
-        <button class="ai-suggestion-btn" onclick="sendAISuggestion('Explicame la regla 7 sobre multicuentas')">Regla de multicuentas</button>
-        <button class="ai-suggestion-btn" onclick="sendAISuggestion('Un usuario tiene 5 warns, que deberia pasar?')">Escalacion de warns</button>
-      </div>
-    </div>
-  `;
-  loadAIUsage();
-  toast('Conversacion limpiada', 'info');
-}
-
-function handleAIChatKeydown(e) {
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault();
-    sendAIMessage();
-  }
 }
 
 const themes = {

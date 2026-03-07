@@ -215,18 +215,8 @@ El bot usa **MongoDB** (compatible con MongoDB Atlas) para almacenar:
 - Solo el autor de la nota o un admin/dueño puede eliminarla
 - Página "Notas Internas" en la barra lateral
 
-### Asistente IA de Moderación
-- Asistente IA integrado en el Staff Panel para ayudar con decisiones de moderación
-- Conoce las 10 reglas del servidor + Guía de Sanciones completa (18 categorías con duraciones exactas)
-- Soporte dual de OpenAI: Replit AI Integrations (desarrollo) + API key manual (Render producción)
-- Respuestas completas en JSON (no streaming) para mayor confiabilidad
-- Botones de sugerencias rápidas para consultas comunes
-- Historial de conversación persistente en memoria por sesión
-- Pregunta si es primera falta o reincidencia para dar la sanción correcta
-- Página "Asistente IA" en la barra lateral
-- Archivo de reglas: `staff-panel/server-rules.json`
-- Guía de sanciones: `staff-panel/sanctions-guide.json`
-- Comandos del bot: `staff-panel/bot-commands.json`
+### Asistente IA de Moderación (REMOVIDO)
+- El asistente IA fue removido del Staff Panel en Marzo 2026
 
 ## Última Actualización
 Marzo 2026 - Sistema de Auditoría Avanzado:
