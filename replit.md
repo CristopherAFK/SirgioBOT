@@ -104,9 +104,10 @@ El bot usa **MongoDB** (compatible con MongoDB Atlas) para almacenar:
 - Notificaciones por DM al staff para eventos MEDIUM (solo admins/owner), HIGH y CRITICAL (todo el staff)
 - Sistema de retención de datos configurable (30/60/90/180/365 días o ilimitada) con purga automática cada 6h
 - Hash routing para deep linking (ej: /panel#logs navega directo a auditoría)
-- Highlight del log más reciente al entrar (scroll + iluminación 1s)
+- Scroll al log más reciente (abajo) al entrar con iluminación 1s
+- Logs muestran nombres de usuario en lugar de IDs numéricos (IDs solo en campos explícitos)
 - Filas HIGH/CRITICAL con borde lateral rojo para resaltado permanente
-- Sin colores grises: category SYSTEM ahora usa violeta (#a064ff)
+- Sin colores grises: category SYSTEM ahora usa violeta (#8b5cf6)
 - No se generan logs de backup
 - Auto-refresh cada 30 segundos, debounce en búsqueda
 - Responsive: en móvil los filtros se apilan, gráficos apilados, tabla se convierte en cards
@@ -209,11 +210,13 @@ El bot usa **MongoDB** (compatible con MongoDB Atlas) para almacenar:
 - **Admins** (1212891335929897030): Permisos completos
 - **Head Admins** (1230952139015327755): Permisos completos + comandos avanzados
 
-### Personalización de Tema
-- 6 temas predefinidos: Default, Lo-fi, Anime, Cartoon, Simple, Videojuegos
-- Personalización custom: fuente, color de botones, fondo y texto
-- Preferencias guardadas por usuario en localStorage
-- Página "Personalizar" en la barra lateral
+### Estilo Visual del Panel
+- Paleta celeste/azul/blanco con acentos naranja
+- Variables CSS: --accent: #38bdf8 (celeste), --warning: #f97316 (naranja)
+- Micro-animaciones: hover scale en botones, elevación en cards, glow en inputs, fade-in en páginas, bounce-in en toasts
+- Fuente Inter como fuente principal
+- Scrollbars personalizados, bordes sutiles con gradientes celestes
+- Sección "Personalizar" eliminada (ya no hay temas ni personalización)
 
 ### Foto de Perfil de Discord
 - Muestra la foto de perfil del usuario de Discord en la barra lateral

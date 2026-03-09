@@ -80,12 +80,6 @@
             <span class="icon">&#8505;</span> Consultas
           </div>
         </div>
-        <div class="nav-category">
-          <div class="nav-category-title">Ajustes</div>
-          <div class="nav-item" data-page="settings" onclick="navigateTo('settings')">
-            <span class="icon">&#127912;</span> Personalizar
-          </div>
-        </div>
       </nav>
       <div class="sidebar-footer">
         <div class="user-info">
@@ -476,61 +470,6 @@
         </div>
       </div>
 
-      <!-- Settings -->
-      <div id="page-settings" class="page" style="display:none">
-        <div class="page-header">
-          <h1>Personalizar</h1>
-          <p>Cambia la apariencia del panel</p>
-        </div>
-        <div class="card">
-          <div class="card-header">&#127912; Temas Predefinidos</div>
-          <div class="card-body">
-            <div class="themes-grid" id="themes-grid"></div>
-          </div>
-        </div>
-        <div class="card">
-          <div class="card-header">&#9998; Personalizacion Avanzada</div>
-          <div class="card-body">
-            <div class="custom-theme-controls">
-              <div class="form-group">
-                <label>Fuente</label>
-                <select id="custom-font" onchange="applyCustomFromControls()" style="width:100%;padding:10px 14px;background:var(--bg-input);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);font-size:14px;">
-                  <option value="'Segoe UI', system-ui, -apple-system, sans-serif">Segoe UI</option>
-                  <option value="'Inter', system-ui, sans-serif">Inter</option>
-                  <option value="Georgia, serif">Georgia</option>
-                  <option value="'Quicksand', sans-serif">Quicksand</option>
-                  <option value="'Comic Sans MS', 'Chalkboard SE', cursive">Comic Sans MS</option>
-                  <option value="'Orbitron', monospace">Orbitron</option>
-                  <option value="'Roboto', sans-serif">Roboto</option>
-                  <option value="'Montserrat', sans-serif">Montserrat</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label>Color de Botones (Accent)</label>
-                <div class="color-picker-wrapper">
-                  <input type="color" id="custom-accent" value="#5865f2" onchange="applyCustomFromControls()">
-                  <span id="custom-accent-text">#5865f2</span>
-                </div>
-              </div>
-              <div class="form-group">
-                <label>Color de Fondo</label>
-                <div class="color-picker-wrapper">
-                  <input type="color" id="custom-bg" value="#1a1a2e" onchange="applyCustomFromControls()">
-                  <span id="custom-bg-text">#1a1a2e</span>
-                </div>
-              </div>
-              <div class="form-group">
-                <label>Color de Texto</label>
-                <div class="color-picker-wrapper">
-                  <input type="color" id="custom-text" value="#ffffff" onchange="applyCustomFromControls()">
-                  <span id="custom-text-text">#ffffff</span>
-                </div>
-              </div>
-            </div>
-            <button class="btn btn-warning" onclick="resetTheme()" style="margin-top:16px">Restablecer</button>
-          </div>
-        </div>
-      </div>
     </main>
   </div>
 

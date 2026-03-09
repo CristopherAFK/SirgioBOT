@@ -101,7 +101,6 @@ async function initApp() {
     loadDashboard(status);
     loadChannels();
     loadRoles();
-    loadSavedTheme();
   } catch (e) {
     toast('Error al conectar: ' + e.message, 'error');
   }
@@ -182,6 +181,8 @@ function formatLogSummary(log) {
   const d = log.details || {};
   const parts = [];
   if (d.userTag) parts.push(d.userTag);
+  else if (d.authorTag) parts.push(d.authorTag);
+  else if (d.targetName) parts.push(d.targetName);
   else if (log.targetId) parts.push(log.targetId);
   if (d.staffName) parts.push(`Staff: ${d.staffName}`);
   if (d.reason) { const r = String(d.reason); parts.push(`${r.substring(0, 60)}${r.length > 60 ? '...' : ''}`); }
@@ -221,11 +222,11 @@ async function loadAuditLogs(page) {
     setTimeout(() => {
       const logsContainer = document.getElementById('audit-logs-container');
       if (logsContainer) {
-        logsContainer.scrollTo({ top: 0, behavior: 'smooth' });
-        const firstItem = logsContainer.querySelector('.audit-log-item');
-        if (firstItem) {
-          firstItem.classList.add('highlight-newest');
-          setTimeout(() => firstItem.classList.remove('highlight-newest'), 1000);
+        logsContainer.scrollTo({ top: logsContainer.scrollHeight, behavior: 'smooth' });
+        const lastItem = logsContainer.querySelector('.audit-log-item:last-child');
+        if (lastItem) {
+          lastItem.classList.add('highlight-newest');
+          setTimeout(() => lastItem.classList.remove('highlight-newest'), 1000);
         }
       }
     }, 150);
@@ -247,11 +248,11 @@ async function loadAuditLogsFull(page) {
     setTimeout(() => {
       const fsBody = document.getElementById('audit-fullscreen-body');
       if (fsBody) {
-        fsBody.scrollTo({ top: 0, behavior: 'smooth' });
-        const firstItem = fsBody.querySelector('.audit-log-item');
-        if (firstItem) {
-          firstItem.classList.add('highlight-newest');
-          setTimeout(() => firstItem.classList.remove('highlight-newest'), 1000);
+        fsBody.scrollTo({ top: fsBody.scrollHeight, behavior: 'smooth' });
+        const lastItem = fsBody.querySelector('.audit-log-item:last-child');
+        if (lastItem) {
+          lastItem.classList.add('highlight-newest');
+          setTimeout(() => lastItem.classList.remove('highlight-newest'), 1000);
         }
       }
     }, 150);
@@ -347,7 +348,7 @@ async function loadAuditStats() {
     const stats = await api('GET', '/logs/stats');
     const row = document.getElementById('audit-stats-row');
     const catLabels = { USER: 'Usuarios', CHANNEL: 'Canales', MESSAGE: 'Mensajes', AUTOMOD: 'AutoMod', STAFF: 'Staff', SYSTEM: 'Sistema' };
-    const sevColors = { INFO: 'var(--info)', LOW: 'var(--success)', MEDIUM: 'var(--warning)', HIGH: 'var(--danger)', CRITICAL: '#ff4040' };
+    const sevColors = { INFO: 'var(--info)', LOW: 'var(--success)', MEDIUM: 'var(--warning)', HIGH: 'var(--danger)', CRITICAL: '#ef4444' };
     let html = `<div class="audit-stat-card"><div class="audit-stat-value">${stats.total}</div><div class="audit-stat-label">Total</div></div>`;
     html += `<div class="audit-stat-card"><div class="audit-stat-value">${stats.today}</div><div class="audit-stat-label">Hoy</div></div>`;
     Object.entries(stats.byCategory || {}).forEach(([cat, count]) => {
@@ -440,6 +441,12 @@ function showAuditDetail(idx, containerId) {
     roleName: 'Nombre del Rol', roleColor: 'Color del Rol', emojiName: 'Nombre del Emoji'
   };
 
+  const idToNameMap = {
+    targetId: d.userTag || d.targetName,
+    staffId: d.staffName,
+    authorId: d.authorTag
+  };
+
   let detailsHtml = '';
   Object.entries(d).forEach(([key, val]) => {
     if (val === null || val === undefined) return;
@@ -447,11 +454,14 @@ function showAuditDetail(idx, containerId) {
     if (Array.isArray(val)) displayVal = val.join(', ');
     else if (typeof val === 'object') displayVal = JSON.stringify(val, null, 2);
     else displayVal = String(val);
+    if (idToNameMap[key] && idToNameMap[key] !== val) {
+      displayVal = `${idToNameMap[key]} (${val})`;
+    }
     const label = fieldLabels[key] || key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase());
     detailsHtml += `<div class="audit-detail-field"><div class="detail-label">${escapeHtml(label)}</div><div class="detail-value">${escapeHtml(displayVal)}</div></div>`;
   });
 
-  const targetClickable = log.targetId ? `<span class="detail-value clickable" onclick="openUserProfile('${log.targetId}')">${escapeHtml(d.userTag || log.targetId)}</span>` : '<span class="detail-value">-</span>';
+  const targetClickable = log.targetId ? `<span class="detail-value clickable" onclick="openUserProfile('${log.targetId}')">${escapeHtml(d.userTag || d.targetName || log.targetId)}</span>` : '<span class="detail-value">-</span>';
 
   const hasPrev = idx > 0;
   const hasNext = idx < logs.length - 1;
@@ -722,11 +732,11 @@ function connectAuditSSE() {
         renderAuditTable(cachedAuditLogs, 'audit-logs-list');
         const container = document.getElementById('audit-logs-container');
         if (container) {
-          container.scrollTo({ top: 0, behavior: 'smooth' });
-          const firstItem = container.querySelector('.audit-log-item');
-          if (firstItem) {
-            firstItem.classList.add('highlight-newest');
-            setTimeout(() => firstItem.classList.remove('highlight-newest'), 1000);
+          container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+          const lastItem = container.querySelector('.audit-log-item:last-child');
+          if (lastItem) {
+            lastItem.classList.add('highlight-newest');
+            setTimeout(() => lastItem.classList.remove('highlight-newest'), 1000);
           }
         }
         loadAuditStats();
@@ -765,7 +775,7 @@ function renderTimelineChart(timeline) {
   const ctx = canvas.getContext('2d');
   const dates = Object.keys(timeline).sort();
   if (dates.length === 0) {
-    ctx.fillStyle = '#72767d';
+    ctx.fillStyle = '#64748b';
     ctx.font = '13px sans-serif';
     ctx.fillText('Sin datos para mostrar', canvas.width / 2 - 70, 90);
     return;
@@ -777,16 +787,16 @@ function renderTimelineChart(timeline) {
   const chartH = canvas.height - 40;
   const startX = 40;
 
-  const catColors = { USER: '#5865f2', CHANNEL: '#43b581', MESSAGE: '#7289da', AUTOMOD: '#faa61a', STAFF: '#f04747', SYSTEM: '#a064ff' };
+  const catColors = { USER: '#38bdf8', CHANNEL: '#43b581', MESSAGE: '#0ea5e9', AUTOMOD: '#f97316', STAFF: '#ef4444', SYSTEM: '#8b5cf6' };
   const categories = ['USER', 'CHANNEL', 'MESSAGE', 'AUTOMOD', 'STAFF', 'SYSTEM'];
 
-  ctx.fillStyle = '#72767d';
+  ctx.fillStyle = '#64748b';
   ctx.font = '10px sans-serif';
   for (let i = 0; i <= 4; i++) {
     const y = 10 + (chartH / 4) * i;
     const val = Math.round(max - (max / 4) * i);
     ctx.fillText(val, 0, y + 4);
-    ctx.strokeStyle = 'rgba(114,118,125,0.15)';
+    ctx.strokeStyle = 'rgba(30,58,95,0.4)';
     ctx.beginPath(); ctx.moveTo(startX, y); ctx.lineTo(canvas.width, y); ctx.stroke();
   }
 
@@ -800,12 +810,12 @@ function renderTimelineChart(timeline) {
       if (count === 0) return;
       const h = (count / max) * chartH;
       currentY -= h;
-      ctx.fillStyle = catColors[cat] || '#a064ff';
+      ctx.fillStyle = catColors[cat] || '#8b5cf6';
       ctx.fillRect(x, currentY, barW, h);
     });
 
     if (i % Math.max(1, Math.floor(dates.length / 7)) === 0) {
-      ctx.fillStyle = '#72767d';
+      ctx.fillStyle = '#64748b';
       ctx.font = '9px sans-serif';
       const label = date.substring(5);
       ctx.fillText(label, x, canvas.height - 5);
@@ -829,7 +839,8 @@ function renderStaffActivity(stats) {
   container.innerHTML = stats.slice(0, 10).map((s, i) => {
     const timeAgo = s.lastAction ? timeSince(new Date(s.lastAction)) : 'N/A';
     const avatarHtml = s.avatar ? `<img src="${s.avatar}" class="staff-activity-avatar" alt="">` : `<div class="staff-activity-avatar-placeholder">${(s.displayName || '?')[0]}</div>`;
-    return `<div class="staff-activity-item" onclick="filterByStaff('${s.staffId}')">
+    const rawName = (s.displayName || s.staffId).replace(/"/g, '&quot;');
+    return `<div class="staff-activity-item" data-staff-id="${s.staffId}" data-staff-name="${rawName}" onclick="filterByStaff(this.dataset.staffId, this.dataset.staffName)">
       <span class="staff-rank">#${i + 1}</span>
       ${avatarHtml}
       <div class="staff-activity-info">
@@ -849,9 +860,9 @@ function timeSince(date) {
   return 'hace ' + Math.floor(s / 86400) + 'd';
 }
 
-function filterByStaff(staffId) {
+function filterByStaff(staffId, displayName) {
   const searchEl = document.getElementById('audit-search');
-  if (searchEl) searchEl.value = staffId;
+  if (searchEl) searchEl.value = displayName || staffId;
   loadAuditLogs(1);
 }
 
@@ -944,6 +955,9 @@ function navigateTo(page, skipHash) {
   const pageEl = document.getElementById('page-' + page);
   if (!pageEl) return;
   pageEl.style.display = 'block';
+  pageEl.classList.remove('page-fade-in');
+  void pageEl.offsetWidth;
+  pageEl.classList.add('page-fade-in');
   const navItem = document.querySelector(`.nav-item[data-page="${page}"]`);
   if (navItem) navItem.classList.add('active');
 
@@ -952,7 +966,6 @@ function navigateTo(page, skipHash) {
   if (page === 'logs') initAuditPage();
   if (page === 'dashboard') initApp();
   if (page === 'notes') loadNotesPage();
-  if (page === 'settings') renderThemeSettings();
   const sidebar = document.getElementById('sidebar');
   if (window.innerWidth <= 768) sidebar.classList.remove('open');
 }
@@ -1160,8 +1173,8 @@ function openTool(action) {
         <div class="form-group"><label>Descripcion</label><textarea id="embed-desc" placeholder="Descripcion del embed..."></textarea></div>
         <div class="form-group"><label>Color</label>
           <div class="color-picker-wrapper">
-            <input type="color" id="embed-color" value="#5865F2">
-            <span id="embed-color-text">#5865F2</span>
+            <input type="color" id="embed-color" value="#38bdf8">
+            <span id="embed-color-text">#38bdf8</span>
           </div>
         </div>
         <div class="form-group"><label>Pie de pagina (opcional)</label><input type="text" id="embed-footer" placeholder="Texto del pie"></div>
@@ -1196,7 +1209,7 @@ function openTool(action) {
           <div class="form-group"><label>Mensaje adicional (opcional, encima del embed)</label><textarea id="dm-embed-message" placeholder="Texto opcional..."></textarea></div>
           <div class="form-group"><label>Titulo del embed</label><input type="text" id="dm-embed-title" placeholder="Titulo"></div>
           <div class="form-group"><label>Descripcion</label><textarea id="dm-embed-desc" placeholder="Descripcion..."></textarea></div>
-          <div class="form-group"><label>Color</label><div class="color-picker-wrapper"><input type="color" id="dm-embed-color" value="#5865F2"><span id="dm-embed-color-text">#5865F2</span></div></div>
+          <div class="form-group"><label>Color</label><div class="color-picker-wrapper"><input type="color" id="dm-embed-color" value="#38bdf8"><span id="dm-embed-color-text">#38bdf8</span></div></div>
           <div class="form-group"><label>Pie de pagina</label><input type="text" id="dm-embed-footer" placeholder="Opcional"></div>
           <div class="form-group"><label>URL imagen</label><input type="url" id="dm-embed-image" placeholder="Opcional"></div>
           <div class="form-group"><label>URL thumbnail</label><input type="url" id="dm-embed-thumbnail" placeholder="Opcional"></div>
@@ -1564,108 +1577,6 @@ async function executeRoleInfo() {
   } catch (e) { toast(e.message, 'error'); }
 }
 
-const themes = {
-  dark: {
-    name: 'Oscuro',
-    vars: {
-      '--bg-primary': '#1a1a2e',
-      '--bg-secondary': '#16213e',
-      '--bg-card': '#1e2a45',
-      '--bg-input': '#0f1729',
-      '--text-primary': '#e0e0e0',
-      '--text-muted': '#8892b0',
-      '--border': '#2d3a5c',
-      '--accent': '#5865F2',
-      '--success': '#43b581',
-      '--danger': '#f04747',
-      '--warning': '#faa61a',
-      '--info': '#00b0f4'
-    }
-  },
-  midnight: {
-    name: 'Medianoche',
-    vars: {
-      '--bg-primary': '#0d0d1a',
-      '--bg-secondary': '#12121f',
-      '--bg-card': '#181828',
-      '--bg-input': '#0a0a14',
-      '--text-primary': '#d4d4e8',
-      '--text-muted': '#6b6b8d',
-      '--border': '#252540',
-      '--accent': '#7c3aed',
-      '--success': '#10b981',
-      '--danger': '#ef4444',
-      '--warning': '#f59e0b',
-      '--info': '#3b82f6'
-    }
-  },
-  ocean: {
-    name: 'Oceano',
-    vars: {
-      '--bg-primary': '#0a192f',
-      '--bg-secondary': '#0d2137',
-      '--bg-card': '#112240',
-      '--bg-input': '#071525',
-      '--text-primary': '#ccd6f6',
-      '--text-muted': '#8892b0',
-      '--border': '#1d3557',
-      '--accent': '#64ffda',
-      '--success': '#64ffda',
-      '--danger': '#ff6b6b',
-      '--warning': '#ffd93d',
-      '--info': '#6ec6ff'
-    }
-  },
-  crimson: {
-    name: 'Carmesi',
-    vars: {
-      '--bg-primary': '#1a0a0a',
-      '--bg-secondary': '#2d1515',
-      '--bg-card': '#3a1c1c',
-      '--bg-input': '#120808',
-      '--text-primary': '#f0d0d0',
-      '--text-muted': '#a07070',
-      '--border': '#4a2525',
-      '--accent': '#dc3545',
-      '--success': '#28a745',
-      '--danger': '#ff4757',
-      '--warning': '#ffc107',
-      '--info': '#17a2b8'
-    }
-  }
-};
-
-function applyTheme(themeKey) {
-  const theme = themes[themeKey];
-  if (!theme) return;
-  const root = document.documentElement;
-  for (const [prop, val] of Object.entries(theme.vars)) {
-    root.style.setProperty(prop, val);
-  }
-  localStorage.setItem('selectedTheme', themeKey);
-}
-
-function loadSavedTheme() {
-  const saved = localStorage.getItem('selectedTheme');
-  if (saved && themes[saved]) {
-    applyTheme(saved);
-  }
-}
-
-function renderThemeSettings() {
-  const container = document.getElementById('theme-options');
-  if (!container) return;
-  const currentTheme = localStorage.getItem('selectedTheme') || 'dark';
-  container.innerHTML = Object.entries(themes).map(([key, theme]) => `
-    <div class="theme-option ${key === currentTheme ? 'active' : ''}" onclick="applyTheme('${key}'); renderThemeSettings();">
-      <div class="theme-preview" style="background:${theme.vars['--bg-primary']};">
-        <div style="width:60%;height:6px;border-radius:3px;background:${theme.vars['--accent']};margin-bottom:4px;"></div>
-        <div style="width:40%;height:6px;border-radius:3px;background:${theme.vars['--text-muted']};"></div>
-      </div>
-      <span>${theme.name}</span>
-    </div>
-  `).join('');
-}
 
 let currentNotesUserId = null;
 let currentNotesUserTag = null;
