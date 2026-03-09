@@ -47,13 +47,18 @@ async function login() {
     currentUsername = data.username;
     document.getElementById('login-page').style.display = 'none';
     document.getElementById('app-page').style.display = 'flex';
-    initApp();
+    await initApp();
+    const loginHash = window.location.hash.replace('#', '');
+    if (loginHash && document.getElementById('page-' + loginHash)) {
+      navigateTo(loginHash, true);
+    }
   } catch (e) {
     toast(e.message, 'error');
   }
 }
 
 function logout() {
+  if (auditSSE) { auditSSE.close(); auditSSE = null; auditSSEConnected = false; }
   api('POST', '/logout').catch(() => {});
   sessionToken = null;
   currentRole = null;
@@ -216,7 +221,12 @@ async function loadAuditLogs(page) {
     setTimeout(() => {
       const logsContainer = document.getElementById('audit-logs-container');
       if (logsContainer) {
-        logsContainer.scrollTo({ top: logsContainer.scrollHeight, behavior: 'smooth' });
+        logsContainer.scrollTo({ top: 0, behavior: 'smooth' });
+        const firstItem = logsContainer.querySelector('.audit-log-item');
+        if (firstItem) {
+          firstItem.classList.add('highlight-newest');
+          setTimeout(() => firstItem.classList.remove('highlight-newest'), 1000);
+        }
       }
     }, 150);
   } catch (e) {
@@ -237,7 +247,12 @@ async function loadAuditLogsFull(page) {
     setTimeout(() => {
       const fsBody = document.getElementById('audit-fullscreen-body');
       if (fsBody) {
-        fsBody.scrollTo({ top: fsBody.scrollHeight, behavior: 'smooth' });
+        fsBody.scrollTo({ top: 0, behavior: 'smooth' });
+        const firstItem = fsBody.querySelector('.audit-log-item');
+        if (firstItem) {
+          firstItem.classList.add('highlight-newest');
+          setTimeout(() => firstItem.classList.remove('highlight-newest'), 1000);
+        }
       }
     }, 150);
   } catch (e) {
@@ -288,7 +303,8 @@ function renderAuditTable(logs, containerId) {
     } else if (log.actionType === 'MESSAGE_DELETE' && d.content) {
       msgPreview = `<div class="audit-msg-preview audit-msg-delete"><span class="msg-label">Mensaje:</span> ${escapeHtml(String(d.content).substring(0, 200))}</div>`;
     }
-    return `<div class="audit-log-item ${msgPreview ? 'has-preview' : ''}" onclick="showAuditDetail(${idx}, '${containerId}')">
+    const sevClass = sev === 'CRITICAL' ? ' severity-critical-row' : sev === 'HIGH' ? ' severity-high-row' : '';
+    return `<div class="audit-log-item ${msgPreview ? 'has-preview' : ''}${sevClass}" onclick="showAuditDetail(${idx}, '${containerId}')">
       <span class="audit-log-time">${timeStr}</span>
       <span class="audit-log-type category-${cat}">${log.actionType.replace(/_/g, ' ')}</span>
       <span class="audit-log-severity severity-${sev}">${sev}</span>
@@ -391,10 +407,16 @@ function toggleAuditFullscreen() {
   }
 }
 
+let currentDetailIdx = 0;
+let currentDetailContainer = '';
+
 function showAuditDetail(idx, containerId) {
   const logs = containerId === 'audit-logs-list' ? cachedAuditLogs : cachedAuditLogsFull;
   const log = logs[idx];
   if (!log) return;
+  currentDetailIdx = idx;
+  currentDetailContainer = containerId;
+
   const panel = document.getElementById('audit-detail-panel');
   const backdrop = document.getElementById('audit-detail-backdrop');
   const body = document.getElementById('audit-detail-body');
@@ -412,7 +434,10 @@ function showAuditDetail(idx, containerId) {
     ticketNumber: 'Numero de Ticket', category: 'Categoria', suggestionId: 'ID de Sugerencia',
     title: 'Titulo', status: 'Estado', rating: 'Calificacion', comment: 'Comentario',
     filename: 'Archivo', collections: 'Colecciones', timestamp: 'Fecha', ip: 'IP',
-    targetId: 'ID del Objetivo', staffId: 'ID del Staff', guildId: 'ID del Servidor'
+    targetId: 'ID del Objetivo', staffId: 'ID del Staff', guildId: 'ID del Servidor',
+    voiceChannel: 'Canal de Voz', oldChannel: 'Canal Anterior', newChannel: 'Canal Nuevo',
+    accountAge: 'Antigüedad', oldNickname: 'Apodo Anterior', newNickname: 'Apodo Nuevo',
+    roleName: 'Nombre del Rol', roleColor: 'Color del Rol', emojiName: 'Nombre del Emoji'
   };
 
   let detailsHtml = '';
@@ -428,7 +453,16 @@ function showAuditDetail(idx, containerId) {
 
   const targetClickable = log.targetId ? `<span class="detail-value clickable" onclick="openUserProfile('${log.targetId}')">${escapeHtml(d.userTag || log.targetId)}</span>` : '<span class="detail-value">-</span>';
 
+  const hasPrev = idx > 0;
+  const hasNext = idx < logs.length - 1;
+
   body.innerHTML = `
+    <div class="audit-detail-nav">
+      <button class="btn btn-sm" onclick="navigateAuditDetail(-1)" ${!hasPrev ? 'disabled' : ''}>&#9664; Anterior</button>
+      <span class="audit-detail-counter">${idx + 1} / ${logs.length}</span>
+      <button class="btn btn-sm" onclick="navigateAuditDetail(1)" ${!hasNext ? 'disabled' : ''}>Siguiente &#9654;</button>
+      <button class="btn btn-sm btn-info" onclick="copyLogJSON()" title="Copiar JSON">&#128203; Copiar</button>
+    </div>
     <div class="audit-detail-field">
       <div class="detail-label">Fecha y Hora</div>
       <div class="detail-value">${date}</div>
@@ -460,6 +494,26 @@ function showAuditDetail(idx, containerId) {
 
   panel.classList.add('active');
   backdrop.classList.add('active');
+}
+
+function navigateAuditDetail(direction) {
+  const newIdx = currentDetailIdx + direction;
+  const logs = currentDetailContainer === 'audit-logs-list' ? cachedAuditLogs : cachedAuditLogsFull;
+  if (newIdx >= 0 && newIdx < logs.length) {
+    showAuditDetail(newIdx, currentDetailContainer);
+  }
+}
+
+function copyLogJSON() {
+  const logs = currentDetailContainer === 'audit-logs-list' ? cachedAuditLogs : cachedAuditLogsFull;
+  const log = logs[currentDetailIdx];
+  if (!log) return;
+  const text = JSON.stringify(log, null, 2);
+  navigator.clipboard.writeText(text).then(() => {
+    toast('Log copiado al portapapeles', 'success');
+  }).catch(() => {
+    toast('Error al copiar', 'error');
+  });
 }
 
 function closeAuditDetail() {
@@ -604,35 +658,40 @@ async function saveUserProfile(userId) {
 }
 
 async function exportAuditLogs() {
+  const formatSelect = document.getElementById('export-format');
+  const format = formatSelect ? formatSelect.value : 'csv';
   const params = buildAuditParams('audit');
-  params.set('limit', 1000);
+  params.set('format', format);
   try {
-    const result = await api('GET', '/logs?' + params.toString());
-    const logs = result.logs || [];
-    if (logs.length === 0) return toast('No hay logs para exportar', 'warning');
-    const lines = logs.map(l => {
-      const d = l.details || {};
-      return `${new Date(l.createdAt).toISOString()}\t${l.actionType}\t${l.category || ''}\t${l.severity || ''}\t${l.targetId || ''}\t${l.staffId || ''}\t${d.staffName || ''}\t${d.reason || ''}\t${d.userTag || ''}`;
+    const response = await fetch(API_BASE + '/logs/export?' + params.toString(), {
+      headers: sessionToken ? { 'X-Session-Token': sessionToken } : {}
     });
-    const header = 'Fecha\tTipo\tCategoria\tGravedad\tTarget\tStaff ID\tStaff\tRazon\tUsuario';
-    const csv = header + '\n' + lines.join('\n');
-    const blob = new Blob([csv], { type: 'text/tab-separated-values' });
+    if (!response.ok) throw new Error('Error del servidor');
+    const blob = await response.blob();
+    const ext = format === 'json' ? 'json' : format === 'tsv' ? 'tsv' : 'csv';
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'audit_logs_' + new Date().toISOString().split('T')[0] + '.tsv';
+    a.download = 'audit_logs_' + new Date().toISOString().split('T')[0] + '.' + ext;
     a.click();
     URL.revokeObjectURL(url);
-    toast('Logs exportados', 'success');
+    toast('Logs exportados en formato ' + format.toUpperCase(), 'success');
   } catch (e) {
     toast('Error exportando: ' + e.message, 'error');
   }
 }
 
+let auditSSE = null;
+let auditSSEConnected = false;
+
 function initAuditPage() {
   loadAuditStats();
   loadAuditActionTypes();
   loadAuditLogs(1);
+  loadAuditTimeline();
+  loadStaffActivity();
+  loadRetentionSettings();
+  connectAuditSSE();
   if (auditRefreshInterval) clearInterval(auditRefreshInterval);
   auditRefreshInterval = setInterval(() => {
     const logsPage = document.getElementById('page-logs');
@@ -640,6 +699,227 @@ function initAuditPage() {
       loadAuditStats();
     }
   }, 30000);
+}
+
+function connectAuditSSE() {
+  if (auditSSE) { auditSSE.close(); auditSSE = null; }
+  if (!sessionToken) return;
+  const indicator = document.getElementById('sse-indicator');
+
+  auditSSE = new EventSource(API_BASE + '/logs/stream?token=' + sessionToken);
+
+  auditSSE.onopen = () => {
+    auditSSEConnected = true;
+    if (indicator) { indicator.classList.add('connected'); indicator.title = 'En vivo'; }
+  };
+
+  auditSSE.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      if (data.type === 'newLog' && data.log) {
+        cachedAuditLogs.unshift(data.log);
+        if (cachedAuditLogs.length > 30) cachedAuditLogs.pop();
+        renderAuditTable(cachedAuditLogs, 'audit-logs-list');
+        const container = document.getElementById('audit-logs-container');
+        if (container) {
+          container.scrollTo({ top: 0, behavior: 'smooth' });
+          const firstItem = container.querySelector('.audit-log-item');
+          if (firstItem) {
+            firstItem.classList.add('highlight-newest');
+            setTimeout(() => firstItem.classList.remove('highlight-newest'), 1000);
+          }
+        }
+        loadAuditStats();
+      }
+    } catch (e) {}
+  };
+
+  auditSSE.onerror = () => {
+    auditSSEConnected = false;
+    if (indicator) { indicator.classList.remove('connected'); indicator.title = 'Desconectado'; }
+    auditSSE.close();
+    auditSSE = null;
+    setTimeout(() => {
+      const logsPage = document.getElementById('page-logs');
+      if (logsPage && logsPage.style.display !== 'none') connectAuditSSE();
+    }, 5000);
+  };
+}
+
+async function loadAuditTimeline() {
+  try {
+    const timeline = await api('GET', '/logs/stats/timeline?days=30');
+    renderTimelineChart(timeline);
+  } catch (e) {}
+}
+
+function renderTimelineChart(timeline) {
+  const container = document.getElementById('audit-timeline-chart');
+  if (!container) return;
+  const canvas = document.createElement('canvas');
+  canvas.width = container.clientWidth || 700;
+  canvas.height = 180;
+  container.innerHTML = '';
+  container.appendChild(canvas);
+
+  const ctx = canvas.getContext('2d');
+  const dates = Object.keys(timeline).sort();
+  if (dates.length === 0) {
+    ctx.fillStyle = '#72767d';
+    ctx.font = '13px sans-serif';
+    ctx.fillText('Sin datos para mostrar', canvas.width / 2 - 70, 90);
+    return;
+  }
+
+  const values = dates.map(d => timeline[d].total || 0);
+  const max = Math.max(...values, 1);
+  const barW = Math.max(4, Math.floor((canvas.width - 60) / dates.length) - 2);
+  const chartH = canvas.height - 40;
+  const startX = 40;
+
+  const catColors = { USER: '#5865f2', CHANNEL: '#43b581', MESSAGE: '#7289da', AUTOMOD: '#faa61a', STAFF: '#f04747', SYSTEM: '#a064ff' };
+  const categories = ['USER', 'CHANNEL', 'MESSAGE', 'AUTOMOD', 'STAFF', 'SYSTEM'];
+
+  ctx.fillStyle = '#72767d';
+  ctx.font = '10px sans-serif';
+  for (let i = 0; i <= 4; i++) {
+    const y = 10 + (chartH / 4) * i;
+    const val = Math.round(max - (max / 4) * i);
+    ctx.fillText(val, 0, y + 4);
+    ctx.strokeStyle = 'rgba(114,118,125,0.15)';
+    ctx.beginPath(); ctx.moveTo(startX, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+  }
+
+  dates.forEach((date, i) => {
+    const x = startX + i * (barW + 2);
+    const total = timeline[date].total || 0;
+    let currentY = 10 + chartH;
+
+    categories.forEach(cat => {
+      const count = timeline[date][cat] || 0;
+      if (count === 0) return;
+      const h = (count / max) * chartH;
+      currentY -= h;
+      ctx.fillStyle = catColors[cat] || '#a064ff';
+      ctx.fillRect(x, currentY, barW, h);
+    });
+
+    if (i % Math.max(1, Math.floor(dates.length / 7)) === 0) {
+      ctx.fillStyle = '#72767d';
+      ctx.font = '9px sans-serif';
+      const label = date.substring(5);
+      ctx.fillText(label, x, canvas.height - 5);
+    }
+  });
+}
+
+async function loadStaffActivity() {
+  try {
+    const stats = await api('GET', '/logs/stats/staff-activity');
+    renderStaffActivity(stats);
+  } catch (e) {}
+}
+
+function renderStaffActivity(stats) {
+  const container = document.getElementById('audit-staff-activity');
+  if (!container || !stats || stats.length === 0) {
+    if (container) container.innerHTML = '<div class="empty-state"><p>Sin actividad de staff</p></div>';
+    return;
+  }
+  container.innerHTML = stats.slice(0, 10).map((s, i) => {
+    const timeAgo = s.lastAction ? timeSince(new Date(s.lastAction)) : 'N/A';
+    const avatarHtml = s.avatar ? `<img src="${s.avatar}" class="staff-activity-avatar" alt="">` : `<div class="staff-activity-avatar-placeholder">${(s.displayName || '?')[0]}</div>`;
+    return `<div class="staff-activity-item" onclick="filterByStaff('${s.staffId}')">
+      <span class="staff-rank">#${i + 1}</span>
+      ${avatarHtml}
+      <div class="staff-activity-info">
+        <div class="staff-activity-name">${escapeHtml(s.displayName || s.staffId)}</div>
+        <div class="staff-activity-meta">${s.totalActions} acciones - Ultima: ${timeAgo}</div>
+      </div>
+      <div class="staff-activity-count">${s.totalActions}</div>
+    </div>`;
+  }).join('');
+}
+
+function timeSince(date) {
+  const s = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (s < 60) return 'hace ' + s + 's';
+  if (s < 3600) return 'hace ' + Math.floor(s / 60) + 'm';
+  if (s < 86400) return 'hace ' + Math.floor(s / 3600) + 'h';
+  return 'hace ' + Math.floor(s / 86400) + 'd';
+}
+
+function filterByStaff(staffId) {
+  const searchEl = document.getElementById('audit-search');
+  if (searchEl) searchEl.value = staffId;
+  loadAuditLogs(1);
+}
+
+function applyQuickFilter(type) {
+  clearAuditFilters();
+  const now = new Date();
+  switch (type) {
+    case 'sanctions-today':
+      document.getElementById('audit-category').value = 'STAFF';
+      document.getElementById('audit-date-from').value = now.toISOString().split('T')[0];
+      break;
+    case 'critical':
+      document.getElementById('audit-severity').value = 'CRITICAL';
+      break;
+    case 'high':
+      document.getElementById('audit-severity').value = 'HIGH';
+      break;
+    case 'last-hour':
+      document.getElementById('audit-search').value = '';
+      const oneHourAgo = new Date(now.getTime() - 3600000);
+      document.getElementById('audit-date-from').value = oneHourAgo.toISOString().split('T')[0];
+      document.getElementById('audit-date-to').value = now.toISOString().split('T')[0];
+      break;
+    case 'deleted-messages':
+      document.getElementById('audit-search').value = 'MESSAGE_DELETE';
+      break;
+    case 'voice':
+      document.getElementById('audit-search').value = 'VOICE';
+      break;
+  }
+  loadAuditLogs(1);
+}
+
+async function loadRetentionSettings() {
+  const container = document.getElementById('retention-settings');
+  if (!container) return;
+  if (!['admin', 'owner'].includes(currentRole)) {
+    container.style.display = 'none';
+    return;
+  }
+  try {
+    const data = await api('GET', '/logs/retention');
+    const retentionSelect = document.getElementById('retention-days');
+    if (retentionSelect) retentionSelect.value = data.days || 0;
+    const info = document.getElementById('retention-info');
+    if (info) info.textContent = `Total: ${data.totalLogs} logs${data.days > 0 ? ` | Se purgarian: ${data.preview}` : ''}`;
+  } catch (e) {}
+}
+
+async function saveRetention() {
+  const days = parseInt(document.getElementById('retention-days').value) || 0;
+  try {
+    const result = await api('POST', '/logs/retention', { days });
+    toast(`Retencion configurada: ${days === 0 ? 'ilimitada' : days + ' dias'}${result.purged > 0 ? ` (${result.purged} logs purgados)` : ''}`, 'success');
+    loadRetentionSettings();
+    loadAuditStats();
+  } catch (e) {
+    toast('Error: ' + e.message, 'error');
+  }
+}
+
+async function previewRetention() {
+  const days = parseInt(document.getElementById('retention-days').value) || 90;
+  try {
+    const result = await api('GET', '/logs/retention/preview?days=' + days);
+    const info = document.getElementById('retention-info');
+    if (info) info.textContent = `Con ${days} dias se purgarian: ${result.count} logs`;
+  } catch (e) {}
 }
 
 async function loadChannels() {
@@ -658,11 +938,16 @@ async function loadRoles() {
   }
 }
 
-function navigateTo(page) {
+function navigateTo(page, skipHash) {
   document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-  document.getElementById('page-' + page).style.display = 'block';
-  document.querySelector(`.nav-item[data-page="${page}"]`).classList.add('active');
+  const pageEl = document.getElementById('page-' + page);
+  if (!pageEl) return;
+  pageEl.style.display = 'block';
+  const navItem = document.querySelector(`.nav-item[data-page="${page}"]`);
+  if (navItem) navItem.classList.add('active');
+
+  if (!skipHash) window.location.hash = page;
 
   if (page === 'logs') initAuditPage();
   if (page === 'dashboard') initApp();
@@ -671,6 +956,27 @@ function navigateTo(page) {
   const sidebar = document.getElementById('sidebar');
   if (window.innerWidth <= 768) sidebar.classList.remove('open');
 }
+
+function handleHashNavigation() {
+  const hash = window.location.hash.replace('#', '');
+  if (hash && document.getElementById('page-' + hash)) {
+    navigateTo(hash, true);
+  }
+}
+
+window.addEventListener('hashchange', handleHashNavigation);
+window.addEventListener('DOMContentLoaded', function() {
+  const hash = window.location.hash.replace('#', '');
+  if (hash && document.getElementById('page-' + hash)) {
+    const checkLogin = setInterval(function() {
+      if (document.getElementById('app-page').style.display !== 'none') {
+        clearInterval(checkLogin);
+        navigateTo(hash, true);
+      }
+    }, 200);
+    setTimeout(function() { clearInterval(checkLogin); }, 10000);
+  }
+});
 
 function toggleSidebar() {
   document.getElementById('sidebar').classList.toggle('open');

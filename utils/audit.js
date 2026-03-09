@@ -19,7 +19,16 @@ const ACTION_EMOJIS = {
   'WARN_ADD': '⚠️',
   'MUTE_APPLY': '🔇',
   'BAN_APPLY': '🔨',
-  'BACKUP_CREATE': '💾',
+  'VOICE_JOIN': '🔊',
+  'VOICE_LEAVE': '🔇',
+  'VOICE_MOVE': '🔀',
+  'MEMBER_BOOST': '💎',
+  'MEMBER_UNBOOST': '💔',
+  'EMOJI_CREATE': '😀',
+  'EMOJI_DELETE': '🗑️',
+  'ROLE_CREATE': '🏷️',
+  'ROLE_DELETE': '❌',
+  'ROLE_UPDATE': '✏️',
   'DEFAULT': '📌'
 };
 
@@ -63,7 +72,9 @@ module.exports = (client) => {
                     { name: 'Warns', value: 'WARN' },
                     { name: 'Mutes', value: 'MUTE' },
                     { name: 'Bans', value: 'BAN' },
-                    { name: 'Backups', value: 'BACKUP' }
+                    { name: 'Voz', value: 'VOICE' },
+                    { name: 'Roles', value: 'ROLE' },
+                    { name: 'Emojis', value: 'EMOJI' }
                   )))
           .addSubcommand(sub => 
             sub.setName('search')

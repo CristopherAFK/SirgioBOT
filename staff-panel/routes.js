@@ -1,6 +1,6 @@
 const express = require('express');
 const { EmbedBuilder } = require('discord.js');
-const { db, mongoose } = require('../database');
+const { db, mongoose, auditEmitter } = require('../database');
 const path = require('path');
 const crypto = require('crypto');
 const { GUILD_ID: CONFIG_GUILD_ID, LOG_CHANNEL_ID } = require('../config');
@@ -141,9 +141,18 @@ function setupStaffPanel(app, client) {
     res.json({ token, role: account.role, username: account.displayName });
   });
 
+  const sseClients = new Map();
+
   router.post('/logout', authenticate, (req, res) => {
     const token = req.headers['x-session-token'];
     sessions.delete(token);
+    for (const [sseRes, data] of sseClients.entries()) {
+      if (data.token === token) {
+        auditEmitter.removeListener('newLog', data.onNewLog);
+        sseRes.end();
+        sseClients.delete(sseRes);
+      }
+    }
     res.json({ success: true });
   });
 
@@ -736,6 +745,168 @@ function setupStaffPanel(app, client) {
     }
   });
 
+  router.get('/logs/stats/timeline', authenticate, async (req, res) => {
+    try {
+      const days = parseInt(req.query.days) || 30;
+      const timeline = await db.getAuditTimeline(days);
+      res.json(timeline);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.get('/logs/stats/staff-activity', authenticate, async (req, res) => {
+    try {
+      const stats = await db.getStaffActivityStats();
+      const guild = getGuild();
+      const enriched = await Promise.all(stats.map(async (s) => {
+        let displayName = s.staffId;
+        let avatar = null;
+        const accountEntry = Object.values(ACCOUNTS).find(a => a.discordId === s.staffId);
+        if (accountEntry) displayName = accountEntry.displayName;
+        if (guild) {
+          try {
+            const member = await guild.members.fetch(s.staffId);
+            avatar = member.user.displayAvatarURL({ size: 64 });
+            if (!accountEntry) displayName = member.displayName;
+          } catch (e) {}
+        }
+        return { ...s, displayName, avatar };
+      }));
+      res.json(enriched);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.get('/logs/export', authenticate, async (req, res) => {
+    try {
+      const format = req.query.format || 'csv';
+      const options = {
+        category: req.query.category,
+        severity: req.query.severity,
+        actionType: req.query.actionType,
+        targetId: req.query.userId || req.query.targetId,
+        staffId: req.query.staffId,
+        dateFrom: req.query.dateFrom,
+        dateTo: req.query.dateTo,
+        search: req.query.search,
+        limit: 10000,
+        page: 1
+      };
+      Object.keys(options).forEach(k => { if (!options[k]) delete options[k]; });
+      const result = await db.getAuditLogs(options);
+      const logs = result.logs || [];
+
+      if (format === 'json') {
+        res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Content-Disposition', 'attachment; filename=audit_logs.json');
+        return res.json(logs.map(l => ({
+          date: l.createdAt,
+          actionType: l.actionType,
+          category: l.category,
+          severity: l.severity,
+          targetId: l.targetId,
+          staffId: l.staffId,
+          details: l.details
+        })));
+      }
+
+      const separator = format === 'tsv' ? '\t' : ',';
+      const header = ['Fecha', 'Tipo', 'Categoria', 'Gravedad', 'Target', 'Staff ID', 'Staff', 'Razon', 'Usuario'].join(separator);
+      const lines = logs.map(l => {
+        const d = l.details || {};
+        const fields = [
+          new Date(l.createdAt).toISOString(),
+          l.actionType || '',
+          l.category || '',
+          l.severity || '',
+          l.targetId || '',
+          l.staffId || '',
+          d.staffName || '',
+          (d.reason || '').replace(/[\r\n,\t]/g, ' '),
+          d.userTag || ''
+        ];
+        if (format === 'csv') return fields.map(f => `"${String(f).replace(/"/g, '""')}"`).join(',');
+        return fields.join('\t');
+      });
+
+      const bom = format === 'csv' ? '\uFEFF' : '';
+      const ext = format === 'tsv' ? 'tsv' : 'csv';
+      res.setHeader('Content-Type', format === 'csv' ? 'text/csv; charset=utf-8' : 'text/tab-separated-values');
+      res.setHeader('Content-Disposition', `attachment; filename=audit_logs.${ext}`);
+      res.send(bom + header + '\n' + lines.join('\n'));
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.get('/logs/stream', (req, res) => {
+    const token = req.headers['x-session-token'] || req.query.token;
+    if (!token || !sessions.has(token)) return res.status(401).json({ error: 'No autorizado' });
+    req.session = sessions.get(token);
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders();
+
+    res.write('data: {"type":"connected"}\n\n');
+
+    const onNewLog = (log) => {
+      if (!sessions.has(token)) { res.end(); return; }
+      res.write(`data: ${JSON.stringify({ type: 'newLog', log })}\n\n`);
+    };
+    auditEmitter.on('newLog', onNewLog);
+    sseClients.set(res, { token, onNewLog });
+
+    req.on('close', () => {
+      auditEmitter.removeListener('newLog', onNewLog);
+      sseClients.delete(res);
+    });
+  });
+
+  router.get('/logs/retention', authenticate, async (req, res) => {
+    try {
+      const config = await db.getConfig('audit_retention_days');
+      const days = config || 0;
+      let preview = 0;
+      if (days > 0) {
+        preview = await db.getAuditRetentionPreview(days);
+      }
+      const stats = await db.getAuditLogStats();
+      res.json({ days, preview, totalLogs: stats.total });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.post('/logs/retention', authenticate, async (req, res) => {
+    if (!['admin', 'owner'].includes(req.session.role)) {
+      return res.status(403).json({ error: 'Solo admins pueden configurar retencion' });
+    }
+    try {
+      const days = parseInt(req.body.days) || 0;
+      await db.setConfig('audit_retention_days', days);
+      let purged = 0;
+      if (days > 0) {
+        purged = await db.purgeOldAuditLogs(days);
+      }
+      res.json({ success: true, days, purged });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.get('/logs/retention/preview', authenticate, async (req, res) => {
+    try {
+      const days = parseInt(req.query.days) || 90;
+      const count = await db.getAuditRetentionPreview(days);
+      res.json({ days, count });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   router.get('/user/:userId/profile', authenticate, async (req, res) => {
     try {
       const guild = getGuild();
@@ -825,6 +996,60 @@ function setupStaffPanel(app, client) {
       default: return null;
     }
   }
+
+  const SEVERITY_COLORS = { MEDIUM: 0xfaa61a, HIGH: 0xf04747, CRITICAL: 0xff0000 };
+  const SEVERITY_LABELS = { MEDIUM: '⚠️ Media', HIGH: '🔴 Alta', CRITICAL: '🚨 Critica' };
+
+  auditEmitter.on('newLog', async (log) => {
+    try {
+      if (!client || !client.isReady()) return;
+      const sev = log.severity;
+      if (!['MEDIUM', 'HIGH', 'CRITICAL'].includes(sev)) return;
+
+      const embed = new EmbedBuilder()
+        .setColor(SEVERITY_COLORS[sev] || 0xfaa61a)
+        .setTitle(`${SEVERITY_LABELS[sev] || sev} - ${(log.actionType || '').replace(/_/g, ' ')}`)
+        .addFields(
+          { name: 'Categoria', value: log.category || 'SYSTEM', inline: true },
+          { name: 'Severidad', value: sev, inline: true }
+        )
+        .setTimestamp(new Date(log.createdAt));
+
+      const d = log.details || {};
+      if (d.userTag) embed.addFields({ name: 'Usuario', value: d.userTag, inline: true });
+      if (log.targetId) embed.addFields({ name: 'Target ID', value: log.targetId, inline: true });
+      if (d.staffName) embed.addFields({ name: 'Staff', value: d.staffName, inline: true });
+      if (d.reason) embed.addFields({ name: 'Razon', value: String(d.reason).substring(0, 200) });
+      if (d.channelName) embed.addFields({ name: 'Canal', value: `#${d.channelName}`, inline: true });
+
+      const staffToNotify = Object.values(ACCOUNTS).filter(a => {
+        if (sev === 'MEDIUM') return ['admin', 'owner'].includes(a.role);
+        return true;
+      });
+
+      for (const staff of staffToNotify) {
+        if (staff.discordId === log.staffId) continue;
+        try {
+          const user = await client.users.fetch(staff.discordId);
+          await user.send({ embeds: [embed] });
+        } catch (e) {}
+      }
+    } catch (e) {
+      console.error('[AuditDM] Error enviando notificacion:', e.message);
+    }
+  });
+
+  setInterval(async () => {
+    try {
+      const retentionDays = await db.getConfig('audit_retention_days');
+      if (retentionDays && retentionDays > 0) {
+        const purged = await db.purgeOldAuditLogs(retentionDays);
+        if (purged > 0) console.log(`[AuditRetention] Purgados ${purged} logs antiguos (>${retentionDays} dias)`);
+      }
+    } catch (e) {
+      console.error('[AuditRetention] Error:', e.message);
+    }
+  }, 6 * 60 * 60 * 1000);
 }
 
 module.exports = { setupStaffPanel };

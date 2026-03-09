@@ -11,8 +11,9 @@ El bot usa **MongoDB** (compatible con MongoDB Atlas) para almacenar:
 - Mutes activos (persistentes a reinicios)
 - Bans temporales (persistentes a reinicios)
 - Estadísticas de staff
-- Logs de auditoría
+- Logs de auditoría (con EventEmitter para SSE y notificaciones DM)
 - Configuración
+- Retención de datos configurable
 
 ## Características Principales
 
@@ -93,13 +94,22 @@ El bot usa **MongoDB** (compatible con MongoDB Atlas) para almacenar:
 ### Sistema de Auditoría Avanzado (Staff Panel)
 - Esquema extendido con campos `category` (USER/CHANNEL/MESSAGE/AUTOMOD/STAFF/SYSTEM) y `severity` (INFO/LOW/MEDIUM/HIGH/CRITICAL)
 - Índices compuestos para búsqueda eficiente
-- `auditEvents.js`: listeners para messageUpdate, messageDelete, guildMemberUpdate, channelCreate/Delete/Update, guildBanAdd/Remove
-- API endpoints: GET /api/logs (filtros+paginación), GET /api/logs/stats, GET /api/logs/action-types, GET/POST /api/user/:id/profile
-- Frontend con filtros avanzados (texto, categoría, severity, tipo, fechas, usuario), paginación, modo pantalla completa (fullscreen overlay z-index 5000), panel de detalle slide-in, modal de perfil de usuario
-- Auto-refresh cada 30 segundos, debounce en búsqueda, exportación de logs
-- Responsive: en móvil los filtros se apilan, tabla se convierte en cards
-- `cachedAuditLogs` para vista normal, `cachedAuditLogsFull` para vista fullscreen
-- Todas las llamadas a `db.addAuditLog()` en todo el codebase incluyen category y severity
+- `auditEvents.js`: listeners para messageUpdate, messageDelete, guildMemberUpdate, channelCreate/Delete/Update, guildBanAdd/Remove, voiceStateUpdate, emojiCreate/Delete, roleCreate/Delete/Update, boost/unboost
+- API endpoints: GET /api/logs (filtros+paginación), GET /api/logs/stats, GET /api/logs/action-types, GET /api/logs/stats/timeline, GET /api/logs/stats/staff-activity, GET /api/logs/export, GET /api/logs/stream (SSE), GET/POST /api/logs/retention, GET/POST /api/user/:id/profile
+- Frontend con filtros avanzados (texto, categoría, severity, tipo, fechas, usuario), paginación, modo pantalla completa, panel de detalle slide-in con navegación anterior/siguiente y copiar JSON, modal de perfil de usuario
+- Gráfico de actividad (Canvas API, 30 días) y ranking de actividad del staff
+- Server-Sent Events (SSE) para actualizaciones en tiempo real con indicador visual "En vivo"
+- Filtros rápidos: Sanciones hoy, Críticas, Alta gravedad, Última hora, Mensajes borrados, Actividad de voz
+- Exportación mejorada: CSV (UTF-8 BOM), TSV, JSON con exportación server-side sin límite de 1000
+- Notificaciones por DM al staff para eventos MEDIUM (solo admins/owner), HIGH y CRITICAL (todo el staff)
+- Sistema de retención de datos configurable (30/60/90/180/365 días o ilimitada) con purga automática cada 6h
+- Hash routing para deep linking (ej: /panel#logs navega directo a auditoría)
+- Highlight del log más reciente al entrar (scroll + iluminación 1s)
+- Filas HIGH/CRITICAL con borde lateral rojo para resaltado permanente
+- Sin colores grises: category SYSTEM ahora usa violeta (#a064ff)
+- No se generan logs de backup
+- Auto-refresh cada 30 segundos, debounce en búsqueda
+- Responsive: en móvil los filtros se apilan, gráficos apilados, tabla se convierte en cards
 
 ## Estructura de Archivos
 ```

@@ -1,4 +1,7 @@
 const mongoose = require('mongoose');
+const { EventEmitter } = require('events');
+
+const auditEmitter = new EventEmitter();
 
 const MONGODB_URI = process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb://localhost:27017/sirgiobot';
 
@@ -348,7 +351,9 @@ const db = {
 
   async addAuditLog(actionType, odId = null, targetId = null, staffId = null, details = {}, category = 'SYSTEM', severity = 'INFO') {
     const log = new AuditLog({ actionType, odId, targetId, staffId, details, category, severity });
-    return await log.save();
+    const saved = await log.save();
+    auditEmitter.emit('newLog', saved.toObject());
+    return saved;
   },
 
   async getAuditLogs(options = {}) {
@@ -466,10 +471,72 @@ const db = {
     await RateLimit.deleteMany({ timestamp: { $lt: fiveMinutesAgo } });
   },
 
+  async getAuditTimeline(days = 30) {
+    const since = new Date();
+    since.setDate(since.getDate() - days);
+    const pipeline = [
+      { $match: { createdAt: { $gte: since } } },
+      { $group: {
+        _id: {
+          date: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+          category: '$category'
+        },
+        count: { $sum: 1 }
+      }},
+      { $sort: { '_id.date': 1 } }
+    ];
+    const results = await AuditLog.aggregate(pipeline);
+    const timeline = {};
+    results.forEach(r => {
+      const d = r._id.date;
+      if (!timeline[d]) timeline[d] = { total: 0 };
+      timeline[d][r._id.category || 'SYSTEM'] = r.count;
+      timeline[d].total += r.count;
+    });
+    return timeline;
+  },
+
+  async getStaffActivityStats() {
+    const pipeline = [
+      { $match: { staffId: { $ne: null } } },
+      { $group: {
+        _id: '$staffId',
+        totalActions: { $sum: 1 },
+        lastAction: { $max: '$createdAt' },
+        categories: { $push: '$category' }
+      }},
+      { $sort: { totalActions: -1 } }
+    ];
+    const results = await AuditLog.aggregate(pipeline);
+    return results.map(r => {
+      const catCounts = {};
+      (r.categories || []).forEach(c => { catCounts[c] = (catCounts[c] || 0) + 1; });
+      return {
+        staffId: r._id,
+        totalActions: r.totalActions,
+        lastAction: r.lastAction,
+        byCategory: catCounts
+      };
+    });
+  },
+
+  async getAuditRetentionPreview(days) {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - days);
+    return await AuditLog.countDocuments({ createdAt: { $lt: cutoff } });
+  },
+
+  async purgeOldAuditLogs(days) {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - days);
+    const result = await AuditLog.deleteMany({ createdAt: { $lt: cutoff } });
+    return result.deletedCount;
+  },
+
   async query(queryString, params = []) {
     console.warn('SQL query called on MongoDB - this should be migrated');
     return { rows: [] };
   }
 };
 
-module.exports = { connectDB, db, mongoose };
+module.exports = { connectDB, db, mongoose, auditEmitter };

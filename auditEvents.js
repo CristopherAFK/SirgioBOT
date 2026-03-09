@@ -61,6 +61,19 @@ function setupAuditEvents(client) {
           roles: removedRoles.map(r => r.name)
         }, 'USER', 'LOW');
       }
+
+      const oldBoosting = oldMember.premiumSince;
+      const newBoosting = newMember.premiumSince;
+      if (!oldBoosting && newBoosting) {
+        await db.addAuditLog('MEMBER_BOOST', null, newMember.id, null, {
+          userTag: newMember.user.tag,
+          boostSince: newBoosting.toISOString()
+        }, 'USER', 'INFO');
+      } else if (oldBoosting && !newBoosting) {
+        await db.addAuditLog('MEMBER_UNBOOST', null, newMember.id, null, {
+          userTag: newMember.user.tag
+        }, 'USER', 'INFO');
+      }
     } catch (e) {
       console.error('[AuditEvents] Error logging guildMemberUpdate:', e.message);
     }
@@ -150,6 +163,106 @@ function setupAuditEvents(client) {
       }, 'USER', 'INFO');
     } catch (e) {
       console.error('[AuditEvents] Error logging guildMemberRemove:', e.message);
+    }
+  });
+
+  client.on('voiceStateUpdate', async (oldState, newState) => {
+    try {
+      const member = newState.member || oldState.member;
+      if (!member || member.user.bot) return;
+
+      if (!oldState.channelId && newState.channelId) {
+        await db.addAuditLog('VOICE_JOIN', null, member.id, null, {
+          userTag: member.user.tag,
+          channelId: newState.channelId,
+          channelName: newState.channel?.name || 'Desconocido'
+        }, 'USER', 'INFO');
+      } else if (oldState.channelId && !newState.channelId) {
+        await db.addAuditLog('VOICE_LEAVE', null, member.id, null, {
+          userTag: member.user.tag,
+          channelId: oldState.channelId,
+          channelName: oldState.channel?.name || 'Desconocido'
+        }, 'USER', 'INFO');
+      } else if (oldState.channelId && newState.channelId && oldState.channelId !== newState.channelId) {
+        await db.addAuditLog('VOICE_MOVE', null, member.id, null, {
+          userTag: member.user.tag,
+          fromChannelId: oldState.channelId,
+          fromChannelName: oldState.channel?.name || 'Desconocido',
+          toChannelId: newState.channelId,
+          toChannelName: newState.channel?.name || 'Desconocido'
+        }, 'USER', 'INFO');
+      }
+    } catch (e) {
+      console.error('[AuditEvents] Error logging voiceStateUpdate:', e.message);
+    }
+  });
+
+  client.on('emojiCreate', async (emoji) => {
+    try {
+      await db.addAuditLog('EMOJI_CREATE', null, null, null, {
+        emojiName: emoji.name,
+        emojiId: emoji.id,
+        animated: emoji.animated || false
+      }, 'SYSTEM', 'INFO');
+    } catch (e) {
+      console.error('[AuditEvents] Error logging emojiCreate:', e.message);
+    }
+  });
+
+  client.on('emojiDelete', async (emoji) => {
+    try {
+      await db.addAuditLog('EMOJI_DELETE', null, null, null, {
+        emojiName: emoji.name,
+        emojiId: emoji.id,
+        animated: emoji.animated || false
+      }, 'SYSTEM', 'INFO');
+    } catch (e) {
+      console.error('[AuditEvents] Error logging emojiDelete:', e.message);
+    }
+  });
+
+  client.on('roleCreate', async (role) => {
+    try {
+      await db.addAuditLog('ROLE_CREATE', null, null, null, {
+        roleName: role.name,
+        roleId: role.id,
+        color: role.hexColor,
+        mentionable: role.mentionable,
+        hoisted: role.hoist
+      }, 'SYSTEM', 'INFO');
+    } catch (e) {
+      console.error('[AuditEvents] Error logging roleCreate:', e.message);
+    }
+  });
+
+  client.on('roleDelete', async (role) => {
+    try {
+      await db.addAuditLog('ROLE_DELETE', null, null, null, {
+        roleName: role.name,
+        roleId: role.id,
+        color: role.hexColor
+      }, 'SYSTEM', 'MEDIUM');
+    } catch (e) {
+      console.error('[AuditEvents] Error logging roleDelete:', e.message);
+    }
+  });
+
+  client.on('roleUpdate', async (oldRole, newRole) => {
+    try {
+      const changes = [];
+      if (oldRole.name !== newRole.name) changes.push(`Nombre: ${oldRole.name} -> ${newRole.name}`);
+      if (oldRole.hexColor !== newRole.hexColor) changes.push(`Color: ${oldRole.hexColor} -> ${newRole.hexColor}`);
+      if (oldRole.hoist !== newRole.hoist) changes.push(`Destacado: ${newRole.hoist}`);
+      if (oldRole.mentionable !== newRole.mentionable) changes.push(`Mencionable: ${newRole.mentionable}`);
+      if (oldRole.permissions.bitfield !== newRole.permissions.bitfield) changes.push('Permisos modificados');
+      if (changes.length === 0) return;
+      await db.addAuditLog('ROLE_UPDATE', null, null, null, {
+        roleName: newRole.name,
+        roleId: newRole.id,
+        changes
+      }, 'SYSTEM', 'LOW');
+    } catch (e) {
+      console.error('[AuditEvents] Error logging roleUpdate:', e.message);
     }
   });
 

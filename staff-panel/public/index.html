@@ -260,15 +260,42 @@
       <div id="page-logs" class="page" style="display:none">
         <div class="page-header audit-header">
           <div>
-            <h1>Sistema de Auditoria</h1>
+            <h1>Sistema de Auditoria <span class="sse-indicator" id="sse-indicator" title="Desconectado"></span></h1>
             <p>Registro completo de todas las acciones del servidor</p>
           </div>
           <div class="audit-header-actions">
-            <button class="btn btn-sm btn-primary" onclick="toggleAuditFullscreen()" title="Pantalla completa">&#x26F6; Expandir</button>
+            <select id="export-format" class="export-format-select">
+              <option value="csv">CSV</option>
+              <option value="tsv">TSV</option>
+              <option value="json">JSON</option>
+            </select>
             <button class="btn btn-sm" style="background:var(--border)" onclick="exportAuditLogs()" title="Exportar">&#128229; Exportar</button>
+            <button class="btn btn-sm btn-primary" onclick="toggleAuditFullscreen()" title="Pantalla completa">&#x26F6; Expandir</button>
           </div>
         </div>
         <div class="audit-stats-row" id="audit-stats-row"></div>
+
+        <div class="audit-charts-row">
+          <div class="card audit-chart-card">
+            <div class="card-header">&#128200; Actividad (30 dias)</div>
+            <div class="card-body" id="audit-timeline-chart"></div>
+          </div>
+          <div class="card audit-chart-card audit-staff-card">
+            <div class="card-header">&#128101; Actividad del Staff</div>
+            <div class="card-body" id="audit-staff-activity"></div>
+          </div>
+        </div>
+
+        <div class="audit-quick-filters">
+          <span class="quick-filter-label">Filtros rapidos:</span>
+          <button class="btn btn-xs quick-filter-btn" onclick="applyQuickFilter('sanctions-today')">Sanciones hoy</button>
+          <button class="btn btn-xs quick-filter-btn" onclick="applyQuickFilter('critical')">Criticas</button>
+          <button class="btn btn-xs quick-filter-btn" onclick="applyQuickFilter('high')">Alta gravedad</button>
+          <button class="btn btn-xs quick-filter-btn" onclick="applyQuickFilter('last-hour')">Ultima hora</button>
+          <button class="btn btn-xs quick-filter-btn" onclick="applyQuickFilter('deleted-messages')">Mensajes borrados</button>
+          <button class="btn btn-xs quick-filter-btn" onclick="applyQuickFilter('voice')">Actividad de voz</button>
+        </div>
+
         <div class="card audit-filters-card">
           <div class="card-body">
             <button class="btn btn-sm audit-mobile-filter-toggle" onclick="document.getElementById('audit-filters').classList.toggle('filters-collapsed')">&#9776; Filtros</button>
@@ -340,6 +367,25 @@
           </div>
         </div>
         <div class="audit-pagination" id="audit-pagination"></div>
+
+        <div class="card retention-card" id="retention-settings">
+          <div class="card-header">&#128197; Retencion de Datos</div>
+          <div class="card-body">
+            <div class="retention-controls">
+              <select id="retention-days">
+                <option value="0">Ilimitada</option>
+                <option value="30">30 dias</option>
+                <option value="60">60 dias</option>
+                <option value="90">90 dias</option>
+                <option value="180">180 dias</option>
+                <option value="365">1 ano</option>
+              </select>
+              <button class="btn btn-sm btn-primary" onclick="saveRetention()">Guardar</button>
+              <button class="btn btn-sm" style="background:var(--border)" onclick="previewRetention()">Preview</button>
+              <span class="retention-info" id="retention-info"></span>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Audit Fullscreen Overlay -->

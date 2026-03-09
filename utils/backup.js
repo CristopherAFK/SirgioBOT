@@ -47,12 +47,6 @@ async function createBackup(client) {
 
     await cleanupOldBackups();
 
-    await db.addAuditLog('BACKUP_CREATE', null, null, null, {
-      filename: path.basename(backupFile),
-      collections: collections.length,
-      timestamp: backup.timestamp
-    }, 'SYSTEM', 'INFO');
-
   } catch (error) {
     console.error('Error creando backup:', error);
   }
