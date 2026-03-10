@@ -88,7 +88,7 @@ El bot usa **MongoDB** (compatible con MongoDB Atlas) para almacenar:
 - Autenticación por cuentas individuales (hardcoded en routes.js ACCOUNTS)
 - Roles: Helper, Moderador, Admin con permisos diferenciados
 - API REST en `/api/` que ejecuta acciones via Discord.js
-- Herramientas: Warn, Mute, Unmute, Ban, Timeout, Lock/Unlock/Nuke Channel, Clear Messages, Send Embed, Send DM, Edit Message, Block Links, Quarantine, Reduce Warn, View History, Server/User/Role Info
+- Herramientas: Warn, Mute, Unmute, Ban, Timeout, Lock/Unlock/Nuke Channel, Clear Messages, Send Embed, Send DM, Edit Message, Block Links, Quarantine, Reduce Warn, View History, Server/User/Role Info, Create/Edit/Delete Role, Create/Edit/Delete Channel, Channel Info, Members by Role, Emoji List, Invite List, Ban List
 - Búsqueda de usuarios en tiempo real
 
 ### Sistema de Auditoría Avanzado (Staff Panel)
@@ -229,8 +229,30 @@ El bot usa **MongoDB** (compatible con MongoDB Atlas) para almacenar:
 ### Notas Internas del Staff
 - Los miembros del staff pueden añadir notas privadas sobre cualquier usuario
 - Almacenamiento en MongoDB (colección staff_notes)
-- Solo el autor de la nota o un admin/dueño puede eliminarla
+- Auto-carga de todas las notas al abrir la página, con filtro por usuario
+- Edición inline de notas (autor o admin/owner)
+- Solo el autor de la nota o un admin/dueño puede eliminar/editar
+- Cada nota muestra autor, usuario objetivo, fecha y si fue editada
 - Página "Notas Internas" en la barra lateral
+
+### Gestión de Roles (Admin)
+- Crear roles con nombre, color, mencionable y separar en lista
+- Editar roles existentes (nombre, color, opciones)
+- Eliminar roles con confirmación
+- Solo admin/owner tienen permisos
+
+### Gestión de Canales
+- Crear canales (texto/voz/categoría) con categoría padre y tema
+- Editar canales (nombre, tema, slowmode, NSFW, categoría)
+- Eliminar canales con confirmación
+- Solo admin/owner tienen permisos
+
+### Herramientas de Consulta Adicionales
+- Info de Canal: detalles completos del canal (tipo, categoría, NSFW, slowmode, fecha creación)
+- Miembros por Rol: lista de miembros con un rol específico con avatares
+- Lista de Emojis: grid visual de todos los emojis del servidor
+- Lista de Invitaciones: invites activas con usos, creador y canal
+- Lista de Bans: usuarios baneados con razón
 
 ### Asistente IA de Moderación (REMOVIDO)
 - El asistente IA fue removido del Staff Panel en Marzo 2026

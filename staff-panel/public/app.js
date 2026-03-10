@@ -1429,6 +1429,109 @@ function openTool(action) {
       `, `<button class="btn btn-primary" onclick="executeRoleInfo()">Ver Info</button>
          <button class="btn btn-sm" style="background:var(--border)" onclick="closeModal()">Cancelar</button>`);
       break;
+
+    case 'create_role':
+      openModal('Crear Rol', `
+        <div class="form-group"><label>Nombre</label><input type="text" id="crole-name" placeholder="Nombre del rol"></div>
+        <div class="form-group"><label>Color</label><div class="color-picker-wrapper"><input type="color" id="crole-color" value="#38bdf8"><span id="crole-color-text">#38bdf8</span></div></div>
+        <div class="form-group" style="display:flex;align-items:center;gap:12px;"><label style="margin:0">Mencionable</label><label class="toggle-switch"><input type="checkbox" id="crole-mentionable"><span class="toggle-slider"></span></label></div>
+        <div class="form-group" style="display:flex;align-items:center;gap:12px;"><label style="margin:0">Separar en lista</label><label class="toggle-switch"><input type="checkbox" id="crole-hoist"><span class="toggle-slider"></span></label></div>
+      `, `<button class="btn btn-success" onclick="executeCreateRole()">Crear Rol</button>
+         <button class="btn btn-sm" style="background:var(--border)" onclick="closeModal()">Cancelar</button>`);
+      setTimeout(() => {
+        const ci = document.getElementById('crole-color');
+        if (ci) ci.addEventListener('input', e => { document.getElementById('crole-color-text').textContent = e.target.value; });
+      }, 100);
+      break;
+
+    case 'edit_role':
+      openModal('Editar Rol', `
+        <div class="form-group"><label>Rol</label>${roleSelect('erole-role')}</div>
+        <div class="form-group"><label>Nuevo nombre (opcional)</label><input type="text" id="erole-name" placeholder="Dejar vacio para no cambiar"></div>
+        <div class="form-group"><label>Nuevo color (opcional)</label><div class="color-picker-wrapper"><input type="color" id="erole-color" value="#38bdf8"><span id="erole-color-text">#38bdf8</span></div></div>
+        <input type="hidden" id="erole-color-changed" value="0">
+        <div class="form-group" style="display:flex;align-items:center;gap:12px;"><label style="margin:0">Mencionable</label><label class="toggle-switch"><input type="checkbox" id="erole-mentionable"><span class="toggle-slider"></span></label></div>
+        <div class="form-group" style="display:flex;align-items:center;gap:12px;"><label style="margin:0">Separar en lista</label><label class="toggle-switch"><input type="checkbox" id="erole-hoist"><span class="toggle-slider"></span></label></div>
+      `, `<button class="btn btn-primary" onclick="executeEditRole()">Editar Rol</button>
+         <button class="btn btn-sm" style="background:var(--border)" onclick="closeModal()">Cancelar</button>`);
+      setTimeout(() => {
+        const ci = document.getElementById('erole-color');
+        if (ci) ci.addEventListener('input', e => {
+          document.getElementById('erole-color-text').textContent = e.target.value;
+          document.getElementById('erole-color-changed').value = '1';
+        });
+      }, 100);
+      break;
+
+    case 'delete_role':
+      openModal('Eliminar Rol', `
+        <div class="form-group"><label>Rol</label>${roleSelect('drole-role')}</div>
+        <p style="color:var(--danger);font-size:13px;margin-top:8px;">Esta accion es irreversible. El rol sera eliminado permanentemente.</p>
+      `, `<button class="btn btn-danger" onclick="executeDeleteRole()">Eliminar Rol</button>
+         <button class="btn btn-sm" style="background:var(--border)" onclick="closeModal()">Cancelar</button>`);
+      break;
+
+    case 'create_channel':
+      loadCategories('cchannel-category');
+      openModal('Crear Canal', `
+        <div class="form-group"><label>Nombre</label><input type="text" id="cchannel-name" placeholder="nombre-del-canal"></div>
+        <div class="form-group"><label>Tipo</label>
+          <select id="cchannel-type" style="width:100%;padding:10px;background:var(--bg-input);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);">
+            <option value="text">Texto</option><option value="voice">Voz</option><option value="category">Categoria</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Categoria (opcional)</label><select id="cchannel-category" style="width:100%;padding:10px;background:var(--bg-input);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);"><option value="">Sin categoria</option></select></div>
+        <div class="form-group"><label>Tema (opcional, solo texto)</label><input type="text" id="cchannel-topic" placeholder="Tema del canal"></div>
+      `, `<button class="btn btn-success" onclick="executeCreateChannel()">Crear Canal</button>
+         <button class="btn btn-sm" style="background:var(--border)" onclick="closeModal()">Cancelar</button>`);
+      break;
+
+    case 'edit_channel':
+      loadCategories('echannel-category');
+      openModal('Editar Canal', `
+        <div class="form-group"><label>Canal</label>${channelSelect('echannel-channel')}</div>
+        <div class="form-group"><label>Nuevo nombre (opcional)</label><input type="text" id="echannel-name" placeholder="Dejar vacio para no cambiar"></div>
+        <div class="form-group"><label>Nuevo tema (opcional)</label><input type="text" id="echannel-topic" placeholder="Dejar vacio para no cambiar"></div>
+        <div class="form-group"><label>Slowmode (segundos, 0=desactivado)</label><input type="number" id="echannel-slowmode" min="0" max="21600" value="0"></div>
+        <div class="form-group"><label>Mover a categoria</label><select id="echannel-category" style="width:100%;padding:10px;background:var(--bg-input);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);"><option value="">No cambiar</option></select></div>
+        <div class="form-group" style="display:flex;align-items:center;gap:12px;"><label style="margin:0">NSFW</label><label class="toggle-switch"><input type="checkbox" id="echannel-nsfw"><span class="toggle-slider"></span></label></div>
+      `, `<button class="btn btn-primary" onclick="executeEditChannel()">Editar Canal</button>
+         <button class="btn btn-sm" style="background:var(--border)" onclick="closeModal()">Cancelar</button>`);
+      break;
+
+    case 'delete_channel':
+      openModal('Eliminar Canal', `
+        <div class="form-group"><label>Canal</label>${channelSelect('dchannel-channel')}</div>
+        <p style="color:var(--danger);font-size:13px;margin-top:8px;">Esta accion es irreversible. El canal y todos sus mensajes seran eliminados.</p>
+      `, `<button class="btn btn-danger" onclick="executeDeleteChannel()">Eliminar Canal</button>
+         <button class="btn btn-sm" style="background:var(--border)" onclick="closeModal()">Cancelar</button>`);
+      break;
+
+    case 'channel_info':
+      openModal('Info de Canal', `
+        <div class="form-group"><label>Canal</label>${channelSelect('chinfo-channel')}</div>
+      `, `<button class="btn btn-primary" onclick="executeChannelInfo()">Ver Info</button>
+         <button class="btn btn-sm" style="background:var(--border)" onclick="closeModal()">Cancelar</button>`);
+      break;
+
+    case 'member_list':
+      openModal('Miembros por Rol', `
+        <div class="form-group"><label>Rol</label>${roleSelect('memlist-role')}</div>
+      `, `<button class="btn btn-primary" onclick="executeMemberList()">Ver Miembros</button>
+         <button class="btn btn-sm" style="background:var(--border)" onclick="closeModal()">Cancelar</button>`);
+      break;
+
+    case 'emoji_list':
+      executeEmojiList();
+      break;
+
+    case 'invite_list':
+      executeInviteList();
+      break;
+
+    case 'ban_list':
+      executeBanList();
+      break;
   }
 }
 
@@ -1709,6 +1812,217 @@ async function executeRoleInfo() {
   } catch (e) { toast(e.message, 'error'); }
 }
 
+async function executeCreateRole() {
+  const name = document.getElementById('crole-name').value.trim();
+  if (!name) return toast('Indica el nombre del rol', 'error');
+  const color = document.getElementById('crole-color').value;
+  const mentionable = document.getElementById('crole-mentionable').checked;
+  const hoist = document.getElementById('crole-hoist').checked;
+  try {
+    const r = await api('POST', '/action/create-role', { name, color, mentionable, hoist });
+    toast(`Rol "${escapeHtml(r.role.name)}" creado`, 'success');
+    closeModal();
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+async function executeEditRole() {
+  const roleId = document.getElementById('erole-role').value;
+  if (!roleId) return toast('Selecciona un rol', 'error');
+  const body = { roleId };
+  const name = document.getElementById('erole-name').value.trim();
+  if (name) body.name = name;
+  const colorChanged = document.getElementById('erole-color-changed');
+  if (colorChanged && colorChanged.value === '1') body.color = document.getElementById('erole-color').value;
+  const mentionable = document.getElementById('erole-mentionable');
+  const hoist = document.getElementById('erole-hoist');
+  body.mentionable = mentionable.checked;
+  body.hoist = hoist.checked;
+  if (Object.keys(body).length <= 1) return toast('No hay cambios para aplicar', 'error');
+  try {
+    const r = await api('POST', '/action/edit-role', body);
+    toast(`Rol "${escapeHtml(r.role.name)}" editado`, 'success');
+    closeModal();
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+async function executeDeleteRole() {
+  const roleId = document.getElementById('drole-role').value;
+  if (!roleId) return toast('Selecciona un rol', 'error');
+  if (!confirm('Estas seguro de eliminar este rol? Esta accion es irreversible.')) return;
+  try {
+    const r = await api('POST', '/action/delete-role', { roleId });
+    toast(`Rol "${escapeHtml(r.roleName)}" eliminado`, 'success');
+    closeModal();
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+async function loadCategories(selectId) {
+  try {
+    const cats = await api('GET', '/guild/categories');
+    setTimeout(() => {
+      const sel = document.getElementById(selectId);
+      if (!sel) return;
+      cats.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = c.name;
+        sel.appendChild(opt);
+      });
+    }, 150);
+  } catch (e) {}
+}
+
+async function executeCreateChannel() {
+  const name = document.getElementById('cchannel-name').value.trim();
+  if (!name) return toast('Indica el nombre del canal', 'error');
+  const type = document.getElementById('cchannel-type').value;
+  const categoryId = document.getElementById('cchannel-category').value || undefined;
+  const topic = document.getElementById('cchannel-topic').value.trim() || undefined;
+  try {
+    const r = await api('POST', '/action/create-channel', { name, type, categoryId, topic });
+    toast(`Canal "#${escapeHtml(r.channel.name)}" creado`, 'success');
+    closeModal();
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+async function executeEditChannel() {
+  const channelId = document.getElementById('echannel-channel').value;
+  if (!channelId) return toast('Selecciona un canal', 'error');
+  const body = { channelId };
+  const name = document.getElementById('echannel-name').value.trim();
+  const topic = document.getElementById('echannel-topic').value.trim();
+  const slowmodeEl = document.getElementById('echannel-slowmode');
+  const nsfwEl = document.getElementById('echannel-nsfw');
+  const categoryId = document.getElementById('echannel-category').value;
+  if (name) body.name = name;
+  if (topic) body.topic = topic;
+  if (slowmodeEl && slowmodeEl.value !== '0') body.slowmode = slowmodeEl.value;
+  if (nsfwEl && nsfwEl.checked) body.nsfw = true;
+  if (categoryId) body.categoryId = categoryId;
+  if (Object.keys(body).length <= 1) return toast('No hay cambios para aplicar', 'error');
+  try {
+    const r = await api('POST', '/action/edit-channel', body);
+    toast(`Canal "#${escapeHtml(r.channel.name)}" editado`, 'success');
+    closeModal();
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+async function executeDeleteChannel() {
+  const channelId = document.getElementById('dchannel-channel').value;
+  if (!channelId) return toast('Selecciona un canal', 'error');
+  if (!confirm('Estas seguro? El canal y todos sus mensajes seran eliminados permanentemente.')) return;
+  try {
+    const r = await api('POST', '/action/delete-channel', { channelId });
+    toast(`Canal "#${escapeHtml(r.channelName)}" eliminado`, 'success');
+    closeModal();
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+async function executeChannelInfo() {
+  const channelId = document.getElementById('chinfo-channel').value;
+  if (!channelId) return toast('Selecciona un canal', 'error');
+  try {
+    const r = await api('GET', '/info/channel/' + channelId);
+    let html = `<h3 style="margin-bottom:12px;">#${escapeHtml(r.name)}</h3>
+    <div class="stats-grid" style="grid-template-columns:repeat(2,1fr);gap:8px;">
+      <div class="stat-card"><div class="stat-value">${escapeHtml(r.type)}</div><div class="stat-label">Tipo</div></div>
+      <div class="stat-card"><div class="stat-value">${escapeHtml(r.category)}</div><div class="stat-label">Categoria</div></div>
+      <div class="stat-card"><div class="stat-value">${r.nsfw ? 'Si' : 'No'}</div><div class="stat-label">NSFW</div></div>
+      <div class="stat-card"><div class="stat-value">${parseInt(r.slowmode) || 0}s</div><div class="stat-label">Slowmode</div></div>
+      <div class="stat-card"><div class="stat-value">${parseInt(r.position)}</div><div class="stat-label">Posicion</div></div>
+      <div class="stat-card"><div class="stat-value">${new Date(r.createdAt).toLocaleDateString('es')}</div><div class="stat-label">Creado</div></div>
+    </div>
+    <p style="color:var(--text-muted);margin-top:12px;font-size:13px;">Tema: ${escapeHtml(r.topic)}</p>`;
+    document.getElementById('modal-body').innerHTML = html;
+    document.getElementById('modal-footer').innerHTML = `<button class="btn btn-sm" style="background:var(--border)" onclick="closeModal()">Cerrar</button>`;
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+async function executeMemberList() {
+  const roleId = document.getElementById('memlist-role').value;
+  if (!roleId) return toast('Selecciona un rol', 'error');
+  try {
+    const r = await api('GET', '/info/members-by-role/' + roleId);
+    let html = `<h3 style="color:${escapeHtml(r.roleColor || 'inherit')};margin-bottom:12px;">${escapeHtml(r.roleName)} (${r.members.length} miembros)</h3>`;
+    if (r.members.length === 0) {
+      html += '<p style="color:var(--text-muted)">No hay miembros con este rol</p>';
+    } else {
+      html += '<div style="max-height:400px;overflow-y:auto;">' + r.members.map(m =>
+        `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);">
+          <img src="${escapeHtml(m.avatar)}" style="width:24px;height:24px;border-radius:50%;">
+          <span>${escapeHtml(m.displayName)}</span>
+          <span style="color:var(--text-muted);font-size:12px;margin-left:auto;">${escapeHtml(m.tag)}</span>
+        </div>`
+      ).join('') + '</div>';
+    }
+    document.getElementById('modal-body').innerHTML = html;
+    document.getElementById('modal-footer').innerHTML = `<button class="btn btn-sm" style="background:var(--border)" onclick="closeModal()">Cerrar</button>`;
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+async function executeEmojiList() {
+  try {
+    const emojis = await api('GET', '/info/emojis');
+    let html = `<h3 style="margin-bottom:12px;">Emojis del servidor (${parseInt(emojis.length)})</h3>`;
+    if (emojis.length === 0) {
+      html += '<p style="color:var(--text-muted)">No hay emojis personalizados</p>';
+    } else {
+      html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:8px;max-height:400px;overflow-y:auto;">' +
+        emojis.map(e =>
+          `<div style="text-align:center;padding:8px;background:var(--bg-input);border-radius:8px;">
+            <img src="${escapeHtml(e.url)}" style="width:32px;height:32px;" title="${escapeHtml(e.name)}">
+            <div style="font-size:11px;color:var(--text-muted);margin-top:4px;overflow:hidden;text-overflow:ellipsis;">:${escapeHtml(e.name)}:</div>
+          </div>`
+        ).join('') + '</div>';
+    }
+    openModal('Emojis del Servidor', html, `<button class="btn btn-sm" style="background:var(--border)" onclick="closeModal()">Cerrar</button>`);
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+async function executeInviteList() {
+  try {
+    const invites = await api('GET', '/info/invites');
+    let html = `<h3 style="margin-bottom:12px;">Invitaciones (${parseInt(invites.length)})</h3>`;
+    if (invites.length === 0) {
+      html += '<p style="color:var(--text-muted)">No hay invitaciones activas</p>';
+    } else {
+      html += '<div style="max-height:400px;overflow-y:auto;">' + invites.map(i =>
+        `<div style="padding:8px;background:var(--bg-input);border-radius:8px;margin-bottom:6px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="color:var(--accent);font-weight:600;">${escapeHtml(i.code)}</span>
+            <span style="font-size:12px;color:var(--text-muted);">${parseInt(i.uses)}/${escapeHtml(String(i.maxUses))} usos</span>
+          </div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">
+            Por: ${escapeHtml(i.inviter)} | Canal: #${escapeHtml(i.channel)} | ${new Date(i.createdAt).toLocaleDateString('es')}
+          </div>
+        </div>`
+      ).join('') + '</div>';
+    }
+    openModal('Invitaciones del Servidor', html, `<button class="btn btn-sm" style="background:var(--border)" onclick="closeModal()">Cerrar</button>`);
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+async function executeBanList() {
+  try {
+    const bans = await api('GET', '/info/bans');
+    let html = `<h3 style="margin-bottom:12px;">Usuarios Baneados (${parseInt(bans.length)})</h3>`;
+    if (bans.length === 0) {
+      html += '<p style="color:var(--text-muted)">No hay usuarios baneados</p>';
+    } else {
+      html += '<div style="max-height:400px;overflow-y:auto;">' + bans.map(b =>
+        `<div style="display:flex;align-items:center;gap:8px;padding:8px;background:var(--bg-input);border-radius:8px;margin-bottom:6px;">
+          <img src="${escapeHtml(b.avatar)}" style="width:32px;height:32px;border-radius:50%;">
+          <div style="flex:1;">
+            <div style="font-weight:600;">${escapeHtml(b.tag)}</div>
+            <div style="font-size:12px;color:var(--text-muted);">ID: ${escapeHtml(b.id)}</div>
+          </div>
+          <div style="font-size:12px;color:var(--danger);text-align:right;max-width:200px;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(b.reason)}</div>
+        </div>`
+      ).join('') + '</div>';
+    }
+    openModal('Lista de Bans', html, `<button class="btn btn-sm" style="background:var(--border)" onclick="closeModal()">Cerrar</button>`);
+  } catch (e) { toast(e.message, 'error'); }
+}
 
 let currentNotesUserId = null;
 let currentNotesUserTag = null;
@@ -1716,56 +2030,128 @@ let currentNotesUserTag = null;
 function loadNotesPage() {
   currentNotesUserId = null;
   currentNotesUserTag = null;
-  document.getElementById('notes-container').innerHTML = '';
-  document.getElementById('notes-form').style.display = 'none';
   const userInput = document.getElementById('notes-user');
   if (userInput) userInput.value = '';
   const userIdInput = document.getElementById('notes-user_id');
   if (userIdInput) userIdInput.value = '';
+  loadAllNotes();
 }
 
-async function loadNotes() {
-  const userId = document.getElementById('notes-user_id').value;
-  const userTag = document.getElementById('notes-user').value;
-  if (!userId) return toast('Selecciona un usuario primero', 'error');
-  currentNotesUserId = userId;
-  currentNotesUserTag = userTag;
-  document.getElementById('notes-form').style.display = 'block';
+async function loadAllNotes() {
   try {
-    const notes = await api('GET', '/notes/' + userId);
-    const container = document.getElementById('notes-container');
-    if (notes.length === 0) {
-      container.innerHTML = '<div class="card" style="margin-top:16px"><div class="card-body"><div class="empty-state"><div class="empty-icon">&#128221;</div><p>No hay notas para este usuario</p></div></div></div>';
-      return;
-    }
-    container.innerHTML = '<div class="card" style="margin-top:16px"><div class="card-header">&#128203; Notas de ' + userTag + '</div><div class="card-body">' +
-      notes.map(n => {
-        const date = new Date(n.createdAt).toLocaleString('es');
-        const canDelete = n.authorId === currentDiscordId || ['admin', 'owner'].includes(currentRole);
-        const deleteBtn = canDelete ? `<button class="btn btn-sm btn-danger" onclick="deleteNote('${n._id}')">Eliminar</button>` : '';
-        return `<div class="note-card">
-          <div class="note-header">
-            <span class="note-author">${n.authorName}</span>
-            <span class="note-date">${date}</span>
-          </div>
-          <div class="note-content">${n.content.replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>')}</div>
-          ${deleteBtn ? '<div class="note-footer">' + deleteBtn + '</div>' : ''}
-        </div>`;
-      }).join('') + '</div></div>';
+    const notes = await api('GET', '/notes/all');
+    renderNotes(notes, 'Todas las Notas');
   } catch (e) {
     toast('Error cargando notas: ' + e.message, 'error');
   }
 }
 
+async function loadNotes() {
+  const userId = document.getElementById('notes-user_id').value;
+  const userTag = document.getElementById('notes-user').value;
+  if (!userId) return toast('Selecciona un usuario para filtrar', 'error');
+  currentNotesUserId = userId;
+  currentNotesUserTag = userTag;
+  try {
+    const notes = await api('GET', '/notes/' + userId);
+    renderNotes(notes, 'Notas de ' + userTag);
+  } catch (e) {
+    toast('Error cargando notas: ' + e.message, 'error');
+  }
+}
+
+function clearNotesFilter() {
+  currentNotesUserId = null;
+  currentNotesUserTag = null;
+  const userInput = document.getElementById('notes-user');
+  if (userInput) userInput.value = '';
+  const userIdInput = document.getElementById('notes-user_id');
+  if (userIdInput) userIdInput.value = '';
+  loadAllNotes();
+}
+
+function renderNotes(notes, title) {
+  const container = document.getElementById('notes-container');
+  if (notes.length === 0) {
+    container.innerHTML = '<div class="card" style="margin-top:16px"><div class="card-body"><div class="empty-state"><div class="empty-icon">&#128221;</div><p>No hay notas</p></div></div></div>';
+    return;
+  }
+  container.innerHTML = '<div class="card" style="margin-top:16px"><div class="card-header">&#128203; ' + title + ' (' + notes.length + ')</div><div class="card-body">' +
+    notes.map(n => {
+      const date = new Date(n.createdAt).toLocaleString('es');
+      const isAuthor = n.authorId === currentDiscordId;
+      const canModify = isAuthor || ['admin', 'owner'].includes(currentRole);
+      const editBtn = canModify ? `<button class="btn btn-sm btn-primary" onclick="startEditNote('${n._id}')">Editar</button>` : '';
+      const deleteBtn = canModify ? `<button class="btn btn-sm btn-danger" onclick="deleteNote('${n._id}')">Eliminar</button>` : '';
+      const editedInfo = n.editedAt ? `<span style="font-size:11px;color:var(--text-muted);margin-left:8px;">(editado ${new Date(n.editedAt).toLocaleString('es')} por ${escapeHtml(n.editedBy || '?')})</span>` : '';
+      return `<div class="note-card" id="note-${escapeHtml(String(n._id))}">
+        <div class="note-header">
+          <span class="note-author">${escapeHtml(n.authorName)}</span>
+          <span style="color:var(--accent);font-size:12px;">&#8594; ${escapeHtml(n.targetTag || n.targetUserId)}</span>
+          <span class="note-date">${date}${editedInfo}</span>
+        </div>
+        <div class="note-content" id="note-content-${n._id}">${n.content.replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>')}</div>
+        ${(editBtn || deleteBtn) ? '<div class="note-footer">' + editBtn + ' ' + deleteBtn + '</div>' : ''}
+      </div>`;
+    }).join('') + '</div></div>';
+}
+
+function startEditNote(noteId) {
+  const contentEl = document.getElementById('note-content-' + noteId);
+  if (!contentEl) return;
+  const currentContent = contentEl.innerHTML.replace(/<br\s*\/?>/gi, '\n').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+  const noteCard = document.getElementById('note-' + noteId);
+  const footer = noteCard.querySelector('.note-footer');
+  contentEl.innerHTML = `<textarea id="note-edit-${noteId}" style="width:100%;min-height:80px;background:var(--bg-input);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);padding:8px;resize:vertical;">${currentContent}</textarea>`;
+  if (footer) {
+    footer.innerHTML = `<button class="btn btn-sm btn-success" onclick="saveEditNote('${noteId}')">Guardar</button> <button class="btn btn-sm" style="background:var(--border)" onclick="cancelEditNote()">Cancelar</button>`;
+  }
+}
+
+async function saveEditNote(noteId) {
+  const textarea = document.getElementById('note-edit-' + noteId);
+  if (!textarea) return;
+  const content = textarea.value.trim();
+  if (!content) return toast('El contenido no puede estar vacio', 'error');
+  try {
+    await api('PUT', '/notes/' + noteId, { content });
+    toast('Nota editada', 'success');
+    if (currentNotesUserId) {
+      loadNotes();
+    } else {
+      loadAllNotes();
+    }
+  } catch (e) {
+    toast('Error: ' + e.message, 'error');
+  }
+}
+
+function cancelEditNote() {
+  if (currentNotesUserId) {
+    loadNotes();
+  } else {
+    loadAllNotes();
+  }
+}
+
 async function createNote() {
-  if (!currentNotesUserId) return toast('Selecciona un usuario primero', 'error');
+  const userId = document.getElementById('notes-new-user_id')?.value;
+  const userInput = document.getElementById('notes-new-user');
+  const userTag = userInput ? userInput.value : '';
+  if (!userId) return toast('Selecciona un usuario para la nota', 'error');
   const content = document.getElementById('note-content').value.trim();
   if (!content) return toast('Escribe el contenido de la nota', 'error');
   try {
-    await api('POST', '/notes', { targetUserId: currentNotesUserId, targetTag: currentNotesUserTag, content });
+    await api('POST', '/notes', { targetUserId: userId, targetTag: userTag, content });
     toast('Nota guardada', 'success');
     document.getElementById('note-content').value = '';
-    loadNotes();
+    if (userInput) userInput.value = '';
+    document.getElementById('notes-new-user_id').value = '';
+    if (currentNotesUserId) {
+      loadNotes();
+    } else {
+      loadAllNotes();
+    }
   } catch (e) {
     toast('Error: ' + e.message, 'error');
   }
@@ -1776,7 +2162,11 @@ async function deleteNote(noteId) {
   try {
     await api('DELETE', '/notes/' + noteId);
     toast('Nota eliminada', 'success');
-    loadNotes();
+    if (currentNotesUserId) {
+      loadNotes();
+    } else {
+      loadAllNotes();
+    }
   } catch (e) {
     toast('Error: ' + e.message, 'error');
   }

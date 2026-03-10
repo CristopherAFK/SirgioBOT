@@ -103,8 +103,8 @@ function setupStaffPanel(app, client) {
   const ROLE_PERMISSIONS = {
     helper: ['warn', 'mute', 'unmute'],
     moderator: ['warn', 'mute', 'unmute', 'ban', 'timeout', 'send_embed', 'send_dm', 'edit_message', 'block_links'],
-    admin: ['warn', 'mute', 'unmute', 'ban', 'timeout', 'send_embed', 'send_dm', 'edit_message', 'block_links', 'lock_channel', 'unlock_channel', 'nuke_channel', 'clear_messages', 'quarantine', 'reduce_warn', 'view_history', 'user_info', 'server_info', 'role_info'],
-    owner: ['warn', 'mute', 'unmute', 'ban', 'timeout', 'send_embed', 'send_dm', 'edit_message', 'block_links', 'lock_channel', 'unlock_channel', 'nuke_channel', 'clear_messages', 'quarantine', 'reduce_warn', 'view_history', 'user_info', 'server_info', 'role_info']
+    admin: ['warn', 'mute', 'unmute', 'ban', 'timeout', 'send_embed', 'send_dm', 'edit_message', 'block_links', 'lock_channel', 'unlock_channel', 'nuke_channel', 'clear_messages', 'quarantine', 'reduce_warn', 'view_history', 'user_info', 'server_info', 'role_info', 'create_role', 'edit_role', 'delete_role', 'create_channel', 'edit_channel', 'delete_channel', 'channel_info', 'member_list', 'emoji_list', 'invite_list', 'ban_list'],
+    owner: ['warn', 'mute', 'unmute', 'ban', 'timeout', 'send_embed', 'send_dm', 'edit_message', 'block_links', 'lock_channel', 'unlock_channel', 'nuke_channel', 'clear_messages', 'quarantine', 'reduce_warn', 'view_history', 'user_info', 'server_info', 'role_info', 'create_role', 'edit_role', 'delete_role', 'create_channel', 'edit_channel', 'delete_channel', 'channel_info', 'member_list', 'emoji_list', 'invite_list', 'ban_list']
   };
 
   function authenticate(req, res, next) {
@@ -663,6 +663,19 @@ function setupStaffPanel(app, client) {
 
   // === STAFF NOTES ===
 
+  router.get('/notes/all', authenticate, async (req, res) => {
+    try {
+      const notes = await mongoose.connection.db.collection('staff_notes')
+        .find({})
+        .sort({ createdAt: -1 })
+        .limit(200)
+        .toArray();
+      res.json(notes);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   router.get('/notes/:userId', authenticate, async (req, res) => {
     try {
       const notes = await mongoose.connection.db.collection('staff_notes')
@@ -694,6 +707,26 @@ function setupStaffPanel(app, client) {
     }
   });
 
+  router.put('/notes/:noteId', authenticate, async (req, res) => {
+    const { content } = req.body;
+    if (!content) return res.status(400).json({ error: 'Contenido requerido' });
+    try {
+      const { ObjectId } = require('mongodb');
+      const note = await mongoose.connection.db.collection('staff_notes').findOne({ _id: new ObjectId(req.params.noteId) });
+      if (!note) return res.status(404).json({ error: 'Nota no encontrada' });
+      if (note.authorId !== req.session.discordId && !['admin', 'owner'].includes(req.session.role)) {
+        return res.status(403).json({ error: 'Solo el autor o un admin puede editar esta nota' });
+      }
+      await mongoose.connection.db.collection('staff_notes').updateOne(
+        { _id: new ObjectId(req.params.noteId) },
+        { $set: { content, editedAt: new Date(), editedBy: req.session.username } }
+      );
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   router.delete('/notes/:noteId', authenticate, async (req, res) => {
     try {
       const { ObjectId } = require('mongodb');
@@ -707,6 +740,255 @@ function setupStaffPanel(app, client) {
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
+  });
+
+  // === ROLE MANAGEMENT ===
+
+  router.post('/action/create-role', authenticate, async (req, res) => {
+    if (!hasPermission(req, 'create_role')) return res.status(403).json({ error: 'Sin permisos' });
+    const { name, color, mentionable, hoist } = req.body;
+    if (!name) return res.status(400).json({ error: 'Nombre requerido' });
+    try {
+      const guild = getGuild();
+      if (!guild) return res.status(503).json({ error: 'Bot no conectado' });
+      const role = await guild.roles.create({
+        name,
+        color: color || undefined,
+        mentionable: mentionable || false,
+        hoist: hoist || false
+      });
+      await db.addAuditLog('CREATE_ROLE', req.session.discordId, null, null, {
+        staffName: req.session.username, roleName: name, roleId: role.id, color: color || 'default'
+      }, 'SYSTEM', 'MEDIUM');
+      res.json({ success: true, role: { id: role.id, name: role.name, color: role.hexColor } });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.post('/action/edit-role', authenticate, async (req, res) => {
+    if (!hasPermission(req, 'edit_role')) return res.status(403).json({ error: 'Sin permisos' });
+    const { roleId, name, color, mentionable, hoist } = req.body;
+    if (!roleId) return res.status(400).json({ error: 'ID del rol requerido' });
+    try {
+      const guild = getGuild();
+      if (!guild) return res.status(503).json({ error: 'Bot no conectado' });
+      const role = guild.roles.cache.get(roleId);
+      if (!role) return res.status(404).json({ error: 'Rol no encontrado' });
+      const changes = {};
+      if (name !== undefined) changes.name = name;
+      if (color !== undefined) changes.color = color;
+      if (mentionable !== undefined) changes.mentionable = mentionable;
+      if (hoist !== undefined) changes.hoist = hoist;
+      const oldName = role.name;
+      await role.edit(changes);
+      await db.addAuditLog('EDIT_ROLE', req.session.discordId, null, null, {
+        staffName: req.session.username, roleName: oldName, roleId, changes: Object.keys(changes)
+      }, 'SYSTEM', 'MEDIUM');
+      res.json({ success: true, role: { id: role.id, name: role.name, color: role.hexColor } });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.post('/action/delete-role', authenticate, async (req, res) => {
+    if (!hasPermission(req, 'delete_role')) return res.status(403).json({ error: 'Sin permisos' });
+    const { roleId } = req.body;
+    if (!roleId) return res.status(400).json({ error: 'ID del rol requerido' });
+    try {
+      const guild = getGuild();
+      if (!guild) return res.status(503).json({ error: 'Bot no conectado' });
+      const role = guild.roles.cache.get(roleId);
+      if (!role) return res.status(404).json({ error: 'Rol no encontrado' });
+      const roleName = role.name;
+      await role.delete();
+      await db.addAuditLog('PANEL_DELETE_ROLE', req.session.discordId, null, null, {
+        staffName: req.session.username, roleName, roleId
+      }, 'SYSTEM', 'HIGH');
+      res.json({ success: true, roleName });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // === CHANNEL MANAGEMENT ===
+
+  router.post('/action/create-channel', authenticate, async (req, res) => {
+    if (!hasPermission(req, 'create_channel')) return res.status(403).json({ error: 'Sin permisos' });
+    const { name, type, categoryId, topic } = req.body;
+    if (!name) return res.status(400).json({ error: 'Nombre requerido' });
+    try {
+      const guild = getGuild();
+      if (!guild) return res.status(503).json({ error: 'Bot no conectado' });
+      const channelType = type === 'voice' ? 2 : type === 'category' ? 4 : 0;
+      const options = { name, type: channelType };
+      if (categoryId) options.parent = categoryId;
+      if (topic && channelType === 0) options.topic = topic;
+      const channel = await guild.channels.create(options);
+      await db.addAuditLog('PANEL_CREATE_CHANNEL', req.session.discordId, null, null, {
+        staffName: req.session.username, channelName: name, channelId: channel.id, channelType: type || 'text'
+      }, 'CHANNEL', 'MEDIUM');
+      res.json({ success: true, channel: { id: channel.id, name: channel.name } });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.post('/action/edit-channel', authenticate, async (req, res) => {
+    if (!hasPermission(req, 'edit_channel')) return res.status(403).json({ error: 'Sin permisos' });
+    const { channelId, name, topic, nsfw, slowmode, categoryId } = req.body;
+    if (!channelId) return res.status(400).json({ error: 'ID del canal requerido' });
+    try {
+      const guild = getGuild();
+      if (!guild) return res.status(503).json({ error: 'Bot no conectado' });
+      const channel = guild.channels.cache.get(channelId);
+      if (!channel) return res.status(404).json({ error: 'Canal no encontrado' });
+      const changes = {};
+      if (name !== undefined) changes.name = name;
+      if (topic !== undefined) changes.topic = topic;
+      if (nsfw !== undefined) changes.nsfw = nsfw;
+      if (slowmode !== undefined) changes.rateLimitPerUser = parseInt(slowmode) || 0;
+      if (categoryId !== undefined) changes.parent = categoryId || null;
+      const oldName = channel.name;
+      await channel.edit(changes);
+      await db.addAuditLog('PANEL_EDIT_CHANNEL', req.session.discordId, null, null, {
+        staffName: req.session.username, channelName: oldName, channelId, changes: Object.keys(changes)
+      }, 'CHANNEL', 'MEDIUM');
+      res.json({ success: true, channel: { id: channel.id, name: channel.name } });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.post('/action/delete-channel', authenticate, async (req, res) => {
+    if (!hasPermission(req, 'delete_channel')) return res.status(403).json({ error: 'Sin permisos' });
+    const { channelId } = req.body;
+    if (!channelId) return res.status(400).json({ error: 'ID del canal requerido' });
+    try {
+      const guild = getGuild();
+      if (!guild) return res.status(503).json({ error: 'Bot no conectado' });
+      const channel = guild.channels.cache.get(channelId);
+      if (!channel) return res.status(404).json({ error: 'Canal no encontrado' });
+      const channelName = channel.name;
+      await channel.delete();
+      await db.addAuditLog('PANEL_DELETE_CHANNEL', req.session.discordId, null, null, {
+        staffName: req.session.username, channelName, channelId
+      }, 'CHANNEL', 'HIGH');
+      res.json({ success: true, channelName });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // === ADDITIONAL INFO ENDPOINTS ===
+
+  router.get('/info/channel/:channelId', authenticate, async (req, res) => {
+    if (!hasPermission(req, 'channel_info')) return res.status(403).json({ error: 'Sin permisos' });
+    try {
+      const guild = getGuild();
+      if (!guild) return res.status(503).json({ error: 'Bot no conectado' });
+      const channel = guild.channels.cache.get(req.params.channelId);
+      if (!channel) return res.status(404).json({ error: 'Canal no encontrado' });
+      res.json({
+        id: channel.id,
+        name: channel.name,
+        type: channel.type === 0 ? 'Texto' : channel.type === 2 ? 'Voz' : channel.type === 4 ? 'Categoria' : String(channel.type),
+        topic: channel.topic || 'Sin tema',
+        nsfw: channel.nsfw || false,
+        slowmode: channel.rateLimitPerUser || 0,
+        category: channel.parent?.name || 'Sin categoria',
+        createdAt: channel.createdAt,
+        position: channel.position
+      });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.get('/info/members-by-role/:roleId', authenticate, async (req, res) => {
+    if (!hasPermission(req, 'member_list')) return res.status(403).json({ error: 'Sin permisos' });
+    try {
+      const guild = getGuild();
+      if (!guild) return res.status(503).json({ error: 'Bot no conectado' });
+      const role = guild.roles.cache.get(req.params.roleId);
+      if (!role) return res.status(404).json({ error: 'Rol no encontrado' });
+      const members = role.members.map(m => ({
+        id: m.id,
+        tag: m.user.tag,
+        displayName: m.displayName,
+        avatar: m.user.displayAvatarURL({ size: 32 })
+      }));
+      res.json({ roleName: role.name, roleColor: role.hexColor, members });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.get('/info/emojis', authenticate, async (req, res) => {
+    if (!hasPermission(req, 'emoji_list')) return res.status(403).json({ error: 'Sin permisos' });
+    try {
+      const guild = getGuild();
+      if (!guild) return res.status(503).json({ error: 'Bot no conectado' });
+      const emojis = guild.emojis.cache.map(e => ({
+        id: e.id,
+        name: e.name,
+        animated: e.animated,
+        url: e.url
+      }));
+      res.json(emojis);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.get('/info/invites', authenticate, async (req, res) => {
+    if (!hasPermission(req, 'invite_list')) return res.status(403).json({ error: 'Sin permisos' });
+    try {
+      const guild = getGuild();
+      if (!guild) return res.status(503).json({ error: 'Bot no conectado' });
+      const invites = await guild.invites.fetch();
+      const result = invites.map(i => ({
+        code: i.code,
+        url: i.url,
+        uses: i.uses,
+        maxUses: i.maxUses || 'Ilimitado',
+        inviter: i.inviter?.tag || 'Desconocido',
+        channel: i.channel?.name || 'Desconocido',
+        createdAt: i.createdAt,
+        expiresAt: i.expiresAt
+      }));
+      res.json(result);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.get('/info/bans', authenticate, async (req, res) => {
+    if (!hasPermission(req, 'ban_list')) return res.status(403).json({ error: 'Sin permisos' });
+    try {
+      const guild = getGuild();
+      if (!guild) return res.status(503).json({ error: 'Bot no conectado' });
+      const bans = await guild.bans.fetch();
+      const result = bans.map(b => ({
+        id: b.user.id,
+        tag: b.user.tag,
+        avatar: b.user.displayAvatarURL({ size: 32 }),
+        reason: b.reason || 'Sin razon'
+      }));
+      res.json(result);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.get('/guild/categories', authenticate, (req, res) => {
+    const guild = getGuild();
+    if (!guild) return res.status(503).json({ error: 'Bot no conectado' });
+    const categories = guild.channels.cache
+      .filter(c => c.type === 4)
+      .map(c => ({ id: c.id, name: c.name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    res.json(categories);
   });
 
   // === AUDIT LOGS ===

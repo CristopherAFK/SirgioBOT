@@ -153,6 +153,21 @@
           <p>Administra los canales del servidor</p>
         </div>
         <div class="tools-grid">
+          <div class="tool-btn" data-action="create_channel" onclick="openTool('create_channel')">
+            <span class="tool-icon">&#10133;</span>
+            <span class="tool-name">Crear Canal</span>
+            <span class="tool-desc">Nuevo canal</span>
+          </div>
+          <div class="tool-btn" data-action="edit_channel" onclick="openTool('edit_channel')">
+            <span class="tool-icon">&#9998;</span>
+            <span class="tool-name">Editar Canal</span>
+            <span class="tool-desc">Modificar canal</span>
+          </div>
+          <div class="tool-btn" data-action="delete_channel" onclick="openTool('delete_channel')">
+            <span class="tool-icon">&#128465;</span>
+            <span class="tool-name">Eliminar Canal</span>
+            <span class="tool-desc">Eliminar canal</span>
+          </div>
           <div class="tool-btn" data-action="lock_channel" onclick="openTool('lock_channel')">
             <span class="tool-icon">&#128274;</span>
             <span class="tool-name">Bloquear Canal</span>
@@ -228,6 +243,21 @@
             <span class="tool-name">Ver Historial</span>
             <span class="tool-desc">Historial de sanciones</span>
           </div>
+          <div class="tool-btn" data-action="create_role" onclick="openTool('create_role')">
+            <span class="tool-icon">&#10133;</span>
+            <span class="tool-name">Crear Rol</span>
+            <span class="tool-desc">Nuevo rol</span>
+          </div>
+          <div class="tool-btn" data-action="edit_role" onclick="openTool('edit_role')">
+            <span class="tool-icon">&#9998;</span>
+            <span class="tool-name">Editar Rol</span>
+            <span class="tool-desc">Modificar rol</span>
+          </div>
+          <div class="tool-btn" data-action="delete_role" onclick="openTool('delete_role')">
+            <span class="tool-icon">&#128465;</span>
+            <span class="tool-name">Eliminar Rol</span>
+            <span class="tool-desc">Eliminar rol</span>
+          </div>
         </div>
       </div>
 
@@ -252,6 +282,31 @@
             <span class="tool-icon">&#127917;</span>
             <span class="tool-name">Info de Roles</span>
             <span class="tool-desc">Info de rol</span>
+          </div>
+          <div class="tool-btn" data-action="channel_info" onclick="openTool('channel_info')">
+            <span class="tool-icon">&#128172;</span>
+            <span class="tool-name">Info de Canal</span>
+            <span class="tool-desc">Detalles del canal</span>
+          </div>
+          <div class="tool-btn" data-action="member_list" onclick="openTool('member_list')">
+            <span class="tool-icon">&#128101;</span>
+            <span class="tool-name">Miembros por Rol</span>
+            <span class="tool-desc">Lista de miembros</span>
+          </div>
+          <div class="tool-btn" data-action="emoji_list" onclick="openTool('emoji_list')">
+            <span class="tool-icon">&#128522;</span>
+            <span class="tool-name">Emojis</span>
+            <span class="tool-desc">Lista de emojis</span>
+          </div>
+          <div class="tool-btn" data-action="invite_list" onclick="openTool('invite_list')">
+            <span class="tool-icon">&#128279;</span>
+            <span class="tool-name">Invitaciones</span>
+            <span class="tool-desc">Lista de invites</span>
+          </div>
+          <div class="tool-btn" data-action="ban_list" onclick="openTool('ban_list')">
+            <span class="tool-icon">&#128296;</span>
+            <span class="tool-name">Lista de Bans</span>
+            <span class="tool-desc">Usuarios baneados</span>
           </div>
         </div>
       </div>
@@ -357,6 +412,7 @@
                   <button class="btn btn-sm btn-primary" onclick="applyAuditUserFilter()">Filtrar</button>
                   <button class="btn btn-sm" style="background:var(--border)" onclick="clearAuditFilters()">Limpiar</button>
                   <button class="btn btn-sm" style="background:var(--accent)" onclick="searchUserMessages()">&#128269; Mensajes</button>
+                  <button class="btn btn-sm btn-primary" onclick="toggleAuditFullscreen()" title="Pantalla completa">&#x26F6; Expandir</button>
                 </div>
               </div>
             </div>
@@ -464,28 +520,35 @@
         </div>
         <div class="card">
           <div class="card-body">
-            <div class="form-group search-input">
-              <input type="text" id="notes-user" placeholder="Buscar usuario..." oninput="searchUsers('notes-user')">
-              <input type="hidden" id="notes-user_id">
-              <input type="hidden" id="notes-user_tag">
-              <div class="search-results" id="notes-user_results"></div>
+            <div class="notes-top-row">
+              <div class="form-group search-input" style="flex:1;margin:0">
+                <input type="text" id="notes-user" placeholder="Buscar usuario para filtrar..." oninput="searchUsers('notes-user')">
+                <input type="hidden" id="notes-user_id">
+                <input type="hidden" id="notes-user_tag">
+                <div class="search-results" id="notes-user_results"></div>
+              </div>
+              <button class="btn btn-primary" onclick="loadNotes()">Filtrar</button>
+              <button class="btn" style="background:var(--border)" onclick="clearNotesFilter()">Todas</button>
             </div>
-            <button class="btn btn-primary" onclick="loadNotes()" style="margin-top:8px">Cargar Notas</button>
+          </div>
+        </div>
+        <div class="card" style="margin-top:12px">
+          <div class="card-header">&#128221; Nueva Nota</div>
+          <div class="card-body">
+            <div class="notes-top-row" style="margin-bottom:8px">
+              <div class="form-group search-input" style="flex:1;margin:0" id="notes-new-user-group">
+                <input type="text" id="notes-new-user" placeholder="Buscar usuario para la nota..." oninput="searchUsers('notes-new-user')">
+                <input type="hidden" id="notes-new-user_id">
+                <div class="search-results" id="notes-new-user_results"></div>
+              </div>
+            </div>
+            <div class="form-group">
+              <textarea id="note-content" placeholder="Escribe tu nota sobre este usuario..."></textarea>
+            </div>
+            <button class="btn btn-success" onclick="createNote()">Guardar Nota</button>
           </div>
         </div>
         <div id="notes-container"></div>
-        <div id="notes-form" style="display:none">
-          <div class="card" style="margin-top:16px">
-            <div class="card-header">&#128221; Nueva Nota</div>
-            <div class="card-body">
-              <div class="form-group">
-                <label>Contenido</label>
-                <textarea id="note-content" placeholder="Escribe tu nota sobre este usuario..."></textarea>
-              </div>
-              <button class="btn btn-success" onclick="createNote()">Guardar Nota</button>
-            </div>
-          </div>
-        </div>
       </div>
 
     </main>

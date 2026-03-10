@@ -735,6 +735,12 @@ body {
 }
 
 
+.notes-top-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
 .note-card {
   background: var(--bg-input);
   border: 1px solid var(--border);
@@ -746,8 +752,13 @@ body {
 .note-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
   margin-bottom: 8px;
+}
+
+.note-header .note-date {
+  margin-left: auto;
 }
 
 .note-author {
