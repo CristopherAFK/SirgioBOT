@@ -1,18 +1,62 @@
 const { db } = require('./database');
 
 function setupAuditEvents(client) {
+  function extractAttachments(message) {
+    if (!message.attachments || message.attachments.size === 0) return [];
+    return message.attachments.map(att => ({
+      name: att.name || 'unknown',
+      url: att.url || '',
+      proxyURL: att.proxyURL || '',
+      size: att.size || 0,
+      contentType: att.contentType || '',
+      width: att.width || null,
+      height: att.height || null
+    }));
+  }
+
+  function getAttachmentType(contentType, name) {
+    if (!contentType && name) {
+      const ext = name.split('.').pop().toLowerCase();
+      if (['png','jpg','jpeg','gif','webp','bmp','svg'].includes(ext)) return 'image';
+      if (['mp4','webm','mov','avi','mkv'].includes(ext)) return 'video';
+      if (['mp3','ogg','wav','flac','aac'].includes(ext)) return 'audio';
+      return 'file';
+    }
+    if (contentType.startsWith('image/')) return 'image';
+    if (contentType.startsWith('video/')) return 'video';
+    if (contentType.startsWith('audio/')) return 'audio';
+    return 'file';
+  }
+
   client.on('messageUpdate', async (oldMessage, newMessage) => {
     try {
       if (!oldMessage.author || oldMessage.author.bot) return;
-      if (oldMessage.content === newMessage.content) return;
-      await db.addAuditLog('MESSAGE_EDIT', null, oldMessage.author.id, null, {
+      const contentChanged = oldMessage.content !== newMessage.content;
+      const oldAttachments = extractAttachments(oldMessage);
+      const newAttachments = extractAttachments(newMessage);
+      const attachmentsChanged = oldAttachments.length !== newAttachments.length ||
+        oldAttachments.some((a, i) => !newAttachments[i] || a.url !== newAttachments[i].url);
+      if (!contentChanged && !attachmentsChanged) return;
+      const details = {
         channelId: oldMessage.channel.id,
         channelName: oldMessage.channel.name,
         messageId: oldMessage.id,
         userTag: oldMessage.author.tag,
         oldContent: (oldMessage.content || '').substring(0, 500),
         newContent: (newMessage.content || '').substring(0, 500)
-      }, 'MESSAGE', 'INFO');
+      };
+      if (oldAttachments.length > 0) {
+        details.oldAttachments = oldAttachments.map(a => ({ name: a.name, url: a.url, type: getAttachmentType(a.contentType, a.name), size: a.size }));
+      }
+      if (newAttachments.length > 0) {
+        details.newAttachments = newAttachments.map(a => ({ name: a.name, url: a.url, type: getAttachmentType(a.contentType, a.name), size: a.size }));
+      }
+      if (oldAttachments.length > 0 && newAttachments.length < oldAttachments.length) {
+        const removedNames = oldAttachments.filter(oa => !newAttachments.some(na => na.url === oa.url)).map(a => a.name);
+        details.removedAttachments = removedNames;
+      }
+      const severity = (oldAttachments.length > 0 && newAttachments.length < oldAttachments.length) ? 'LOW' : 'INFO';
+      await db.addAuditLog('MESSAGE_EDIT', null, oldMessage.author.id, null, details, 'MESSAGE', severity);
     } catch (e) {
       console.error('[AuditEvents] Error logging messageUpdate:', e.message);
     }
@@ -21,14 +65,28 @@ function setupAuditEvents(client) {
   client.on('messageDelete', async (message) => {
     try {
       if (!message.author || message.author.bot) return;
-      await db.addAuditLog('MESSAGE_DELETE', null, message.author.id, null, {
+      const attachments = extractAttachments(message);
+      const details = {
         channelId: message.channel.id,
         channelName: message.channel.name,
         messageId: message.id,
         userTag: message.author.tag,
         content: (message.content || '').substring(0, 500),
-        hadAttachments: message.attachments?.size > 0
-      }, 'MESSAGE', 'LOW');
+        hadAttachments: attachments.length > 0
+      };
+      if (attachments.length > 0) {
+        details.attachments = attachments.map(a => ({
+          name: a.name,
+          url: a.url,
+          proxyURL: a.proxyURL,
+          type: getAttachmentType(a.contentType, a.name),
+          size: a.size,
+          width: a.width,
+          height: a.height
+        }));
+      }
+      const severity = attachments.length > 0 ? 'MEDIUM' : 'LOW';
+      await db.addAuditLog('MESSAGE_DELETE', null, message.author.id, null, details, 'MESSAGE', severity);
     } catch (e) {
       console.error('[AuditEvents] Error logging messageDelete:', e.message);
     }

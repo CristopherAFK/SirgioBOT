@@ -104,7 +104,11 @@ El bot usa **MongoDB** (compatible con MongoDB Atlas) para almacenar:
 - Notificaciones por DM al staff para eventos MEDIUM (solo admins/owner), HIGH y CRITICAL (todo el staff)
 - Sistema de retención de datos configurable (30/60/90/180/365 días o ilimitada) con purga automática cada 6h
 - Hash routing para deep linking (ej: /panel#logs navega directo a auditoría)
-- Scroll al log más reciente (abajo) al entrar con iluminación 1s
+- Scroll al log más reciente (abajo) al entrar con iluminación 1s - el zoom ignora filtros/stats/gráficos y baja directo a la consola de logs
+- Registro completo de attachments (imágenes, videos, archivos) en MESSAGE_DELETE y MESSAGE_EDIT con nombre, tipo, tamaño y URL
+- Búsqueda de mensajes por usuario: botón "Mensajes" en filtros para ver todos los mensajes de un usuario específico incluyendo contenido multimedia
+- Registro de logins del staff (STAFF_LOGIN) con usuario, rol, fecha y hora - visible en Inicio y en Auditoría
+- Panel de Inicio muestra tabla de logins recientes del staff
 - Logs muestran nombres de usuario en lugar de IDs numéricos (IDs solo en campos explícitos)
 - Filas HIGH/CRITICAL con borde lateral rojo para resaltado permanente
 - Sin colores grises: category SYSTEM ahora usa violeta (#8b5cf6)

@@ -99,9 +99,15 @@
           <p>Vista general del servidor</p>
         </div>
         <div class="stats-grid" id="stats-grid"></div>
-        <div class="card">
-          <div class="card-header">&#128220; Actividad Reciente</div>
-          <div class="card-body" id="recent-logs"></div>
+        <div class="dashboard-two-col">
+          <div class="card">
+            <div class="card-header">&#128220; Actividad Reciente</div>
+            <div class="card-body" id="recent-logs"></div>
+          </div>
+          <div class="card">
+            <div class="card-header">&#128100; Logins del Staff</div>
+            <div class="card-body" id="staff-logins"></div>
+          </div>
         </div>
       </div>
 
@@ -350,9 +356,21 @@
                   <label>&nbsp;</label>
                   <button class="btn btn-sm btn-primary" onclick="applyAuditUserFilter()">Filtrar</button>
                   <button class="btn btn-sm" style="background:var(--border)" onclick="clearAuditFilters()">Limpiar</button>
+                  <button class="btn btn-sm" style="background:var(--accent)" onclick="searchUserMessages()">&#128269; Mensajes</button>
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+
+        <div class="card user-messages-card" id="user-messages-section" style="display:none">
+          <div class="card-header">
+            &#128172; Mensajes del usuario: <span id="user-messages-name"></span>
+            <button class="btn btn-xs" style="float:right;background:var(--border)" onclick="closeUserMessages()">&#10005; Cerrar</button>
+          </div>
+          <div class="card-body">
+            <div id="user-messages-list" class="audit-logs-list"></div>
+            <div class="audit-pagination" id="user-messages-pagination"></div>
           </div>
         </div>
         <div class="card">

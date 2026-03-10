@@ -134,6 +134,38 @@ function loadDashboard(status) {
   `).join('');
 
   loadRecentLogs('recent-logs', 10);
+  loadStaffLogins();
+}
+
+async function loadStaffLogins() {
+  try {
+    const result = await api('GET', '/logs?actionType=STAFF_LOGIN&limit=20');
+    const logs = result.logs || [];
+    const container = document.getElementById('staff-logins');
+    if (!container) return;
+    if (logs.length === 0) {
+      container.innerHTML = '<div class="empty-state"><p>No hay logins registrados</p></div>';
+      return;
+    }
+    container.innerHTML = `<table class="staff-logins-table">
+      <thead><tr><th>Usuario</th><th>Rol</th><th>Fecha</th><th>Hora</th></tr></thead>
+      <tbody>${logs.map(log => {
+        const d = log.details || {};
+        const date = new Date(log.createdAt);
+        const dateStr = date.toLocaleDateString('es', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        const timeStr = date.toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        return `<tr>
+          <td><strong>${escapeHtml(d.staffName || '-')}</strong></td>
+          <td><span class="login-role-badge">${escapeHtml(d.role || '-')}</span></td>
+          <td>${dateStr}</td>
+          <td>${timeStr}</td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table>`;
+  } catch (e) {
+    const container = document.getElementById('staff-logins');
+    if (container) container.innerHTML = '<p style="color:var(--text-muted)">Error cargando logins</p>';
+  }
 }
 
 let auditCurrentPage = 1;
@@ -198,6 +230,18 @@ function formatLogSummary(log) {
   if (d.content && log.actionType === 'MESSAGE_DELETE') {
     parts.push(String(d.content).substring(0, 80));
   }
+  if (d.attachments && Array.isArray(d.attachments) && d.attachments.length > 0) {
+    const icons = { image: '🖼️', video: '🎬', audio: '🎵', file: '📎' };
+    const attSummary = d.attachments.map(a => `${icons[a.type] || '📎'} ${a.name}`).join(', ');
+    parts.push(attSummary);
+  }
+  if (d.oldAttachments && Array.isArray(d.oldAttachments) && d.removedAttachments) {
+    const icons = { image: '🖼️', video: '🎬', audio: '🎵', file: '📎' };
+    parts.push('Archivos eliminados: ' + d.removedAttachments.join(', '));
+  }
+  if (d.role && log.actionType === 'STAFF_LOGIN') {
+    parts.push(`Rol: ${d.role}`);
+  }
   if (d.roles && Array.isArray(d.roles)) parts.push(d.roles.join(', '));
   if (d.changes && Array.isArray(d.changes)) parts.push(d.changes.join(', '));
   return parts.length ? escapeHtml(parts.join(' | ')) : 'Sin detalles';
@@ -222,6 +266,7 @@ async function loadAuditLogs(page) {
     setTimeout(() => {
       const logsContainer = document.getElementById('audit-logs-container');
       if (logsContainer) {
+        logsContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
         logsContainer.scrollTo({ top: logsContainer.scrollHeight, behavior: 'smooth' });
         const lastItem = logsContainer.querySelector('.audit-log-item:last-child');
         if (lastItem) {
@@ -299,10 +344,22 @@ function renderAuditTable(logs, containerId) {
     const idx = logs.length - 1 - i;
     const d = log.details || {};
     let msgPreview = '';
-    if (log.actionType === 'MESSAGE_EDIT' && d.oldContent && d.newContent) {
-      msgPreview = `<div class="audit-msg-preview audit-msg-edit"><span class="msg-label">Antes:</span> <span class="msg-old">${escapeHtml(String(d.oldContent).substring(0, 120))}</span><br><span class="msg-label">Despues:</span> <span class="msg-new">${escapeHtml(String(d.newContent).substring(0, 120))}</span></div>`;
-    } else if (log.actionType === 'MESSAGE_DELETE' && d.content) {
-      msgPreview = `<div class="audit-msg-preview audit-msg-delete"><span class="msg-label">Mensaje:</span> ${escapeHtml(String(d.content).substring(0, 200))}</div>`;
+    if (log.actionType === 'MESSAGE_EDIT' && (d.oldContent || d.newContent)) {
+      msgPreview = `<div class="audit-msg-preview audit-msg-edit"><span class="msg-label">Antes:</span> <span class="msg-old">${escapeHtml(String(d.oldContent || '').substring(0, 120))}</span><br><span class="msg-label">Despues:</span> <span class="msg-new">${escapeHtml(String(d.newContent || '').substring(0, 120))}</span></div>`;
+      if (d.removedAttachments && d.removedAttachments.length > 0) {
+        msgPreview += `<div class="audit-msg-preview audit-msg-attachment"><span class="msg-label">📎 Archivos eliminados:</span> ${escapeHtml(d.removedAttachments.join(', '))}</div>`;
+      }
+    } else if (log.actionType === 'MESSAGE_DELETE') {
+      if (d.content) {
+        msgPreview = `<div class="audit-msg-preview audit-msg-delete"><span class="msg-label">Mensaje:</span> ${escapeHtml(String(d.content).substring(0, 200))}</div>`;
+      }
+      if (d.attachments && d.attachments.length > 0) {
+        const icons = { image: '🖼️', video: '🎬', audio: '🎵', file: '📎' };
+        const attHtml = d.attachments.map(a => `${icons[a.type] || '📎'} ${escapeHtml(a.name)}`).join(', ');
+        msgPreview += `<div class="audit-msg-preview audit-msg-attachment"><span class="msg-label">Archivos:</span> ${attHtml}</div>`;
+      }
+    } else if (log.actionType === 'STAFF_LOGIN') {
+      msgPreview = `<div class="audit-msg-preview audit-msg-login"><span class="msg-label">👤 Login:</span> ${escapeHtml(d.staffName || '')} — Rol: ${escapeHtml(d.role || '')}</div>`;
     }
     const sevClass = sev === 'CRITICAL' ? ' severity-critical-row' : sev === 'HIGH' ? ' severity-high-row' : '';
     return `<div class="audit-log-item ${msgPreview ? 'has-preview' : ''}${sevClass}" onclick="showAuditDetail(${idx}, '${containerId}')">
@@ -394,6 +451,47 @@ function clearAuditFilters() {
   loadAuditLogs(1);
 }
 
+let userMessagesUserId = null;
+let userMessagesPage = 1;
+let cachedUserMessages = [];
+
+function searchUserMessages() {
+  const userId = document.getElementById('audit-user-search_id').value;
+  const userName = document.getElementById('audit-user-search').value;
+  if (!userId) {
+    toast('Selecciona un usuario primero', 'error');
+    return;
+  }
+  userMessagesUserId = userId;
+  document.getElementById('user-messages-name').textContent = userName || userId;
+  document.getElementById('user-messages-section').style.display = 'block';
+  loadUserMessages(1);
+}
+
+async function loadUserMessages(page) {
+  userMessagesPage = page || 1;
+  try {
+    const result = await api('GET', `/logs?userId=${userMessagesUserId}&category=MESSAGE&page=${userMessagesPage}&limit=30`);
+    cachedUserMessages = result.logs || [];
+    const container = document.getElementById('user-messages-list');
+    if (cachedUserMessages.length === 0) {
+      container.innerHTML = '<div class="empty-state"><p>No se encontraron mensajes de este usuario</p></div>';
+    } else {
+      renderAuditTable(cachedUserMessages, 'user-messages-list');
+    }
+    renderAuditPagination(result.page, result.totalPages, result.total, 'user-messages-pagination', loadUserMessages);
+    document.getElementById('user-messages-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } catch (e) {
+    document.getElementById('user-messages-list').innerHTML = '<div class="empty-state"><p>Error cargando mensajes</p></div>';
+  }
+}
+
+function closeUserMessages() {
+  document.getElementById('user-messages-section').style.display = 'none';
+  userMessagesUserId = null;
+  cachedUserMessages = [];
+}
+
 function toggleAuditFullscreen() {
   const overlay = document.getElementById('audit-fullscreen-overlay');
   const isActive = overlay.classList.contains('active');
@@ -408,11 +506,28 @@ function toggleAuditFullscreen() {
   }
 }
 
+function renderAttachmentSection(title, attachments) {
+  const icons = { image: '🖼️', video: '🎬', audio: '🎵', file: '📎' };
+  let html = `<div class="audit-detail-field"><div class="detail-label">${escapeHtml(title)}</div><div class="detail-value attachment-list">`;
+  attachments.forEach(a => {
+    const icon = icons[a.type] || '📎';
+    const sizeStr = a.size ? (a.size > 1048576 ? (a.size / 1048576).toFixed(1) + ' MB' : (a.size / 1024).toFixed(1) + ' KB') : '';
+    html += `<div class="attachment-item">
+      <span class="attachment-icon">${icon}</span>
+      <span class="attachment-name">${escapeHtml(a.name)}</span>
+      <span class="attachment-meta">${escapeHtml(a.type || 'archivo')}${sizeStr ? ' - ' + sizeStr : ''}</span>
+      ${a.url ? `<a href="${escapeHtml(a.url)}" target="_blank" class="attachment-link" onclick="event.stopPropagation()">Ver</a>` : ''}
+    </div>`;
+  });
+  html += '</div></div>';
+  return html;
+}
+
 let currentDetailIdx = 0;
 let currentDetailContainer = '';
 
 function showAuditDetail(idx, containerId) {
-  const logs = containerId === 'audit-logs-list' ? cachedAuditLogs : cachedAuditLogsFull;
+  const logs = containerId === 'audit-logs-list' ? cachedAuditLogs : containerId === 'user-messages-list' ? cachedUserMessages : cachedAuditLogsFull;
   const log = logs[idx];
   if (!log) return;
   currentDetailIdx = idx;
@@ -447,9 +562,12 @@ function showAuditDetail(idx, containerId) {
     authorId: d.authorTag
   };
 
+  const attachmentKeys = ['attachments', 'oldAttachments', 'newAttachments', 'removedAttachments'];
+
   let detailsHtml = '';
   Object.entries(d).forEach(([key, val]) => {
     if (val === null || val === undefined) return;
+    if (attachmentKeys.includes(key)) return;
     let displayVal = val;
     if (Array.isArray(val)) displayVal = val.join(', ');
     else if (typeof val === 'object') displayVal = JSON.stringify(val, null, 2);
@@ -460,6 +578,19 @@ function showAuditDetail(idx, containerId) {
     const label = fieldLabels[key] || key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase());
     detailsHtml += `<div class="audit-detail-field"><div class="detail-label">${escapeHtml(label)}</div><div class="detail-value">${escapeHtml(displayVal)}</div></div>`;
   });
+
+  if (d.attachments && Array.isArray(d.attachments) && d.attachments.length > 0) {
+    detailsHtml += renderAttachmentSection('Archivos adjuntos eliminados', d.attachments);
+  }
+  if (d.oldAttachments && Array.isArray(d.oldAttachments) && d.oldAttachments.length > 0) {
+    detailsHtml += renderAttachmentSection('Archivos antes de editar', d.oldAttachments);
+  }
+  if (d.newAttachments && Array.isArray(d.newAttachments) && d.newAttachments.length > 0) {
+    detailsHtml += renderAttachmentSection('Archivos despues de editar', d.newAttachments);
+  }
+  if (d.removedAttachments && Array.isArray(d.removedAttachments) && d.removedAttachments.length > 0) {
+    detailsHtml += `<div class="audit-detail-field"><div class="detail-label">Archivos eliminados en edicion</div><div class="detail-value" style="color:var(--danger)">${escapeHtml(d.removedAttachments.join(', '))}</div></div>`;
+  }
 
   const targetClickable = log.targetId ? `<span class="detail-value clickable" onclick="openUserProfile('${log.targetId}')">${escapeHtml(d.userTag || d.targetName || log.targetId)}</span>` : '<span class="detail-value">-</span>';
 
@@ -508,14 +639,14 @@ function showAuditDetail(idx, containerId) {
 
 function navigateAuditDetail(direction) {
   const newIdx = currentDetailIdx + direction;
-  const logs = currentDetailContainer === 'audit-logs-list' ? cachedAuditLogs : cachedAuditLogsFull;
+  const logs = currentDetailContainer === 'audit-logs-list' ? cachedAuditLogs : currentDetailContainer === 'user-messages-list' ? cachedUserMessages : cachedAuditLogsFull;
   if (newIdx >= 0 && newIdx < logs.length) {
     showAuditDetail(newIdx, currentDetailContainer);
   }
 }
 
 function copyLogJSON() {
-  const logs = currentDetailContainer === 'audit-logs-list' ? cachedAuditLogs : cachedAuditLogsFull;
+  const logs = currentDetailContainer === 'audit-logs-list' ? cachedAuditLogs : currentDetailContainer === 'user-messages-list' ? cachedUserMessages : cachedAuditLogsFull;
   const log = logs[currentDetailIdx];
   if (!log) return;
   const text = JSON.stringify(log, null, 2);
@@ -732,6 +863,7 @@ function connectAuditSSE() {
         renderAuditTable(cachedAuditLogs, 'audit-logs-list');
         const container = document.getElementById('audit-logs-container');
         if (container) {
+          container.scrollIntoView({ behavior: 'smooth', block: 'start' });
           container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
           const lastItem = container.querySelector('.audit-log-item:last-child');
           if (lastItem) {

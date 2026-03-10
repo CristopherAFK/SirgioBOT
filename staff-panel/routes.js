@@ -138,6 +138,12 @@ function setupStaffPanel(app, client) {
     }
     const token = crypto.randomBytes(32).toString('hex');
     sessions.set(token, { role: account.role, username: account.displayName, discordId: account.discordId, loginAt: Date.now() });
+    const roleLabels = { helper: 'Helper', moderator: 'Moderador', admin: 'Admin', owner: 'Dueño' };
+    db.addAuditLog('STAFF_LOGIN', account.discordId, null, null, {
+      staffName: account.displayName,
+      role: roleLabels[account.role] || account.role,
+      loginTime: new Date().toISOString()
+    }, 'STAFF', 'INFO').catch(e => console.error('[Panel] Error logging staff login:', e.message));
     res.json({ token, role: account.role, username: account.displayName });
   });
 
