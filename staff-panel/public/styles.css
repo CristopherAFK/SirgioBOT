@@ -76,6 +76,28 @@ body {
   margin-bottom: 24px;
 }
 
+.login-code-info {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.login-code-icon {
+  font-size: 48px;
+  display: block;
+  margin-bottom: 12px;
+}
+
+.login-code-info p {
+  margin-bottom: 4px;
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.login-code-hint {
+  color: var(--text-muted) !important;
+  font-size: 12px !important;
+}
+
 .form-group {
   margin-bottom: 16px;
   text-align: left;
@@ -1786,4 +1808,92 @@ body {
   .audit-header-actions { flex-direction: column; }
   .audit-log-item { padding: 10px 12px; }
   .audit-pagination button { padding: 8px 10px; font-size: 13px; }
+}
+
+.attachment-media-preview {
+  margin-top: 8px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.attachment-media-preview img {
+  max-width: 320px;
+  max-height: 240px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  display: block;
+}
+.attachment-media-preview img:hover {
+  transform: scale(1.03);
+  box-shadow: 0 4px 20px rgba(56,189,248,0.25);
+}
+.attachment-media-preview video {
+  max-width: 400px;
+  max-height: 280px;
+  border-radius: 8px;
+  display: block;
+  background: #000;
+}
+.attachment-media-preview audio {
+  width: 100%;
+  max-width: 400px;
+  display: block;
+}
+.attachment-item.has-media {
+  flex-direction: column;
+  align-items: flex-start;
+}
+.attachment-info-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.audit-inline-thumbs {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+.audit-inline-thumb {
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.audit-inline-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 2px 12px rgba(56,189,248,0.3);
+}
+
+.multi-recipients-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+.multi-recipient-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-weight: 500;
+}
+.multi-recipient-remove {
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 700;
+  opacity: 0.7;
+  transition: opacity 0.15s;
+}
+.multi-recipient-remove:hover {
+  opacity: 1;
 }

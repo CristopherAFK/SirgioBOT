@@ -13,19 +13,37 @@
     <div class="login-box">
       <h1>Staff Panel</h1>
       <p>SirgioBOT - Panel de Moderacion</p>
-      <div class="form-group">
-        <label>Usuario</label>
-        <input type="text" id="login-username" placeholder="Ingresa tu usuario" autocomplete="username">
+      <div id="login-form-fields">
+        <div class="form-group">
+          <label>Usuario</label>
+          <input type="text" id="login-username" placeholder="Ingresa tu usuario" autocomplete="username">
+        </div>
+        <div class="form-group">
+          <label>Contraseña</label>
+          <input type="password" id="login-password" placeholder="Ingresa tu contraseña" autocomplete="current-password">
+        </div>
+        <button class="btn btn-primary btn-full" onclick="login()">Iniciar Sesion</button>
+        <script>
+          document.getElementById('login-password').addEventListener('keydown', function(e) { if (e.key === 'Enter') login(); });
+          document.getElementById('login-username').addEventListener('keydown', function(e) { if (e.key === 'Enter') document.getElementById('login-password').focus(); });
+        </script>
       </div>
-      <div class="form-group">
-        <label>Contraseña</label>
-        <input type="password" id="login-password" placeholder="Ingresa tu contraseña" autocomplete="current-password">
+      <div id="login-code-fields" style="display:none">
+        <div class="login-code-info">
+          <span class="login-code-icon">&#128274;</span>
+          <p>Se envio un codigo de 5 digitos a tu DM de Discord</p>
+          <p class="login-code-hint">El codigo expira en 10 minutos</p>
+        </div>
+        <div class="form-group">
+          <label>Codigo de Verificacion</label>
+          <input type="text" id="login-code-input" placeholder="Ingresa el codigo de 5 digitos" maxlength="5" autocomplete="one-time-code" style="text-align:center;font-size:24px;letter-spacing:8px;font-weight:700;">
+        </div>
+        <button class="btn btn-primary btn-full" onclick="verifyCode()">Verificar</button>
+        <button class="btn btn-full" style="background:var(--border);margin-top:8px;" onclick="cancelCode()">Volver al Login</button>
+        <script>
+          document.getElementById('login-code-input').addEventListener('keydown', function(e) { if (e.key === 'Enter') verifyCode(); });
+        </script>
       </div>
-      <button class="btn btn-primary btn-full" onclick="login()">Iniciar Sesion</button>
-      <script>
-        document.getElementById('login-password').addEventListener('keydown', function(e) { if (e.key === 'Enter') login(); });
-        document.getElementById('login-username').addEventListener('keydown', function(e) { if (e.key === 'Enter') document.getElementById('login-password').focus(); });
-      </script>
     </div>
   </div>
 

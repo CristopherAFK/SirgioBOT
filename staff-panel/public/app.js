@@ -36,24 +36,62 @@ function toast(msg, type = 'info') {
   setTimeout(() => el.remove(), 4000);
 }
 
+let pendingCodeId = null;
+
 async function login() {
   const username = document.getElementById('login-username').value;
   const password = document.getElementById('login-password').value;
   if (!username || !password) return toast('Ingresa usuario y contraseña', 'error');
   try {
     const data = await api('POST', '/login', { username, password });
-    sessionToken = data.token;
-    currentRole = data.role;
-    currentUsername = data.username;
-    document.getElementById('login-page').style.display = 'none';
-    document.getElementById('app-page').style.display = 'flex';
-    await initApp();
-    const loginHash = window.location.hash.replace('#', '');
-    if (loginHash && document.getElementById('page-' + loginHash)) {
-      navigateTo(loginHash, true);
+    if (data.requireCode) {
+      pendingCodeId = data.codeId;
+      document.getElementById('login-form-fields').style.display = 'none';
+      document.getElementById('login-code-fields').style.display = 'block';
+      document.getElementById('login-code-input').value = '';
+      document.getElementById('login-code-input').focus();
+      toast('Codigo de verificacion enviado a tu DM de Discord', 'info');
+      return;
     }
+    completeLogin(data);
   } catch (e) {
     toast(e.message, 'error');
+  }
+}
+
+async function verifyCode() {
+  const code = document.getElementById('login-code-input').value.trim();
+  if (!code || !pendingCodeId) return toast('Ingresa el codigo de 5 digitos', 'error');
+  try {
+    const data = await api('POST', '/verify-code', { codeId: pendingCodeId, code });
+    pendingCodeId = null;
+    document.getElementById('login-form-fields').style.display = 'block';
+    document.getElementById('login-code-fields').style.display = 'none';
+    completeLogin(data);
+  } catch (e) {
+    toast(e.message, 'error');
+    if (e.message.includes('expirado') || e.message.includes('invalido') || e.message.includes('bloqueada')) {
+      cancelCode();
+    }
+  }
+}
+
+function cancelCode() {
+  pendingCodeId = null;
+  document.getElementById('login-form-fields').style.display = 'block';
+  document.getElementById('login-code-fields').style.display = 'none';
+}
+
+function completeLogin(data) {
+  sessionToken = data.token;
+  currentRole = data.role;
+  currentUsername = data.username;
+  document.getElementById('login-page').style.display = 'none';
+  document.getElementById('app-page').style.display = 'flex';
+  initApp();
+  const loginHash = window.location.hash.replace('#', '');
+  if (loginHash && document.getElementById('page-' + loginHash)) {
+    navigateTo(loginHash, true);
   }
 }
 
@@ -355,8 +393,10 @@ function renderAuditTable(logs, containerId) {
       }
       if (d.attachments && d.attachments.length > 0) {
         const icons = { image: '🖼️', video: '🎬', audio: '🎵', file: '📎' };
+        const thumbs = d.attachments.filter(a => a.type === 'image' && a.url).slice(0, 3);
+        const thumbHtml = thumbs.length > 0 ? '<div class="audit-inline-thumbs">' + thumbs.map(a => `<img src="${escapeHtml(a.url)}" alt="${escapeHtml(a.name)}" class="audit-inline-thumb" onclick="event.stopPropagation();window.open('${escapeHtml(a.url)}','_blank')">`).join('') + '</div>' : '';
         const attHtml = d.attachments.map(a => `${icons[a.type] || '📎'} ${escapeHtml(a.name)}`).join(', ');
-        msgPreview += `<div class="audit-msg-preview audit-msg-attachment"><span class="msg-label">Archivos:</span> ${attHtml}</div>`;
+        msgPreview += `<div class="audit-msg-preview audit-msg-attachment"><span class="msg-label">Archivos:</span> ${attHtml}${thumbHtml}</div>`;
       }
     } else if (log.actionType === 'STAFF_LOGIN') {
       msgPreview = `<div class="audit-msg-preview audit-msg-login"><span class="msg-label">👤 Login:</span> ${escapeHtml(d.staffName || '')} — Rol: ${escapeHtml(d.role || '')}</div>`;
@@ -512,11 +552,24 @@ function renderAttachmentSection(title, attachments) {
   attachments.forEach(a => {
     const icon = icons[a.type] || '📎';
     const sizeStr = a.size ? (a.size > 1048576 ? (a.size / 1048576).toFixed(1) + ' MB' : (a.size / 1024).toFixed(1) + ' KB') : '';
-    html += `<div class="attachment-item">
-      <span class="attachment-icon">${icon}</span>
-      <span class="attachment-name">${escapeHtml(a.name)}</span>
-      <span class="attachment-meta">${escapeHtml(a.type || 'archivo')}${sizeStr ? ' - ' + sizeStr : ''}</span>
-      ${a.url ? `<a href="${escapeHtml(a.url)}" target="_blank" class="attachment-link" onclick="event.stopPropagation()">Ver</a>` : ''}
+    let mediaPreview = '';
+    if (a.url) {
+      if (a.type === 'image') {
+        mediaPreview = `<div class="attachment-media-preview"><img src="${escapeHtml(a.url)}" alt="${escapeHtml(a.name)}" loading="lazy" onclick="event.stopPropagation();window.open('${escapeHtml(a.url)}','_blank')"></div>`;
+      } else if (a.type === 'video') {
+        mediaPreview = `<div class="attachment-media-preview"><video src="${escapeHtml(a.url)}" controls preload="metadata" onclick="event.stopPropagation()"></video></div>`;
+      } else if (a.type === 'audio') {
+        mediaPreview = `<div class="attachment-media-preview"><audio src="${escapeHtml(a.url)}" controls preload="metadata" onclick="event.stopPropagation()"></audio></div>`;
+      }
+    }
+    html += `<div class="attachment-item${mediaPreview ? ' has-media' : ''}">
+      <div class="attachment-info-row">
+        <span class="attachment-icon">${icon}</span>
+        <span class="attachment-name">${escapeHtml(a.name)}</span>
+        <span class="attachment-meta">${escapeHtml(a.type || 'archivo')}${sizeStr ? ' - ' + sizeStr : ''}</span>
+        ${a.url ? `<a href="${escapeHtml(a.url)}" target="_blank" class="attachment-link" onclick="event.stopPropagation()">Descargar</a>` : ''}
+      </div>
+      ${mediaPreview}
     </div>`;
   });
   html += '</div></div>';
@@ -1144,6 +1197,49 @@ function channelSelect(id) {
   return html;
 }
 
+function multiChannelSelect(id) {
+  const grouped = {};
+  channelsCache.forEach(c => {
+    if (!grouped[c.category]) grouped[c.category] = [];
+    grouped[c.category].push(c);
+  });
+  let html = `<div class="multi-channel-select" style="max-height:200px;overflow-y:auto;background:var(--bg-input);border:1px solid var(--border);border-radius:6px;padding:8px;">`;
+  for (const [cat, chs] of Object.entries(grouped)) {
+    html += `<div style="font-size:11px;color:var(--text-muted);font-weight:600;padding:4px 0;margin-top:4px;">${escapeHtml(cat)}</div>`;
+    chs.forEach(c => {
+      html += `<label style="display:flex;align-items:center;gap:6px;padding:3px 4px;cursor:pointer;font-size:13px;"><input type="checkbox" class="multi-ch-cb" value="${c.id}"><span>#${escapeHtml(c.name)}</span></label>`;
+    });
+  }
+  html += '</div>';
+  return html;
+}
+
+let dmUsersList = [];
+
+function addDMUser() {
+  const userId = document.getElementById('dm-user_id').value;
+  const userTag = document.getElementById('dm-user').value;
+  if (!userId) return toast('Selecciona un usuario primero', 'error');
+  if (dmUsersList.find(u => u.id === userId)) return toast('Usuario ya agregado', 'error');
+  dmUsersList.push({ id: userId, tag: userTag });
+  document.getElementById('dm-user').value = '';
+  document.getElementById('dm-user_id').value = '';
+  renderDMUsersList();
+}
+
+function removeDMUser(userId) {
+  dmUsersList = dmUsersList.filter(u => u.id !== userId);
+  renderDMUsersList();
+}
+
+function renderDMUsersList() {
+  const container = document.getElementById('dm-users-list');
+  if (!container) return;
+  container.innerHTML = dmUsersList.map(u =>
+    `<span class="multi-recipient-tag">${escapeHtml(u.tag)} <span class="multi-recipient-remove" onclick="removeDMUser('${u.id}')">&times;</span></span>`
+  ).join('');
+}
+
 function roleSelect(id) {
   let html = `<select id="${id}" style="width:100%;padding:10px 14px;background:var(--bg-input);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);font-size:14px;">`;
   html += '<option value="">Seleccionar rol...</option>';
@@ -1300,7 +1396,8 @@ function openTool(action) {
 
     case 'send_embed':
       openModal('Send Embed - Enviar Embed', `
-        <div class="form-group"><label>Canal</label>${channelSelect('embed-channel')}</div>
+        <div class="form-group"><label>Canales (selecciona uno o varios)</label><div id="embed-channels-container">${multiChannelSelect('embed-channel')}</div></div>
+        <div class="form-group"><label>Mensaje de texto (opcional, encima del embed)</label><textarea id="embed-message" placeholder="Texto plano que aparecera antes del embed..."></textarea></div>
         <div class="form-group"><label>Titulo</label><input type="text" id="embed-title" placeholder="Titulo del embed"></div>
         <div class="form-group"><label>Descripcion</label><textarea id="embed-desc" placeholder="Descripcion del embed..."></textarea></div>
         <div class="form-group"><label>Color</label>
@@ -1325,8 +1422,9 @@ function openTool(action) {
       break;
 
     case 'send_dm':
+      dmUsersList = [];
       openModal('Send DM - Mensaje Privado', `
-        <div class="form-group"><label>Usuario</label>${userSearchField('dm-user')}</div>
+        <div class="form-group"><label>Usuarios</label>${userSearchField('dm-user')}<div id="dm-users-list" class="multi-recipients-list"></div><button type="button" class="btn btn-sm" style="margin-top:6px;background:var(--accent);" onclick="addDMUser()">+ Agregar usuario</button></div>
         <div class="form-group" style="display:flex;align-items:center;gap:12px;">
           <label style="margin:0">Enviar como embed</label>
           <label class="toggle-switch">
@@ -1637,36 +1735,42 @@ async function executeClearMessages() {
 }
 
 async function executeSendEmbed() {
-  const channelId = document.getElementById('embed-channel').value;
+  const checkedChannels = [...document.querySelectorAll('.multi-ch-cb:checked')].map(cb => cb.value);
+  if (checkedChannels.length === 0) return toast('Selecciona al menos un canal', 'error');
   const title = document.getElementById('embed-title').value;
   const description = document.getElementById('embed-desc').value;
   const color = document.getElementById('embed-color').value;
+  const message = document.getElementById('embed-message')?.value?.trim() || undefined;
   const footer = document.getElementById('embed-footer')?.value?.trim() || undefined;
   const image = document.getElementById('embed-image')?.value?.trim() || undefined;
   const thumbnail = document.getElementById('embed-thumbnail')?.value?.trim() || undefined;
   const authorName = document.getElementById('embed-author-name')?.value?.trim() || undefined;
   const authorIconUrl = document.getElementById('embed-author-icon')?.value?.trim() || undefined;
-  if (!channelId || !title) return toast('Completa canal y titulo', 'error');
+  if (!title) return toast('Indica el titulo del embed', 'error');
   try {
-    await api('POST', '/action/send-embed', { channelId, title, description, color, footer, image, thumbnail, authorName, authorIconUrl });
-    toast('Embed enviado', 'success');
+    const r = await api('POST', '/action/send-embed', { channelIds: checkedChannels, title, description, color, message, footer, image, thumbnail, authorName, authorIconUrl });
+    toast(`Embed enviado a ${r.sent} canal(es)${r.failed ? `, ${r.failed} fallaron` : ''}`, 'success');
     closeModal();
   } catch (e) { toast(e.message, 'error'); }
 }
 
 async function executeSendDM() {
-  const userId = document.getElementById('dm-user_id').value;
+  const singleUserId = document.getElementById('dm-user_id').value;
+  const allUsers = [...dmUsersList];
+  if (singleUserId && !allUsers.find(u => u.id === singleUserId)) {
+    allUsers.push({ id: singleUserId, tag: document.getElementById('dm-user').value });
+  }
+  if (allUsers.length === 0) return toast('Agrega al menos un usuario', 'error');
   const useEmbed = document.getElementById('dm-use-embed').checked;
   const message = document.getElementById('dm-message')?.value?.trim();
   const embedMessage = document.getElementById('dm-embed-message')?.value?.trim();
-  if (!userId) return toast('Selecciona un usuario', 'error');
   if (!useEmbed && !message) return toast('Escribe el mensaje o activa embed', 'error');
   if (useEmbed) {
     const embedTitle = document.getElementById('dm-embed-title')?.value?.trim();
     if (!embedTitle) return toast('Indica el titulo del embed', 'error');
   }
   const body = {
-    userId,
+    userIds: allUsers.map(u => u.id),
     message: useEmbed ? (embedMessage || '') : message,
     useEmbed
   };
@@ -1681,8 +1785,9 @@ async function executeSendDM() {
     body.embedAuthorIconUrl = document.getElementById('dm-embed-author-icon')?.value?.trim() || undefined;
   }
   try {
-    await api('POST', '/action/send-dm', body);
-    toast('DM enviado', 'success');
+    const r = await api('POST', '/action/send-dm', body);
+    toast(`DM enviado a ${r.sent} usuario(s)${r.failed ? `, ${r.failed} fallaron` : ''}`, 'success');
+    dmUsersList = [];
     closeModal();
   } catch (e) { toast(e.message, 'error'); }
 }

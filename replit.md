@@ -101,14 +101,18 @@ El bot usa **MongoDB** (compatible con MongoDB Atlas) para almacenar:
 - Server-Sent Events (SSE) para actualizaciones en tiempo real con indicador visual "En vivo"
 - Filtros rápidos: Sanciones hoy, Críticas, Alta gravedad, Última hora, Mensajes borrados, Actividad de voz
 - Exportación mejorada: CSV (UTF-8 BOM), TSV, JSON con exportación server-side sin límite de 1000
-- Notificaciones por DM al staff para eventos MEDIUM (solo admins/owner), HIGH y CRITICAL (todo el staff)
+- Notificaciones por DM al staff solo para eventos HIGH y CRITICAL (todo el staff recibe ambas)
 - Sistema de retención de datos configurable (30/60/90/180/365 días o ilimitada) con purga automática cada 6h
 - Hash routing para deep linking (ej: /panel#logs navega directo a auditoría)
 - Scroll al log más reciente (abajo) al entrar con iluminación 1s - el zoom ignora filtros/stats/gráficos y baja directo a la consola de logs
 - Registro completo de attachments (imágenes, videos, archivos) en MESSAGE_DELETE y MESSAGE_EDIT con nombre, tipo, tamaño y URL
 - Búsqueda de mensajes por usuario: botón "Mensajes" en filtros para ver todos los mensajes de un usuario específico incluyendo contenido multimedia
-- Registro de logins del staff (STAFF_LOGIN) con usuario, rol, fecha y hora - visible en Inicio y en Auditoría
+- Registro de logins del staff (STAFF_LOGIN) con usuario, rol, fecha y hora - visible en Inicio y en Auditoría (rate-limited: 15 min cooldown por usuario)
 - Panel de Inicio muestra tabla de logins recientes del staff
+- 2FA por Discord DM: código de 5 dígitos con expiración de 10 min, confianza de dispositivo por 48h (IP+UA), bloqueo tras 5 intentos fallidos por 30 min
+- Renderizado inline de media en audit logs: imágenes como thumbnails clickeables, video con reproductor, audio con controles
+- Envío de embeds con texto plano opcional y multi-canal (selección por checkboxes)
+- Envío de DMs a múltiples usuarios con acumulador de destinatarios
 - Logs muestran nombres de usuario en lugar de IDs numéricos (IDs solo en campos explícitos)
 - Filas HIGH/CRITICAL con borde lateral rojo para resaltado permanente
 - Sin colores grises: category SYSTEM ahora usa violeta (#8b5cf6)

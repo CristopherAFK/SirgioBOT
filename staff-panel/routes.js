@@ -127,23 +127,157 @@ function setupStaffPanel(app, client) {
     return client.guilds.cache.first();
   }
 
-  router.post('/login', (req, res) => {
+  const loginLogCooldowns = new Map();
+  const LOGIN_LOG_COOLDOWN_MS = 15 * 60 * 1000;
+
+  const loginCodes = new Map();
+  const trustedDevices = new Map();
+  const loginLockouts = new Map();
+  const LOGIN_CODE_EXPIRY_MS = 10 * 60 * 1000;
+  const TRUSTED_DEVICE_MS = 48 * 60 * 60 * 1000;
+  const MAX_CODE_ATTEMPTS = 5;
+  const LOCKOUT_DURATION_MS = 30 * 60 * 1000;
+
+  function getDeviceFingerprint(req) {
+    const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || 'unknown';
+    const ua = req.headers['user-agent'] || 'unknown';
+    return { ip, ua, key: ip + '|' + ua.substring(0, 100) };
+  }
+
+  function isDeviceTrusted(username, fingerprint) {
+    const devices = trustedDevices.get(username);
+    if (!devices) return false;
+    const now = Date.now();
+    const valid = devices.filter(d => d.trustedUntil > now);
+    trustedDevices.set(username, valid);
+    return valid.some(d => d.key === fingerprint.key);
+  }
+
+  function trustDevice(username, fingerprint) {
+    if (!trustedDevices.has(username)) trustedDevices.set(username, []);
+    const devices = trustedDevices.get(username).filter(d => d.trustedUntil > Date.now());
+    devices.push({ key: fingerprint.key, ip: fingerprint.ip, trustedUntil: Date.now() + TRUSTED_DEVICE_MS });
+    trustedDevices.set(username, devices);
+  }
+
+  router.post('/login', async (req, res) => {
     const { username, password } = req.body;
     if (!username || !password) {
       return res.status(400).json({ error: 'Usuario y contraseña requeridos' });
     }
-    const account = ACCOUNTS[username.toLowerCase()];
+    const uKey = username.toLowerCase();
+    const account = ACCOUNTS[uKey];
     if (!account || account.password !== hashPassword(password)) {
       return res.status(401).json({ error: 'Usuario o contraseña incorrectos' });
     }
+
+    const lockoutUntil = loginLockouts.get(uKey);
+    if (lockoutUntil && Date.now() < lockoutUntil) {
+      const mins = Math.ceil((lockoutUntil - Date.now()) / 60000);
+      return res.status(429).json({ error: `Cuenta bloqueada temporalmente. Intenta en ${mins} minutos.` });
+    }
+
+    const fingerprint = getDeviceFingerprint(req);
+    if (!isDeviceTrusted(uKey, fingerprint)) {
+      if (!client || !client.isReady()) {
+        return res.status(503).json({ error: 'Bot no conectado. No se puede enviar codigo de verificacion.' });
+      }
+      const code = String(Math.floor(10000 + Math.random() * 90000));
+      const codeId = crypto.randomBytes(16).toString('hex');
+      loginCodes.set(codeId, {
+        username: uKey,
+        code,
+        expiresAt: Date.now() + LOGIN_CODE_EXPIRY_MS,
+        attempts: 0
+      });
+
+      try {
+        const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+        const user = await client.users.fetch(account.discordId);
+        const codeEmbed = new EmbedBuilder()
+          .setTitle('🔐 Codigo de Verificacion - Staff Panel')
+          .setDescription(`Tu codigo de acceso al Staff Panel es:\n\n# \`${code}\`\n\nEste codigo expira en **10 minutos**.\nSi no solicitaste este codigo, ignora este mensaje.`)
+          .setColor(0x38bdf8)
+          .addFields(
+            { name: 'IP', value: fingerprint.ip, inline: true },
+            { name: 'Dispositivo', value: (fingerprint.ua || '').substring(0, 50) || 'Desconocido', inline: true }
+          )
+          .setFooter({ text: 'SirgioBOT Staff Panel - Verificacion de seguridad' })
+          .setTimestamp();
+        const row = new ActionRowBuilder().addComponents(
+          new ButtonBuilder()
+            .setCustomId('copy_code_display')
+            .setLabel(code)
+            .setStyle(ButtonStyle.Primary)
+            .setDisabled(true)
+        );
+        await user.send({ embeds: [codeEmbed], components: [row] });
+      } catch (e) {
+        loginCodes.delete(codeId);
+        return res.status(500).json({ error: 'No se pudo enviar el codigo por DM. Verifica que tus DMs esten abiertos.' });
+      }
+
+      return res.json({ requireCode: true, codeId });
+    }
+
     const token = crypto.randomBytes(32).toString('hex');
     sessions.set(token, { role: account.role, username: account.displayName, discordId: account.discordId, loginAt: Date.now() });
-    const roleLabels = { helper: 'Helper', moderator: 'Moderador', admin: 'Admin', owner: 'Dueño' };
-    db.addAuditLog('STAFF_LOGIN', account.discordId, null, null, {
-      staffName: account.displayName,
-      role: roleLabels[account.role] || account.role,
-      loginTime: new Date().toISOString()
-    }, 'STAFF', 'INFO').catch(e => console.error('[Panel] Error logging staff login:', e.message));
+
+    const lastLog = loginLogCooldowns.get(uKey);
+    if (!lastLog || Date.now() - lastLog > LOGIN_LOG_COOLDOWN_MS) {
+      loginLogCooldowns.set(uKey, Date.now());
+      const roleLabels = { helper: 'Helper', moderator: 'Moderador', admin: 'Admin', owner: 'Dueño' };
+      db.addAuditLog('STAFF_LOGIN', account.discordId, null, null, {
+        staffName: account.displayName,
+        role: roleLabels[account.role] || account.role,
+        loginTime: new Date().toISOString()
+      }, 'STAFF', 'INFO').catch(e => console.error('[Panel] Error logging staff login:', e.message));
+    }
+    res.json({ token, role: account.role, username: account.displayName });
+  });
+
+  router.post('/verify-code', (req, res) => {
+    const { codeId, code } = req.body;
+    if (!codeId || !code) return res.status(400).json({ error: 'Codigo requerido' });
+    if (!/^\d{5}$/.test(String(code).trim())) return res.status(400).json({ error: 'El codigo debe ser de 5 digitos' });
+    const entry = loginCodes.get(codeId);
+    if (!entry) return res.status(400).json({ error: 'Codigo invalido o expirado. Inicia sesion nuevamente.' });
+    if (Date.now() > entry.expiresAt) {
+      loginCodes.delete(codeId);
+      return res.status(400).json({ error: 'Codigo expirado. Inicia sesion nuevamente.' });
+    }
+    const uKey = entry.username;
+    const lockoutUntil = loginLockouts.get(uKey);
+    if (lockoutUntil && Date.now() < lockoutUntil) {
+      const mins = Math.ceil((lockoutUntil - Date.now()) / 60000);
+      return res.status(429).json({ error: `Cuenta bloqueada temporalmente. Intenta en ${mins} minutos.` });
+    }
+    if (String(code).trim() !== entry.code) {
+      entry.attempts++;
+      if (entry.attempts >= MAX_CODE_ATTEMPTS) {
+        loginCodes.delete(codeId);
+        loginLockouts.set(uKey, Date.now() + LOCKOUT_DURATION_MS);
+        return res.status(429).json({ error: 'Demasiados intentos fallidos. Cuenta bloqueada por 30 minutos.' });
+      }
+      return res.status(401).json({ error: `Codigo incorrecto. Intentos restantes: ${MAX_CODE_ATTEMPTS - entry.attempts}` });
+    }
+    loginCodes.delete(codeId);
+    loginLockouts.delete(uKey);
+    const account = ACCOUNTS[uKey];
+    const fingerprint = getDeviceFingerprint(req);
+    trustDevice(uKey, fingerprint);
+    const token = crypto.randomBytes(32).toString('hex');
+    sessions.set(token, { role: account.role, username: account.displayName, discordId: account.discordId, loginAt: Date.now() });
+    const lastLog = loginLogCooldowns.get(uKey);
+    if (!lastLog || Date.now() - lastLog > LOGIN_LOG_COOLDOWN_MS) {
+      loginLogCooldowns.set(uKey, Date.now());
+      const roleLabels = { helper: 'Helper', moderator: 'Moderador', admin: 'Admin', owner: 'Dueño' };
+      db.addAuditLog('STAFF_LOGIN', account.discordId, null, null, {
+        staffName: account.displayName,
+        role: roleLabels[account.role] || account.role,
+        loginTime: new Date().toISOString()
+      }, 'STAFF', 'INFO').catch(e => console.error('[Panel] Error logging staff login:', e.message));
+    }
     res.json({ token, role: account.role, username: account.displayName });
   });
 
@@ -428,13 +562,12 @@ function setupStaffPanel(app, client) {
 
   router.post('/action/send-embed', authenticate, async (req, res) => {
     if (!hasPermission(req, 'send_embed')) return res.status(403).json({ error: 'Sin permisos' });
-    const { channelId, title, description, color, footer, image, thumbnail, authorName, authorIconUrl, timestamp } = req.body;
-    if (!channelId || !title) return res.status(400).json({ error: 'Faltan canal y título' });
+    const { channelId, channelIds, title, description, color, message, footer, image, thumbnail, authorName, authorIconUrl } = req.body;
+    const targets = channelIds || (channelId ? [channelId] : []);
+    if (targets.length === 0 || !title) return res.status(400).json({ error: 'Faltan canal(es) y título' });
     try {
       const guild = getGuild();
       if (!guild) return res.status(503).json({ error: 'Bot no conectado' });
-      const channel = guild.channels.cache.get(channelId);
-      if (!channel) return res.status(404).json({ error: 'Canal no encontrado' });
       const embed = new EmbedBuilder()
         .setTitle(title)
         .setColor(color ? parseInt(String(color).replace('#', ''), 16) : 0x5865F2);
@@ -443,10 +576,25 @@ function setupStaffPanel(app, client) {
       if (image) embed.setImage(image);
       if (thumbnail) embed.setThumbnail(thumbnail);
       if (authorName) embed.setAuthor({ name: authorName, iconURL: authorIconUrl || undefined });
-      if (timestamp !== false) embed.setTimestamp();
-      await channel.send({ embeds: [embed] });
-      await db.addAuditLog('SEND_EMBED', null, channelId, req.session.discordId, { title, channelName: channel.name, staffName: req.session.username }, 'STAFF', 'INFO');
-      res.json({ success: true, channel: channel.name });
+      embed.setTimestamp();
+      let sent = 0, failed = 0;
+      const channelNames = [];
+      for (const chId of targets) {
+        try {
+          const channel = guild.channels.cache.get(chId);
+          if (!channel) { failed++; continue; }
+          await channel.send({ content: message || undefined, embeds: [embed] });
+          channelNames.push(channel.name);
+          sent++;
+        } catch (e) { failed++; }
+      }
+      if (sent > 0) {
+        await db.addAuditLog('SEND_EMBED', null, targets[0], req.session.discordId, {
+          title, channelNames: channelNames.join(', '), channelCount: sent, staffName: req.session.username
+        }, 'STAFF', 'INFO');
+      }
+      if (sent === 0) return res.status(500).json({ error: 'No se pudo enviar a ningun canal', sent, failed });
+      res.json({ success: true, sent, failed });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
@@ -454,15 +602,15 @@ function setupStaffPanel(app, client) {
 
   router.post('/action/send-dm', authenticate, async (req, res) => {
     if (!hasPermission(req, 'send_dm')) return res.status(403).json({ error: 'Sin permisos' });
-    const { userId, message, useEmbed, embedTitle, embedDescription, embedColor, embedFooter, embedImage, embedThumbnail, embedAuthorName, embedAuthorIconUrl } = req.body;
-    if (!userId) return res.status(400).json({ error: 'Falta usuario' });
+    const { userId, userIds, message, useEmbed, embedTitle, embedDescription, embedColor, embedFooter, embedImage, embedThumbnail, embedAuthorName, embedAuthorIconUrl } = req.body;
+    const targets = userIds || (userId ? [userId] : []);
+    if (targets.length === 0) return res.status(400).json({ error: 'Falta usuario(s)' });
     if (!useEmbed && !message) return res.status(400).json({ error: 'Indica mensaje de texto o activa envío como embed' });
     if (useEmbed && !embedTitle) return res.status(400).json({ error: 'Para embed indica al menos el título' });
     try {
-      const user = await client.users.fetch(userId).catch(() => null);
-      if (!user) return res.status(404).json({ error: 'Usuario no encontrado' });
+      let dmEmbed = null;
       if (useEmbed) {
-        const dmEmbed = new EmbedBuilder()
+        dmEmbed = new EmbedBuilder()
           .setTitle(embedTitle)
           .setColor(embedColor ? parseInt(String(embedColor).replace('#', ''), 16) : 0x5865F2)
           .setTimestamp();
@@ -471,13 +619,30 @@ function setupStaffPanel(app, client) {
         if (embedImage) dmEmbed.setImage(embedImage);
         if (embedThumbnail) dmEmbed.setThumbnail(embedThumbnail);
         if (embedAuthorName) dmEmbed.setAuthor({ name: embedAuthorName, iconURL: embedAuthorIconUrl || undefined });
-        await user.send({ content: message || undefined, embeds: [dmEmbed] });
-      } else {
-        await user.send(message);
+      }
+      let sent = 0, failed = 0;
+      const userTags = [];
+      for (const uid of targets) {
+        try {
+          const user = await client.users.fetch(uid).catch(() => null);
+          if (!user) { failed++; continue; }
+          if (useEmbed) {
+            await user.send({ content: message || undefined, embeds: [dmEmbed] });
+          } else {
+            await user.send(message);
+          }
+          userTags.push(user.tag);
+          sent++;
+        } catch (e) { failed++; }
       }
       const preview = message ? message.substring(0, 100) : (embedTitle || '');
-      await db.addAuditLog('SEND_DM', null, userId, req.session.discordId, { messagePreview: preview, staffName: req.session.username, userTag: user.tag }, 'STAFF', 'INFO');
-      res.json({ success: true, user: user.tag });
+      if (sent > 0) {
+        await db.addAuditLog('SEND_DM', null, targets[0], req.session.discordId, {
+          messagePreview: preview, staffName: req.session.username, userTags: userTags.join(', '), recipientCount: sent
+        }, 'STAFF', 'INFO');
+      }
+      if (sent === 0) return res.status(500).json({ error: 'No se pudo enviar DM a ningun usuario', sent, failed });
+      res.json({ success: true, sent, failed });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
@@ -1292,7 +1457,7 @@ function setupStaffPanel(app, client) {
     try {
       if (!client || !client.isReady()) return;
       const sev = log.severity;
-      if (!['MEDIUM', 'HIGH', 'CRITICAL'].includes(sev)) return;
+      if (!['HIGH', 'CRITICAL'].includes(sev)) return;
 
       const embed = new EmbedBuilder()
         .setColor(SEVERITY_COLORS[sev] || 0xfaa61a)
@@ -1310,10 +1475,7 @@ function setupStaffPanel(app, client) {
       if (d.reason) embed.addFields({ name: 'Razon', value: String(d.reason).substring(0, 200) });
       if (d.channelName) embed.addFields({ name: 'Canal', value: `#${d.channelName}`, inline: true });
 
-      const staffToNotify = Object.values(ACCOUNTS).filter(a => {
-        if (sev === 'MEDIUM') return ['admin', 'owner'].includes(a.role);
-        return true;
-      });
+      const staffToNotify = Object.values(ACCOUNTS);
 
       for (const staff of staffToNotify) {
         if (staff.discordId === log.staffId) continue;
