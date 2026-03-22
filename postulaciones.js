@@ -14,6 +14,7 @@ const {
 } = require('discord.js');
 
 const POSTULACIONES_CHANNEL_ID = '1435093988196618383';
+const POSTULACIONES_CHANNEL_ID_2 = '1484745920074485912';
 const SUBMISSIONS_CHANNEL_ID = '1435091853308461179';
 const { GUILD_ID, ADMIN_ROLE_ID } = require('./config');
 const STAFF_ROLE_ID = ADMIN_ROLE_ID;
@@ -49,8 +50,11 @@ const categories = {
   'twitch_mod': 'Twitch MOD',
   'editor': 'Editor de Sirgio',
   'programador': 'Discord Programador',
-  'helper': 'Helper'
+  'helper': 'Helper',
+  'tester': 'Tester'
 };
+
+const ELIGIBLE_CATEGORIES = ['tester'];
 
 const questions = {
   'tiktok_mod': [
@@ -87,6 +91,10 @@ const questions = {
     { id: 'experience', label: '¿Has ayudado en otras comunidades?', style: TextInputStyle.Paragraph },
     { id: 'problem', label: '¿Qué haces si no sabes resolver algo?', style: TextInputStyle.Paragraph },
     { id: 'schedule', label: '¿En qué horario estás activo?', style: TextInputStyle.Short }
+  ],
+  'tester': [
+    { id: 'why', label: '¿Por qué quieres ser Tester?', style: TextInputStyle.Paragraph },
+    { id: 'account_info', label: 'Información básica de tu cuenta', style: TextInputStyle.Paragraph }
   ]
 };
 
@@ -108,7 +116,8 @@ module.exports = (client) => {
               { name: 'Twitch MOD', value: 'twitch_mod' },
               { name: 'Editor de Sirgio', value: 'editor' },
               { name: 'Discord Programador', value: 'programador' },
-              { name: 'Helper', value: 'helper' }
+              { name: 'Helper', value: 'helper' },
+              { name: 'Tester', value: 'tester' }
             )
         ),
       new SlashCommandBuilder()
@@ -152,9 +161,10 @@ module.exports = (client) => {
       if (commandName === 'postular') {
         const hasStaffRole = interaction.member.roles.cache.has(STAFF_ROLE_ID);
 
-        if (interaction.channelId !== POSTULACIONES_CHANNEL_ID) {
+        const allowedChannels = [POSTULACIONES_CHANNEL_ID, POSTULACIONES_CHANNEL_ID_2];
+        if (!allowedChannels.includes(interaction.channelId)) {
           return interaction.reply({ 
-            content: `❌ Este comando solo puede usarse en <#${POSTULACIONES_CHANNEL_ID}>`, 
+            content: `❌ Este comando solo puede usarse en <#${POSTULACIONES_CHANNEL_ID}> o <#${POSTULACIONES_CHANNEL_ID_2}>`, 
             ephemeral: true 
           });
         }
@@ -169,6 +179,13 @@ module.exports = (client) => {
         const categoria = interaction.options.getString('categoria');
         const categoryName = categories[categoria];
         const categoryQuestions = questions[categoria];
+
+        if (!ELIGIBLE_CATEGORIES.includes(categoria)) {
+          return interaction.reply({
+            content: '❌ No te puedes postular como este rol actualmente.',
+            ephemeral: true
+          });
+        }
 
         const modal = new ModalBuilder()
           .setCustomId(`postulacion|${categoria}|${interaction.user.id}`)
