@@ -122,7 +122,13 @@ module.exports = (client) => {
         ),
       new SlashCommandBuilder()
         .setName('estado_postulaciones')
-        .setDescription('Ver el estado actual de las postulaciones')
+        .setDescription('Ver el estado actual de las postulaciones'),
+      new SlashCommandBuilder()
+        .setName('abrir_postulaciones')
+        .setDescription('Abrir las postulaciones (Solo Staff)'),
+      new SlashCommandBuilder()
+        .setName('cerrar_postulaciones')
+        .setDescription('Cerrar las postulaciones (Solo Staff)')
     ];
 
     try {
@@ -156,6 +162,36 @@ module.exports = (client) => {
           .setTimestamp();
 
         await interaction.reply({ embeds: [embed], ephemeral: true });
+      }
+
+      if (commandName === 'abrir_postulaciones') {
+        const hasStaffRole = interaction.member.roles.cache.has(STAFF_ROLE_ID);
+        if (!hasStaffRole) {
+          return interaction.reply({ content: '❌ No tienes permisos para usar este comando.', ephemeral: true });
+        }
+        postulacionesAbiertas = true;
+        saveStatus();
+        const embed = new EmbedBuilder()
+          .setTitle('✅ Postulaciones Abiertas')
+          .setDescription('Las postulaciones han sido **abiertas**. Los usuarios ya pueden postularse.')
+          .setColor(0x00ff00)
+          .setTimestamp();
+        await interaction.reply({ embeds: [embed] });
+      }
+
+      if (commandName === 'cerrar_postulaciones') {
+        const hasStaffRole = interaction.member.roles.cache.has(STAFF_ROLE_ID);
+        if (!hasStaffRole) {
+          return interaction.reply({ content: '❌ No tienes permisos para usar este comando.', ephemeral: true });
+        }
+        postulacionesAbiertas = false;
+        saveStatus();
+        const embed = new EmbedBuilder()
+          .setTitle('🔒 Postulaciones Cerradas')
+          .setDescription('Las postulaciones han sido **cerradas**. Los usuarios ya no pueden postularse.')
+          .setColor(0xff0000)
+          .setTimestamp();
+        await interaction.reply({ embeds: [embed] });
       }
 
       if (commandName === 'postular') {
