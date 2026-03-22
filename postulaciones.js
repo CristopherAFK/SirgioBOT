@@ -401,10 +401,9 @@ module.exports = (client) => {
 
     try {
       await message.delete();
-      const notice = await message.channel.send({
-        content: `<@${message.author.id}> Este canal es solo para postulaciones. Usa el comando \`/postular\` para enviar tu solicitud.`
-      });
-      setTimeout(() => notice.delete().catch(() => {}), 5000);
+      await message.author.send({
+        content: `Este canal es solo para postulaciones. Usa el comando \`/postular\` en <#${message.channelId}> para enviar tu solicitud.`
+      }).catch(() => {});
     } catch (err) {
       console.error('Error borrando mensaje en canal de postulaciones:', err);
     }
